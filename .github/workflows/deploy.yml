@@ -1,0 +1,46 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow only one concurrent deployment, queueing newer runs and canceling
+# older in-progress ones to avoid stale deployments racing each other.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+# Required for OIDC-based deploys via actions/deploy-pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Only ship the static site files — keeps node_modules, tests,
+          # source plans, and dev artifacts out of the public deployment.
+          path: |
+            index.html
+            svg-icons.js
+            audio
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
