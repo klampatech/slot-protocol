@@ -53,10 +53,15 @@
         #sb { position: absolute; bottom: 15px; right: 15px; padding: 8px 16px; background: transparent; border: 1px solid #ff00ff; color: #ff00ff; font-family: Courier New, monospace; font-size: 12px; cursor: pointer; pointer-events: auto; display: none; z-index: 15; }
         #sb.on { display: block; }
         #sb:hover { background: #ff00ff; color: #0a0a12; }
-        #toast { position: absolute; bottom: 80px; right: 15px; background: #1a1a2e; border: 2px solid #ffff00; box-shadow: 0 0 15px rgba(255,255,0,0.3); padding: 10px 15px; opacity: 0; transform: translateX(100px); transition: all 0.3s; pointer-events: none; z-index: 50; border-radius: 2px; }
+        #toast { position: absolute; bottom: 80px; right: 15px; background: #1a1a2e; border: 2px solid #ffff00; box-shadow: 0 0 15px rgba(255,255,0,0.3); padding: 10px 15px; opacity: 0; transform: translateX(100px); transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); pointer-events: none; z-index: 50; border-radius: 4px; display: flex; align-items: center; gap: 12px; }
         #toast.on { opacity: 1; transform: translateX(0); }
-        .tn { font-size: 14px; color: #ffff00; text-shadow: 0 0 10px #ffff00; }
+        #toast.achievement { border-color: #ffcc00; box-shadow: 0 0 20px rgba(255,204,0,0.5), 0 0 40px rgba(255,204,0,0.2); }
+        .toast-icon { width: 40px; height: 40px; flex-shrink: 0; }
+        .toast-icon svg { width: 100%; height: 100%; }
+        .tn { font-size: 14px; color: #ffff00; text-shadow: 0 0 10px #ffff00; font-weight: bold; }
         .td { font-size: 11px; color: #8888aa; margin-top: 3px; }
+        @keyframes toast-glow { 0%, 100% { filter: drop-shadow(0 0 5px #ffcc00); } 50% { filter: drop-shadow(0 0 15px #ffcc00); } }
+        @keyframes toast-bounce { 0% { transform: translateX(100px) scale(0.8); } 60% { transform: translateX(-5px) scale(1.05); } 100% { transform: translateX(0) scale(1); } }
         .sg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px; max-width: 450px; }
         .si { background: #1a1a2e; border: 1px solid #555566; padding: 10px; text-align: center; cursor: pointer; }
         .si.disabled { opacity: 0.5; cursor: not-allowed; }
@@ -161,6 +166,19 @@
         .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 10px rgba(0,255,242,0.5); transform: scale(1.1); }
         .slot-pool-item.dragging { opacity: 0.5; }
         .slot-arranging-section { margin: 15px 0; text-align: center; }
+        /* Menu decorative styles */
+        .menu-decorative { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px; }
+        .menu-icon svg { display: block; }
+        .menu-divider { width: 40px; height: 2px; background: linear-gradient(90deg, transparent, #00fff2, transparent); }
+        .menu-stats { display: flex; flex-direction: column; gap: 8px; margin: 15px 0; text-align: left; max-width: 250px; }
+        .menu-stat { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #8888aa; }
+        .menu-stat-icon { width: 20px; height: 20px; flex-shrink: 0; }
+        .menu-stat-icon svg { width: 100%; height: 100%; }
+        .menu-stat .stat-label { color: #8888aa; }
+        .menu-stat .stat-value { color: #ffff00; }
+        .menu-footer-decor { margin-top: 15px; opacity: 0.5; }
+        .footer-icon { display: inline-block; animation: pulse-right 2s ease-in-out infinite; }
+        @keyframes pulse-right { 0%, 100% { transform: translateX(0); opacity: 0.3; } 50% { transform: translateX(5px); opacity: 0.7; } }
         .slot-arrows { color: #8888aa; margin: 0 10px; align-self: center; }
         /* ========== SVG ICON DEFINITIONS ========== */
         .svg-icon { display: inline-block; width: 24px; height: 24px; vertical-align: middle; }
@@ -190,14 +208,21 @@
         
         <!-- MENU OVERLAY -->
         <div id="menu" class="ov on">
+            <div class="menu-decorative">
+                <span class="menu-icon svg-icon svg-icon-32" style="width:40px;height:40px;"><svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg></span>
+                <span class="menu-divider"></span>
+                <span class="menu-icon svg-icon svg-icon-32" style="width:40px;height:40px;"><svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg></span>
+                <span class="menu-divider"></span>
+                <span class="menu-icon svg-icon svg-icon-32" style="width:40px;height:40px;"><svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg></span>
+            </div>
             <h1>SLOT PROTOCOL</h1>
             <h2>Rogue Pachinko</h2>
             <p>Drop balls through peg boards, hit targets, survive the floors.</p>
-            <div style="margin:15px;text-align:center;color:#8888aa;font-size:12px;">
-                <div class="stat-line"><span class="stat-label">Best Score:</span> <span class="stat-value" id="msc">0</span></div>
-                <div class="stat-line"><span class="stat-label">Best Floor:</span> <span class="stat-value" id="mfl">0</span></div>
-                <div class="stat-line"><span class="stat-label">Credits:</span> <span class="stat-value" id="mcr">0</span></div>
-                <div class="stat-line"><span class="stat-label">Total Runs:</span> <span class="stat-value" id="mtr">0</span></div>
+            <div class="menu-stats">
+                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg></span><span class="stat-label">Best Score:</span> <span class="stat-value" id="msc">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#00fff2"/><circle cx="9" cy="9" r="2" fill="rgba(255,255,255,0.5)"/></svg></span><span class="stat-label">Best Floor:</span> <span class="stat-value" id="mfl">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#00ff88"/><text x="12" y="16" text-anchor="middle" fill="#004422" font-size="12" font-weight="bold">$</text></svg></span><span class="stat-label">Credits:</span> <span class="stat-value" id="mcr">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3L22 12L12 21L2 12Z" fill="#ffff00"/><text x="12" y="15" text-anchor="middle" fill="#996600" font-size="10" font-weight="bold">$</text></svg></span><span class="stat-label">Total Runs:</span> <span class="stat-value" id="mtr">0</span></div>
             </div>
             <button class="btn" id="startb">INITIATE BREACH</button>
             <button class="btn btn2" id="dailyb">DAILY</button>
@@ -207,6 +232,9 @@
                 <button class="btn btn2" id="lbb">LEADERBOARD</button>
             </div>
             <button class="btn btn2" id="settingsb" style="margin-top:10px;">SETTINGS</button>
+            <div class="menu-footer-decor">
+                <span class="footer-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12H19M13 6L19 12L13 18" stroke="#00fff2" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+            </div>
         </div>
         
         <!-- FLOOR COMPLETE OVERLAY -->
@@ -270,8 +298,11 @@
         
         <!-- TOAST -->
         <div id="toast">
-            <div class="tn" id="tname">Achievement!</div>
-            <div class="td" id="tdesc"></div>
+            <div class="toast-icon" id="ticon"></div>
+            <div>
+                <div class="tn" id="tname">Achievement!</div>
+                <div class="td" id="tdesc"></div>
+            </div>
         </div>
         
         <!-- ACHIEVEMENTS OVERLAY -->
@@ -472,20 +503,36 @@
     
     function unlockAchievement(ach) {
         PERSIST.ach.push(ach.id);
-        showToast(ach.name, ach.desc);
+        showToast(ach.name, ach.desc, 'achievement');
         savePersist();
     }
     
     var toastTimer = null;
-    function showToast(title, desc) {
+    function showToast(title, desc, type) {
         var toast = document.getElementById('toast');
+        var iconEl = document.getElementById('ticon');
         document.getElementById('tname').textContent = title;
         document.getElementById('tdesc').textContent = desc;
+        
+        // Set icon based on type
+        if (type === 'achievement') {
+            iconEl.innerHTML = SVG_ICONS.UI_TROPHY;
+            toast.classList.add('achievement');
+        } else {
+            iconEl.innerHTML = SVG_ICONS.UI_STAR;
+            toast.classList.remove('achievement');
+        }
+        
+        toast.classList.remove('on');
+        // Force reflow for animation restart
+        void toast.offsetWidth;
         toast.classList.add('on');
+        
         if (toastTimer) clearTimeout(toastTimer);
         toastTimer = setTimeout(function() {
             toast.classList.remove('on');
-        }, 3000);
+            toast.classList.remove('achievement');
+        }, 3500);
     }
     
     function updateAchievementsUI() {
@@ -1569,12 +1616,12 @@
                 if (hasSlot) {
                     // Has a slot assigned - show it and allow rearrangement
                     var col = getSlotColor(slotType);
-                    var icon = C.ST_ICONS[slotType];
                     var name = C.ST_NAMES[slotType];
+                    var slotIconSvg = SVG_ICONS.getSlotIcon(slotType);
                     div.style.background = col + '55';
                     div.style.borderColor = col;
                     div.style.color = col;
-                    div.textContent = icon;
+                    div.innerHTML = '<span class="svg-icon svg-icon-24" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">' + slotIconSvg + '</span>';
                     div.title = name + ' - Position ' + (i + 1);
                     div.draggable = true;
 
@@ -1700,15 +1747,15 @@
         for (var j = 0; j < GS.slotPool.length; j++) {
             var poolSlotType = GS.slotPool[j];
             var col = getSlotColor(poolSlotType);
-            var icon = C.ST_ICONS[poolSlotType];
             var name = C.ST_NAMES[poolSlotType];
+            var poolIconSvg = SVG_ICONS.getSlotIcon(poolSlotType);
 
             var poolDiv = document.createElement('div');
             poolDiv.className = 'slot-pool-item';
             poolDiv.style.background = col + '55';
             poolDiv.style.borderColor = col;
             poolDiv.style.color = col;
-            poolDiv.textContent = icon;
+            poolDiv.innerHTML = '<span class="svg-icon svg-icon-24" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">' + poolIconSvg + '</span>';
             poolDiv.title = name;
             poolDiv.dataset.poolIdx = j;
             poolDiv.dataset.slotType = poolSlotType;
@@ -2175,21 +2222,22 @@
         var grid = document.getElementById('sg');
         grid.innerHTML = '';
         var items = [
-            {n: 'Scrambler', c: 50, d: 'Reverses direction'},
-            {n: 'Trojan', c: 75, d: 'Spawns clone balls'},
-            {n: 'Worm', c: 60, d: 'Passes through pegs'},
-            {n: 'Logic Bomb', c: 100, d: 'x3 score on hit'},
-            {n: 'Daemon', c: 80, d: 'Shields one ball'},
-            {n: 'Ghost', c: 70, d: 'Phase through pegs'},
-            {n: 'Cluster', c: 90, d: 'Splits into 3 balls'},
-            {n: 'Explosive', c: 85, d: 'Chain explosions'},
-            {n: 'Slowmo', c: 55, d: 'Slows ball speed'}
+            {n: 'Scrambler', c: 50, d: 'Reverses direction', idx: 0},
+            {n: 'Trojan', c: 75, d: 'Spawns clone balls', idx: 1},
+            {n: 'Worm', c: 60, d: 'Passes through pegs', idx: 2},
+            {n: 'Logic Bomb', c: 100, d: 'x3 score on hit', idx: 3},
+            {n: 'Daemon', c: 80, d: 'Shields one ball', idx: 4},
+            {n: 'Ghost', c: 70, d: 'Phase through pegs', idx: 5},
+            {n: 'Cluster', c: 90, d: 'Splits into 3 balls', idx: 6},
+            {n: 'Explosive', c: 85, d: 'Chain explosions', idx: 7},
+            {n: 'Slowmo', c: 55, d: 'Slows ball speed', idx: 8}
         ];
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             var div = document.createElement('div');
             div.className = 'si';
-            div.innerHTML = '<div class="in">' + item.n + '</div><div class="ic">' + item.c + '</div><div class="ii">' + item.d + '</div>';
+            var iconSvg = SVG_ICONS.getPayloadIcon(item.idx);
+            div.innerHTML = '<div class="in">' + item.n + '</div><div class="ic"><span class="svg-icon svg-icon-24" style="display:inline-block;width:24px;height:24px;vertical-align:middle;">' + iconSvg + '</span> ' + item.c + '</div><div class="ii">' + item.d + '</div>';
             div.addEventListener('click', (function(it) {
                 return function() {
                     if (PERSIST.br >= it.c) {
@@ -2298,11 +2346,30 @@
             ctx.strokeRect(x + 2, C.SY, C.SW - 4, C.SH);
             ctx.lineWidth = 1;
 
-            // Draw slot icon
-            ctx.font = '16px Courier New';
+            // Draw slot icon using SVG_ICONS
+            var slotIconSvg = SVG_ICONS.getSlotIcon(slotType);
+            
+            // Create an image from the SVG
+            var slotImg = new Image();
+            var svgBlob = new Blob([slotIconSvg], {type: 'image/svg+xml'});
+            var slotUrl = URL.createObjectURL(svgBlob);
+            
+            // Draw a colored background circle for the slot icon
+            ctx.beginPath();
+            ctx.arc(x + C.SW / 2, C.SY + C.SH / 2, 16, 0, Math.PI * 2);
+            ctx.fillStyle = slotColor + '66';
+            ctx.fill();
+            ctx.strokeStyle = slotColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Note: Canvas doesn't directly support SVG, so we'll draw the colored circle
+            // and add a small text label below as a fallback indicator
+            ctx.font = '10px Courier New';
             ctx.fillStyle = slotColor;
             ctx.textAlign = 'center';
-            ctx.fillText(C.ST_ICONS[slotType], x + C.SW / 2, C.SY + C.SH / 2 + 6);
+            var shortLabel = C.ST_NAMES[slotType].substring(0, 3);
+            ctx.fillText(shortLabel, x + C.SW / 2, C.SY + C.SH - 8);
         }
         
         // Pegs

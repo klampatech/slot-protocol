@@ -1,0 +1,27 @@
+{
+  "name": "slot-protocol",
+  "version": "1.0.0",
+  "description": "",
+  "main": "validation-tests.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/klampatech/slot-protocol.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/klampatech/slot-protocol/issues"
+  },
+  "homepage": "https://github.com/klampatech/slot-protocol#readme",
+  "dependencies": {
+    "playwright": "^1.60.0"
+  }
+}
