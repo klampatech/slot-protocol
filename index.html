@@ -42,9 +42,9 @@
         .hsb { color: #00ff88; }
         #mul { position: absolute; top: 80px; right: 15px; text-align: right; display: none; }
         #mul.on { display: block; }
-        #mv { font-size: 28px; color: #00fff2; text-shadow: 0 0 20px #00fff2; }
+        #mv { font-size: 28px; color: #00fff2; text-shadow: 0 0 20px #00fff2; transition: transform 0.1s ease, color 0.3s ease, text-shadow 0.3s ease; display: inline-block; }
         #cb { width: 60px; height: 4px; background: #1a1a2e; margin-top: 5px; border: 1px solid #555566; }
-        #cf { height: 100%; background: linear-gradient(90deg, #00fff2, #ff00ff); }
+        #cf { height: 100%; background: linear-gradient(90deg, #00fff2, #ff00ff); transition: background 0.3s ease; }
         #ol { position: absolute; bottom: 65px; left: 15px; right: 15px; font-size: 10px; color: #8888aa; text-align: center; display: none; }
         #ol.on { display: block; }
         #ob { position: absolute; bottom: 60px; left: 15px; right: 15px; height: 20px; background: #1a1a2e; border: 1px solid #555566; border-radius: 3px; overflow: hidden; display: none; }
@@ -70,8 +70,8 @@
         .ic { font-size: 14px; color: #ff00ff; }
         .ii { font-size: 10px; color: #8888aa; margin-top: 3px; }
         /* Payload slot styles */
-        .ps { width: 32px; height: 32px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; border-radius: 4px; }
-        .ps.on { border-color: #9944ff; background: rgba(153,68,255,0.2); }
+        .ps { width: 32px; height: 32px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; border-radius: 4px; transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+        .ps.on { background: rgba(153,68,255,0.2); border-color: #9944ff; }
         .ps-icon { width: 24px; height: 24px; }
         .ps-icon svg { width: 100%; height: 100%; }
         #pi { position: absolute; bottom: 15px; left: 15px; display: none; gap: 5px; }
@@ -96,6 +96,10 @@
         .contrast-mode .hsb { color: #ffffff; text-shadow: none; }
         .contrast-mode #sb { border-color: #ffffff; color: #ffffff; }
         .contrast-mode #sb:hover { background: #ffffff; color: #000000; }
+        .contrast-mode .hs { color: #ffffff; text-shadow: none; }
+        .contrast-mode .hss { color: #ffffff; text-shadow: none; }
+        .contrast-mode .hsj { color: #ffffff; text-shadow: none; }
+        .contrast-mode .hsb { color: #ffffff; text-shadow: none; }
         .contrast-mode #mv { color: #ffffff !important; text-shadow: none !important; }
         .contrast-mode #toast { border-color: #ffffff; background: #1a1a1a; border-radius: 2px; }
         .contrast-mode #toast .tn { color: #ffffff; text-shadow: none; }
@@ -437,6 +441,17 @@
 
 <script src="svg-icons.js"></script>
 <script>
+    // ========== VISUAL ENHANCEMENT TRACKERS ==========
+    var dropPointPulse = 0; // for pulsing drop point animation
+    var activePayloadIndex = 0; // which payload will be used next
+    var pegRipples = []; // visual ripples when pegs are hit
+    var teleportPortals = []; // active teleport portal effects
+    var evolutionPulses = []; // dormant peg evolution glow pulses
+    var collisionFlashes = []; // collision point flash effects
+    var comboIndicator = { scale: 1, timer: 0 }; // animated combo indicator
+    var lifeIndicators = []; // visual life/ball indicators
+    var jackpotPulse = 0; // jackpot counter pulse animation
+    
     // ========== CONSTANTS ==========
     var C = {
         W: 480, H: 700,
@@ -455,7 +470,12 @@
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
         // Multiball settings
-        MAX_BALLS: 3, MULTIBALL_THRESHOLD: 7
+        MAX_BALLS: 3, MULTIBALL_THRESHOLD: 7,
+        // Visual enhancement constants
+        RIPPLE_LIFETIME: 25,
+        PORTAL_LIFETIME: 60,
+        FLASH_LIFETIME: 15,
+        MAX_BALL_COLORS: ['#00fff2', '#ff00ff', '#ffff00', '#00ff88', '#ff6600', '#ffffff']
     };
 
     // ========== GS (GameState) ==========
@@ -1071,6 +1091,16 @@
             GS.pegTypesHit.push(this.t);
         }
         
+        // Spawn peg hit ripple effect
+        spawnPegRipple(this.x, this.y, C.PC[this.t] || '#00fff2', this.hc > 1 ? 1.5 : 1);
+        
+        // Spawn collision flash for all peg hits
+        spawnCollisionFlash(this.x, this.y, C.PC[this.t] || '#00fff2', 1);
+        
+        // Update combo indicator
+        comboIndicator.timer = 30;
+        comboIndicator.scale = 1.3;
+        
         if (this.t === C.PT.C) {
             GS.sc += 200 + GS.cc * 50;
             createFloat(this.x, this.y, '+' + (200 + GS.cc * 50), '#ffff00');
@@ -1098,11 +1128,16 @@
                 this.y = pair.y;
                 pair.paired = true;
                 this.paired = true;
+                // Activate teleport portal effects at both positions
+                activateTeleportPortal(pair.x, pair.y, '#9944ff');
+                activateTeleportPortal(this.x, this.y, '#9944ff');
             }
             GS.sc += bonus;
         } else if (this.t === C.PT.D && this.st === C.PSTATES.D) {
             this.st = C.PSTATES.N;
             GS.sc += bonus;
+            // Spawn evolution glow pulse
+            spawnEvolutionPulse(this.x, this.y);
         } else if (this.t === C.PT.I) {
             // ICE PEG: Freezes ball briefly, bonus on second hit
             if (this.frozen) {
@@ -1113,6 +1148,8 @@
                 GS.sc += bonus;
                 this.frozen = true;
                 createFloat(this.x, this.y, 'ICE!', '#88ddff');
+                // Spawn ice crystal effect
+                spawnIceCrystal(this.x, this.y, true);
             }
             // Ice has low bounce (0.5)
             this.bc = 0.5;
@@ -1122,11 +1159,12 @@
             if (this.fiberHits >= 3) {
                 GS.sc += 300 + GS.cc * 100;
                 createFloat(this.x, this.y, 'FIBER BREAK! +' + (300 + GS.cc * 100), '#ff8844');
+                // Spawn shatter/debris effect
+                spawnShatterDebris(this);
                 // Remove peg
                 var idx = GS.bd.indexOf(this);
                 if (idx !== -1) GS.bd.splice(idx, 1);
                 GS.obj.prg++;
-                spawnFragments(this);
             } else {
                 GS.sc += 75 * this.fiberHits;
                 createFloat(this.x, this.y, 'x' + this.fiberHits, '#ff8844');
@@ -1145,6 +1183,18 @@
             if (this.attractCount >= 5) {
                 GS.sc += 500 + GS.cc * 150;
                 createFloat(this.x, this.y, 'HONEYCOMB! +' + (500 + GS.cc * 150), '#ffcc00');
+                // Spawn honeycomb burst effect
+                for (var i = 0; i < 6; i++) {
+                    var angle = (i / 6) * Math.PI * 2;
+                    frags.push({
+                        x: this.x, y: this.y,
+                        vx: Math.cos(angle) * 4,
+                        vy: Math.sin(angle) * 4,
+                        col: '#ffcc00',
+                        size: 4,
+                        l: 35
+                    });
+                }
                 // Attract nearby pegs and remove them for bonus
                 for (var i = GS.bd.length - 1; i >= 0; i--) {
                     var p = GS.bd[i];
@@ -1167,6 +1217,17 @@
             GS.jp = Math.max(500, GS.jp - jackpotDrain);
             createFloat(this.x, this.y, 'OVERLOAD! -' + jackpotDrain, '#ff4488');
             triggerScreenShake(2);
+            // Spawn electric discharge effect
+            for (var i = 0; i < 4; i++) {
+                var angle = Math.random() * Math.PI * 2;
+                parts.push({
+                    x: this.x, y: this.y,
+                    vx: Math.cos(angle) * 3,
+                    vy: Math.sin(angle) * 3,
+                    c: '#ff88aa',
+                    l: 20
+                });
+            }
             // Overload has erratic bounce
             this.bc = 0.6 + Math.random() * 0.4;
         } else {
@@ -2102,22 +2163,190 @@
         GS.obj.prg++;
     }
 
-    function createPart(x, y, col) {
-        spawnParticles(col || '#00fff2', x, y, 8, 4);
-    }
-
-    function createFloat(x, y, txt, col) {
-        spawnFloatText(x, y, txt, col || '#00fff2');
-    }
-
     function createFrag(x, y) {
         spawnFragments({x: x, y: y, t: 0});
     }
-
+    
+    // ========== VISUAL ENHANCEMENT EFFECTS ==========
+    
+    // Spawn peg hit ripple effect
+    function spawnPegRipple(x, y, color, size) {
+        size = size || 1;
+        if (pegRipples.length >= 50) pegRipples.shift(); // Cap at 50 ripples
+        pegRipples.push({
+            x: x, y: y,
+            r: 0,
+            maxR: (C.PR + 5) * size,
+            color: color,
+            life: C.RIPPLE_LIFETIME,
+            maxLife: C.RIPPLE_LIFETIME
+        });
+    }
+    
+    // Spawn shatter debris effect (for fiber peg break)
+    function spawnShatterDebris(peg) {
+        var col = C.PC[peg.t] || '#00fff2';
+        for (var i = 0; i < 12; i++) {
+            var a = Math.random() * Math.PI * 2;
+            var speed = 2 + Math.random() * 5;
+            frags.push({
+                x: peg.x, y: peg.y,
+                vx: Math.cos(a) * speed,
+                vy: Math.sin(a) * speed - 1,
+                col: col,
+                size: 3 + Math.random() * 6,
+                l: 50,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.3
+            });
+        }
+        // Spawn sparkle particles
+        spawnParticles('#ffffff', peg.x, peg.y, 15, 6);
+    }
+    
+    // Spawn ice crystal growth effect
+    function spawnIceCrystal(x, y, frozen) {
+        if (frozen) {
+            // Ice crystal formation - radial shards
+            for (var i = 0; i < 8; i++) {
+                var angle = (i / 8) * Math.PI * 2;
+                var length = C.PR + 5 + Math.random() * 3;
+                frags.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * 0.5,
+                    vy: Math.sin(angle) * 0.5,
+                    col: '#aaeeff',
+                    size: 2,
+                    l: 20,
+                    isShard: true,
+                    angle: angle,
+                    length: length,
+                    fadeLength: 0
+                });
+            }
+        }
+    }
+    
+    // Activate teleport portal effects
+    function activateTeleportPortal(x, y, color) {
+        if (teleportPortals.length >= 10) teleportPortals.shift();
+        teleportPortals.push({
+            x: x, y: y,
+            r: 0,
+            maxR: 30,
+            color: color,
+            life: C.PORTAL_LIFETIME,
+            maxLife: C.PORTAL_LIFETIME,
+            spiral: 0
+        });
+    }
+    
+    // Spawn evolution glow pulse for dormant pegs
+    function spawnEvolutionPulse(x, y) {
+        if (evolutionPulses.length >= 20) evolutionPulses.shift();
+        evolutionPulses.push({
+            x: x, y: y,
+            r: C.PR,
+            maxR: C.PR + 20,
+            color: '#00ff88',
+            life: 30,
+            maxLife: 30,
+            pulse: 0
+        });
+    }
+    
+    // Spawn collision flash effect
+    function spawnCollisionFlash(x, y, color, intensity) {
+        intensity = intensity || 1;
+        if (collisionFlashes.length >= 30) collisionFlashes.shift();
+        collisionFlashes.push({
+            x: x, y: y,
+            size: C.BR * 2 * intensity,
+            color: color,
+            life: C.FLASH_LIFETIME * intensity,
+            maxLife: C.FLASH_LIFETIME * intensity
+        });
+    }
+    
+    // Create animated floating score
+    function createAnimatedScore(x, y, score, color) {
+        if (floats.length >= 200) floats.shift();
+        floats.push({
+            x: x, y: y,
+            t: '+' + score,
+            c: color,
+            l: 45,
+            vy: -1.5,
+            scale: 1.5,
+            glow: true
+        });
+    }
+    
+    // Update all visual enhancement effects
+    function updateVisualEffects(dt) {
+        var dt60 = dt * 60;
+        
+        // Update drop point pulse
+        dropPointPulse += dt60;
+        
+        // Update peg ripples
+        for (var i = pegRipples.length - 1; i >= 0; i--) {
+            var ripple = pegRipples[i];
+            ripple.r += 1.5 * dt60;
+            ripple.life -= dt60;
+            if (ripple.life <= 0) pegRipples.splice(i, 1);
+        }
+        
+        // Update teleport portals
+        for (var i = teleportPortals.length - 1; i >= 0; i--) {
+            var portal = teleportPortals[i];
+            portal.r += 0.8 * dt60;
+            portal.spiral += 0.15 * dt60;
+            portal.life -= dt60;
+            if (portal.life <= 0) teleportPortals.splice(i, 1);
+        }
+        
+        // Update evolution pulses
+        for (var i = evolutionPulses.length - 1; i >= 0; i--) {
+            var pulse = evolutionPulses[i];
+            pulse.r += 1.2 * dt60;
+            pulse.pulse += 0.2 * dt60;
+            pulse.life -= dt60;
+            if (pulse.life <= 0) evolutionPulses.splice(i, 1);
+        }
+        
+        // Update collision flashes
+        for (var i = collisionFlashes.length - 1; i >= 0; i--) {
+            var flash = collisionFlashes[i];
+            flash.life -= dt60;
+            if (flash.life <= 0) collisionFlashes.splice(i, 1);
+        }
+        
+        // Update combo indicator
+        if (comboIndicator.timer > 0) {
+            comboIndicator.timer -= dt60;
+            comboIndicator.scale = 1 + (comboIndicator.timer / 30) * 0.5;
+        } else {
+            comboIndicator.scale = 1;
+        }
+        
+        // Update jackpot pulse
+        jackpotPulse += dt60 * 0.05;
+        
+        // Update life indicators visual
+        lifeIndicators = [];
+        for (var i = 0; i < GS.bl; i++) {
+            lifeIndicators.push({
+                pulse: (Date.now() / 500 + i * 0.5) % 1,
+                color: i < GS.bl ? GS.ballSkin || '#00fff2' : '#333333'
+            });
+        }
+    }
+    
     function triggerSeismic(x, y) {
         spawnShockwave(x, y);
     }
-
+    
     function triggerExplosion(x, y) {
         for (var i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
@@ -2127,6 +2356,14 @@
                 GS.obj.prg++;
             }
         }
+    }
+    
+    function createPart(x, y, col) {
+        spawnParticles(col || '#00fff2', x, y, 8, 4);
+    }
+    
+    function createFloat(x, y, txt, col) {
+        spawnFloatText(x, y, txt, col || '#00fff2');
     }
 
     function updateFX(dt) {
@@ -2164,6 +2401,9 @@
             screenShake.x = 0;
             screenShake.y = 0;
         }
+        
+        // Update visual enhancement effects
+        updateVisualEffects(dt);
     }
 
     // ========== UI ==========
@@ -2201,52 +2441,91 @@
         document.getElementById('jv').textContent = GS.jp;
         document.getElementById('bv').textContent = GS.bl;
         
-        // Chain multiplier display with color coding
+        // Chain multiplier display with animated color coding and scale effect
         var mult = GS.cc + 1;
         var mv = document.getElementById('mv');
         mv.textContent = 'x' + mult;
         
-        // Color based on multiplier level
+        // Apply animated scale effect from combo indicator
+        var scaleTransform = 'scale(' + comboIndicator.scale + ')';
+        mv.style.transform = scaleTransform;
+        
+        // Color based on multiplier level with smooth transitions
         if (GS.fa) {
             mv.style.color = '#ff00ff'; // Frenzy magenta
-            mv.style.textShadow = '0 0 30px #ff00ff';
+            mv.style.textShadow = '0 0 30px #ff00ff, 0 0 60px rgba(255,0,255,0.5)';
         } else if (GS.cc >= 5) {
             mv.style.color = '#ff00ff'; // High combo magenta
             mv.style.textShadow = '0 0 25px #ff00ff';
         } else if (GS.cc >= 3) {
             mv.style.color = '#ffff00'; // Mid combo gold
             mv.style.textShadow = '0 0 20px #ffff00';
+        } else if (GS.cc >= 1) {
+            mv.style.color = '#00ff88'; // Building combo green
+            mv.style.textShadow = '0 0 15px #00ff88';
         } else {
             mv.style.color = '#00fff2'; // Normal cyan
             mv.style.textShadow = '0 0 20px #00fff2';
         }
         
-        // Chain timer bar
-        document.getElementById('cf').style.width = Math.max(0, (GS.ct / C.CHAIN_T * 100)) + '%';
+        // Animated chain timer bar with gradient fill
+        var chainProgress = Math.max(0, (GS.ct / C.CHAIN_T * 100));
+        var cf = document.getElementById('cf');
+        cf.style.width = chainProgress + '%';
         
-        // Objective progress bar
-        document.getElementById('of').style.width = Math.min(100, (GS.obj.prg / GS.obj.tgt) * 100) + '%';
+        // Color the chain bar based on remaining time
+        if (chainProgress > 60) {
+            cf.style.background = 'linear-gradient(90deg, #00ff88, #00fff2)';
+        } else if (chainProgress > 30) {
+            cf.style.background = 'linear-gradient(90deg, #ffff00, #ff8800)';
+        } else {
+            cf.style.background = 'linear-gradient(90deg, #ff2244, #ff6600)';
+        }
         
-        // Payload inventory
+        // Animated progress bar with shimmer effect
+        var progressPercent = Math.min(100, (GS.obj.prg / GS.obj.tgt) * 100);
+        var of = document.getElementById('of');
+        of.style.width = progressPercent + '%';
+        
+        // Add pulsing glow when progress is high
+        if (progressPercent > 80) {
+            of.style.boxShadow = '0 0 15px rgba(0,255,136,0.8)';
+        } else {
+            of.style.boxShadow = '0 0 5px rgba(0,255,136,0.3)';
+        }
+        
+        // Jackpot counter with pulse animation
+        var jvEl = document.getElementById('jv');
+        var jackpotPulseFactor = 1 + Math.sin(jackpotPulse) * 0.1;
+        jvEl.style.transform = 'scale(' + jackpotPulseFactor + ')';
+        
+        // Payload inventory with visual enhancement
         var ps1 = document.getElementById('ps1');
         var ps2 = document.getElementById('ps2');
         if (GS.pl[0]) {
             var payload0Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[0][0]);
             var payload0Icon = SVG_ICONS.getPayloadIcon(payload0Type >= 0 ? payload0Type : 0);
-            ps1.innerHTML = '<span class="ps-icon">' + payload0Icon + '</span>';
+            var payloadColors = ['#ff6600', '#ff2244', '#00ff88', '#ffff00', '#9944ff', '#88ddff', '#ff00ff', '#ff4444', '#00fff2'];
+            var pColor0 = payloadColors[Math.max(0, payload0Type)];
+            ps1.innerHTML = '<span class="ps-icon" style="color:' + pColor0 + ';">' + payload0Icon + '</span>';
             ps1.className = 'ps on';
+            ps1.style.borderColor = pColor0;
         } else {
             ps1.innerHTML = '<span style="color:#555566;">-</span>';
             ps1.className = 'ps';
+            ps1.style.borderColor = '#555566';
         }
         if (GS.pl[1]) {
             var payload1Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[1][0]);
             var payload1Icon = SVG_ICONS.getPayloadIcon(payload1Type >= 0 ? payload1Type : 0);
-            ps2.innerHTML = '<span class="ps-icon">' + payload1Icon + '</span>';
+            var pColor1 = payloadColors[Math.max(0, payload1Type)];
+            ps2.innerHTML = '<span class="ps-icon" style="color:' + pColor1 + ';">' + payload1Icon + '</span>';
             ps2.className = 'ps on';
+            ps2.style.borderColor = pColor1;
         } else {
             ps2.innerHTML = '<span style="color:#555566;">-</span>';
             ps2.className = 'ps';
+            ps2.style.borderColor = '#555566';
         }
         
         // Update menu stats
@@ -2326,29 +2605,98 @@
             ctx.stroke();
         }
         
-        // Drop zone
+        // Drop zone with enhanced visual effects
         if (GS.scr === C.SCR.P) {
             var dzColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.1)' : 'rgba(0,255,242,0.1)';
             var dzBorderColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.5)' : 'rgba(0,255,242,0.5)';
             var trajColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.3)' : 'rgba(0,255,242,0.3)';
             ctx.fillStyle = dzColor;
             ctx.fillRect(0, 0, C.W, C.DZY);
+            
+            // Animated drop zone border with pulse effect
+            var dropPulse = Math.sin(dropPointPulse * 0.05) * 0.3 + 0.7;
             ctx.strokeStyle = dzBorderColor;
-            ctx.setLineDash([5, 5]);
+            ctx.globalAlpha = dropPulse;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]);
+            ctx.lineDashOffset = -dropPointPulse * 0.5; // Animated dash
             ctx.beginPath();
             ctx.moveTo(0, C.DZY);
             ctx.lineTo(C.W, C.DZY);
             ctx.stroke();
             ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
             
-            // Trajectory preview with OVERCLOCK modifier
-            ctx.strokeStyle = trajColor;
+            // Pulsing drop point indicator
+            var dropX = GS.mouseX;
+            var dropY = C.DZY;
+            
+            // Drop point outer glow (pulsing)
+            ctx.globalAlpha = 0.3 * dropPulse;
+            ctx.fillStyle = GS.ballSkin || '#00fff2';
             ctx.beginPath();
-            var tx = GS.mouseX;
-            var ty = C.DZY + 10;
+            ctx.arc(dropX, dropY + 10, 20 + Math.sin(dropPointPulse * 0.08) * 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Drop point inner circle
+            ctx.globalAlpha = 0.6 * dropPulse;
+            ctx.fillStyle = GS.ballSkin || '#00fff2';
+            ctx.beginPath();
+            ctx.arc(dropX, dropY + 10, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Crosshair indicator
+            ctx.globalAlpha = 0.5 * dropPulse;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(dropX - 15, dropY + 10);
+            ctx.lineTo(dropX + 15, dropY + 10);
+            ctx.moveTo(dropX, dropY - 5);
+            ctx.lineTo(dropX, dropY + 25);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            
+            // Ball selection indicator (shows which payload will be used)
+            if (GS.pl.length > 0) {
+                var payloadNames = ['SCRAM', 'TROJ', 'WORM', 'L.BOMB', 'DAEMON', 'GHOST', 'CLUST', 'EXPL', 'SLOW'];
+                var payloadColors = ['#ff6600', '#ff2244', '#00ff88', '#ffff00', '#9944ff', '#88ddff', '#ff00ff', '#ff4444', '#00fff2'];
+                var nextPayload = GS.pl[0] ? GS.pl[0][0] : null;
+                if (nextPayload) {
+                    var payloadIdx = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(nextPayload);
+                    var pColor = payloadColors[Math.max(0, payloadIdx)];
+                    var pName = payloadNames[Math.max(0, payloadIdx)];
+                    
+                    // Payload indicator at drop point
+                    ctx.globalAlpha = 0.8;
+                    ctx.fillStyle = pColor;
+                    ctx.beginPath();
+                    ctx.arc(dropX, dropY + 35, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = '#000000';
+                    ctx.font = 'bold 8px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(pName.substring(0, 4), dropX, dropY + 38);
+                }
+            }
+            
+            // Enhanced trajectory preview with OVERCLOCK modifier
+            ctx.strokeStyle = trajColor;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 8]);
+            ctx.lineDashOffset = -dropPointPulse * 0.3;
+            ctx.beginPath();
+            var tx = dropX;
+            var ty = C.DZY + 20;
             var tvx = 0;
             var tvy = 2;
             ctx.moveTo(tx, ty);
+            
+            // Draw trajectory with fading effect
             for (var i = 0; i < 30; i++) {
                 tvx *= C.FR;
                 tvy += C.G * GS.gravityMult;
@@ -2356,9 +2704,14 @@
                 tx += tvx;
                 ty += tvy;
                 if (ty > C.H) break;
+                
+                // Fade trajectory based on distance
+                ctx.globalAlpha = Math.max(0.1, 1 - i / 30);
                 ctx.lineTo(tx, ty);
             }
             ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
         }
         
         // Slot collector - only show unlocked slots, styled by type
@@ -2548,7 +2901,110 @@
             }
         }
         
-        // Shockwaves
+        // Peg ripples - draw ripple effects for peg hits
+        for (var i = 0; i < pegRipples.length; i++) {
+            var ripple = pegRipples[i];
+            ctx.globalAlpha = (ripple.life / ripple.maxLife) * 0.6;
+            ctx.strokeStyle = ripple.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(ripple.x, ripple.y, ripple.r, 0, Math.PI * 2);
+            ctx.stroke();
+            // Inner glow ring
+            ctx.globalAlpha = (ripple.life / ripple.maxLife) * 0.3;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        
+        // Teleport portals - draw spiral portal effects
+        for (var i = 0; i < teleportPortals.length; i++) {
+            var portal = teleportPortals[i];
+            var alpha = portal.life / portal.maxLife;
+            
+            // Outer ring
+            ctx.globalAlpha = alpha * 0.7;
+            ctx.strokeStyle = portal.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(portal.x, portal.y, portal.r, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Spiral effect
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (var a = 0; a < Math.PI * 4; a += 0.1) {
+                var sr = portal.r * (1 - a / (Math.PI * 8));
+                var sx = portal.x + Math.cos(a + portal.spiral) * sr;
+                var sy = portal.y + Math.sin(a + portal.spiral) * sr;
+                if (a === 0) ctx.moveTo(sx, sy);
+                else ctx.lineTo(sx, sy);
+            }
+            ctx.stroke();
+            
+            // Center glow
+            ctx.globalAlpha = alpha * 0.5;
+            var portalGrad = ctx.createRadialGradient(portal.x, portal.y, 0, portal.x, portal.y, portal.r * 0.5);
+            portalGrad.addColorStop(0, '#ffffff');
+            portalGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = portalGrad;
+            ctx.beginPath();
+            ctx.arc(portal.x, portal.y, portal.r * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        
+        // Evolution pulses - draw evolution glow for dormant peg activation
+        for (var i = 0; i < evolutionPulses.length; i++) {
+            var pulse = evolutionPulses[i];
+            var alpha = pulse.life / pulse.maxLife;
+            var pulseR = pulse.r + Math.sin(pulse.pulse) * 5;
+            
+            // Outer glow
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.strokeStyle = pulse.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, pulseR, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Inner bright ring
+            ctx.globalAlpha = alpha * 0.8;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Center burst
+            var burstGrad = ctx.createRadialGradient(pulse.x, pulse.y, 0, pulse.x, pulse.y, pulseR);
+            burstGrad.addColorStop(0, pulse.color);
+            burstGrad.addColorStop(0.3, 'transparent');
+            ctx.fillStyle = burstGrad;
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, pulseR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        
+        // Collision flashes - draw impact flashes at collision points
+        for (var i = 0; i < collisionFlashes.length; i++) {
+            var flash = collisionFlashes[i];
+            var alpha = flash.life / flash.maxLife;
+            
+            // Main flash
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(flash.x, flash.y, flash.size * (1 - alpha * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Color halo
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.fillStyle = flash.color;
+            ctx.beginPath();
+            ctx.arc(flash.x, flash.y, flash.size * 1.5 * (1 - alpha * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
         for (var i = 0; i < waves.length; i++) {
             var w = waves[i];
             ctx.beginPath();
@@ -2575,11 +3031,28 @@
             var b = allBalls[ballIdx];
             if (!b || !b.on) continue;
             
-            // Trail
+            // Determine ball color - use different colors for multiball distinction
+            var ballColor = b.skin || '#00fff2';
+            if (PERSIST.multiballEnabled && ballIdx > 0) {
+                // Alternate colors for additional balls in multiball
+                var multiballColors = C.MAX_BALL_COLORS;
+                ballColor = multiballColors[ballIdx % multiballColors.length];
+            }
+            
+            // Enhanced glowing trail
             for (var i = 0; i < b.tr.length; i++) {
                 var t = b.tr[i];
-                ctx.globalAlpha = (i / b.tr.length) * 0.5;
-                ctx.fillStyle = GS.cc >= 5 ? '#ff00ff' : (GS.cc >= 3 ? '#ffff00' : '#00fff2');
+                var trailAlpha = (i / b.tr.length) * 0.6;
+                var trailColor = GS.cc >= 5 ? '#ff00ff' : (GS.cc >= 3 ? '#ffff00' : ballColor);
+                
+                // Draw trail with glow effect
+                ctx.globalAlpha = trailAlpha * 0.3;
+                ctx.fillStyle = trailColor;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, b.r * (i / b.tr.length) + 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalAlpha = trailAlpha;
                 ctx.beginPath();
                 ctx.arc(t.x, t.y, b.r * (i / b.tr.length), 0, Math.PI * 2);
                 ctx.fill();
@@ -2589,50 +3062,92 @@
             // Ghost ball chromatic aberration effect
             if (b.ghostMode) {
                 // Draw RGB offset copies for chromatic aberration
-                ctx.globalAlpha = 0.3;
+                ctx.globalAlpha = 0.4;
                 ctx.fillStyle = '#ff0000';
                 ctx.beginPath();
-                ctx.arc(b.x - 2, b.y, b.r, 0, Math.PI * 2);
+                ctx.arc(b.x - 3, b.y, b.r, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
-                ctx.arc(b.x + 2, b.y, b.r, 0, Math.PI * 2);
+                ctx.arc(b.x + 3, b.y, b.r, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = '#0000ff';
                 ctx.beginPath();
-                ctx.arc(b.x, b.y - 2, b.r, 0, Math.PI * 2);
+                ctx.arc(b.x, b.y - 3, b.r, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.globalAlpha = 0.7;
+                ctx.globalAlpha = 0.6;
                 ctx.fillStyle = '#88ddff';
+                
+                // Draw ghost trail effect
+                for (var gi = 0; gi < b.tr.length; gi++) {
+                    var gt = b.tr[gi];
+                    ctx.globalAlpha = (gi / b.tr.length) * 0.3;
+                    ctx.fillStyle = '#88ddff';
+                    ctx.beginPath();
+                    ctx.arc(gt.x, gt.y, b.r * (gi / b.tr.length), 0, Math.PI * 2);
+                    ctx.fill();
+                }
             } else {
-                ctx.fillStyle = b.skin || '#00fff2';
+                ctx.fillStyle = ballColor;
             }
             
-            // Ball body
+            // Ball body with enhanced gradient
             ctx.beginPath();
             ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
             var grad = ctx.createRadialGradient(b.x - 2, b.y - 2, 0, b.x, b.y, b.r);
             grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.5, b.ol ? '#ff2244' : (b.skin || '#00fff2'));
-            grad.addColorStop(1, b.ol ? '#aa0022' : (darkenColor(b.skin || '#00fff2', 0.5)));
+            grad.addColorStop(0.3, ballColor);
+            grad.addColorStop(0.7, b.ol ? '#ff2244' : ballColor);
+            grad.addColorStop(1, b.ol ? '#aa0022' : darkenColor(ballColor, 0.5));
             ctx.fillStyle = grad;
             ctx.fill();
             
+            // Ball highlight/shine
+            ctx.globalAlpha = 0.6;
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.beginPath();
+            ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            
             // Shield ring for shielded balls
             if (b.sh) {
+                // Animated shield ring
+                var shieldPulse = Math.sin(Date.now() / 100) * 2;
                 ctx.strokeStyle = '#00ff88';
                 ctx.lineWidth = 3;
-                ctx.globalAlpha = 0.7;
+                ctx.globalAlpha = 0.8;
                 ctx.beginPath();
-                ctx.arc(b.x, b.y, b.r + 5, 0, Math.PI * 2);
+                ctx.arc(b.x, b.y, b.r + 6 + shieldPulse, 0, Math.PI * 2);
                 ctx.stroke();
-                // Glow effect
+                
+                // Outer glow
                 ctx.strokeStyle = 'rgba(0,255,136,0.3)';
-                ctx.lineWidth = 6;
+                ctx.lineWidth = 8;
                 ctx.stroke();
+                
+                // Energy sparks on shield
+                ctx.strokeStyle = '#00ffaa';
+                ctx.lineWidth = 1;
+                for (var s = 0; s < 4; s++) {
+                    var sparkAngle = Date.now() / 200 + s * Math.PI / 2;
+                    var sparkR = b.r + 8 + shieldPulse;
+                    ctx.beginPath();
+                    ctx.moveTo(b.x + Math.cos(sparkAngle) * sparkR, b.y + Math.sin(sparkAngle) * sparkR);
+                    ctx.lineTo(b.x + Math.cos(sparkAngle) * (sparkR + 5), b.y + Math.sin(sparkAngle) * (sparkR + 5));
+                    ctx.stroke();
+                }
             }
             
             ctx.globalAlpha = 1;
+            
+            // Multi-ball distinction: draw ball number indicator for additional balls
+            if (PERSIST.multiballEnabled && ballIdx > 0) {
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(ballIdx + 1, b.x, b.y + 4);
+            }
             
             // Mini balls (cluster payload)
             ctx.fillStyle = '#9944ff';
@@ -2641,6 +3156,12 @@
                 if (!mb.on) continue;
                 ctx.beginPath();
                 ctx.arc(mb.x, mb.y, mb.r, 0, Math.PI * 2);
+                // Mini ball gradient
+                var mbGrad = ctx.createRadialGradient(mb.x - 1, mb.y - 1, 0, mb.x, mb.y, mb.r);
+                mbGrad.addColorStop(0, '#ffffff');
+                mbGrad.addColorStop(0.5, '#9944ff');
+                mbGrad.addColorStop(1, '#6622aa');
+                ctx.fillStyle = mbGrad;
                 ctx.fill();
             }
         }
