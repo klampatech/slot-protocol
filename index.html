@@ -1,0 +1,3066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Protocol</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a12; min-height: 100vh; display: flex; justify-content: center; align-items: center; font-family: Courier New, monospace; color: #e0e0ff; overflow: hidden; }
+        #game-container { position: relative; width: 480px; height: 700px; }
+        #gc { display: block; background: #12121f; border: 2px solid #00fff2; box-shadow: 0 0 30px rgba(0,255,242,0.3); }
+        .ov { position: absolute; top: 0; left: 0; width: 480px; height: 700px; background: rgba(10,10,18,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .ov.on { display: flex; }
+        .ov h1 { font-size: 32px; margin-bottom: 20px; text-shadow: 0 0 20px #00fff2; letter-spacing: 4px; }
+        .ov h2 { font-size: 24px; margin-bottom: 15px; }
+        .ov .stat-line { font-size: 14px; margin: 5px 0; }
+        .ov .stat-label { color: #8888aa; }
+        .ov .stat-value { color: #ffff00; }
+        .btn { margin: 10px; padding: 12px 30px; background: transparent; border: 2px solid #00fff2; color: #00fff2; font-family: Courier New, monospace; font-size: 16px; cursor: pointer; text-shadow: 0 0 10px #00fff2; transition: all 0.2s; }
+        .btn:hover { background: #00fff2; color: #0a0a12; box-shadow: 0 0 20px rgba(0,255,242,0.5); }
+        .btn2 { border-color: #555566; color: #8888aa; text-shadow: none; }
+        .btn2:hover { background: #555566; color: #e0e0ff; }
+        .btn3 { border-color: #ff2244; color: #ff2244; }
+        .btn3:hover { background: #ff2244; color: #fff; }
+        #menu h2 { color: #00ff88; text-shadow: 0 0 15px #00ff88; }
+        #fc h2 { color: #00ff88; text-shadow: 0 0 15px #00ff88; }
+        #re h2 { color: #ff2244; text-shadow: 0 0 15px #ff2244; }
+        #shop h2 { color: #ff00ff; text-shadow: 0 0 15px #ff00ff; }
+        #hud { position: absolute; top: 0; left: 0; right: 0; padding: 10px 15px; display: none; justify-content: space-between; pointer-events: none; z-index: 10; }
+        #hud.on { display: flex; }
+        .hs { font-size: 14px; text-shadow: 0 0 10px #00fff2; }
+        .hss { font-size: 18px; color: #ffff00; text-shadow: 0 0 15px #ffff00; }
+        .hsj { color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
+        .hsb { color: #00ff88; }
+        #mul { position: absolute; top: 80px; right: 15px; text-align: right; display: none; }
+        #mul.on { display: block; }
+        #mv { font-size: 28px; color: #00fff2; text-shadow: 0 0 20px #00fff2; }
+        #cb { width: 60px; height: 4px; background: #1a1a2e; margin-top: 5px; border: 1px solid #555566; }
+        #cf { height: 100%; background: linear-gradient(90deg, #00fff2, #ff00ff); }
+        #ol { position: absolute; bottom: 65px; left: 15px; right: 15px; font-size: 10px; color: #8888aa; text-align: center; display: none; }
+        #ol.on { display: block; }
+        #ob { position: absolute; bottom: 60px; left: 15px; right: 15px; height: 20px; background: #1a1a2e; border: 1px solid #555566; border-radius: 3px; overflow: hidden; display: none; }
+        #ob.on { display: block; }
+        #of { height: 100%; width: 0%; background: linear-gradient(90deg, #00ff88, #00fff2); box-shadow: 0 0 10px #00ff88; }
+        #sb { position: absolute; bottom: 15px; right: 15px; padding: 8px 16px; background: transparent; border: 1px solid #ff00ff; color: #ff00ff; font-family: Courier New, monospace; font-size: 12px; cursor: pointer; pointer-events: auto; display: none; z-index: 15; }
+        #sb.on { display: block; }
+        #sb:hover { background: #ff00ff; color: #0a0a12; }
+        #toast { position: absolute; bottom: 80px; right: 15px; background: #1a1a2e; border: 1px solid #ffff00; padding: 10px 15px; opacity: 0; transform: translateX(100px); transition: all 0.3s; pointer-events: none; z-index: 50; }
+        #toast.on { opacity: 1; transform: translateX(0); }
+        .tn { font-size: 14px; color: #ffff00; text-shadow: 0 0 10px #ffff00; }
+        .td { font-size: 11px; color: #8888aa; margin-top: 3px; }
+        .sg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px; max-width: 450px; }
+        .si { background: #1a1a2e; border: 1px solid #555566; padding: 10px; text-align: center; cursor: pointer; }
+        .si.disabled { opacity: 0.5; cursor: not-allowed; }
+        .si.disabled:hover { border-color: #555566; box-shadow: none; }
+        .in { font-size: 12px; color: #00fff2; margin-bottom: 5px; }
+        .ic { font-size: 14px; color: #ff00ff; }
+        .ii { font-size: 10px; color: #8888aa; margin-top: 3px; }
+        .ps { width: 24px; height: 24px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; }
+        .ps.on { border-color: #9944ff; color: #9944ff; }
+        #pi { position: absolute; bottom: 15px; left: 15px; display: none; gap: 5px; }
+        #pi.on { display: flex; }
+        .slot-icon { font-size: 20px; margin: 5px 0; }
+        /* Contrast mode styles - fully replaces neon colors with white/grey on dark */
+        .contrast-mode #game-container #gc { background: #1a1a1a; border-color: #ffffff; box-shadow: none; }
+        .contrast-mode #game-container .ov { background: rgba(20,20,20,0.95); }
+        .contrast-mode .ov h2 { color: #ffffff !important; }
+        .contrast-mode #fc h2 { color: #00ff00 !important; }
+        .contrast-mode #re h2 { color: #ff4444 !important; }
+        .contrast-mode #shop h2 { color: #ffffff !important; }
+        .contrast-mode .btn { border-color: #ffffff; color: #ffffff; }
+        .contrast-mode .btn:hover { background: #ffffff; color: #000000; }
+        .contrast-mode .btn.btn2 { border-color: #888888; color: #888888; }
+        .contrast-mode .btn.btn2:hover { background: #888888; color: #ffffff; }
+        .contrast-mode .btn.btn3 { border-color: #ff4444; color: #ff4444; }
+        .contrast-mode .btn.btn3:hover { background: #ff4444; color: #ffffff; }
+        .contrast-mode .hs { color: #ffffff; text-shadow: none; }
+        .contrast-mode .hss { color: #ffffff; text-shadow: none; }
+        .contrast-mode .hsj { color: #ffffff; text-shadow: none; }
+        .contrast-mode .hsb { color: #ffffff; text-shadow: none; }
+        .contrast-mode #sb { border-color: #ffffff; color: #ffffff; }
+        .contrast-mode #sb:hover { background: #ffffff; color: #000000; }
+        .contrast-mode #mv { color: #ffffff !important; text-shadow: none !important; }
+        .contrast-mode #toast { border-color: #ffffff; background: #1a1a1a; }
+        .contrast-mode #toast .tn { color: #ffffff; text-shadow: none; }
+        .contrast-mode .stat-value { color: #ffffff; }
+        .contrast-mode .toggle.on { background: #ffffff; }
+        /* Leaderboard styles */
+        .lb-list { max-height: 250px; overflow-y: auto; margin: 15px 0; width: 350px; }
+        .lb-item { display: flex; justify-content: space-between; padding: 8px 15px; border-bottom: 1px solid #333; font-size: 14px; }
+        .lb-item:nth-child(odd) { background: rgba(0,255,242,0.05); }
+        .lb-item.top3 { color: #ffff00; font-weight: bold; }
+        .lb-rank { color: #8888aa; width: 30px; }
+        .lb-name { flex: 1; margin-left: 10px; }
+        .lb-score { color: #ffff00; }
+        .lb-date { color: #555566; font-size: 11px; margin-left: 10px; }
+        .name-input { background: #1a1a2e; border: 2px solid #00fff2; color: #00fff2; padding: 10px 15px; font-family: Courier New, monospace; font-size: 16px; width: 200px; text-align: center; margin: 10px 0; }
+        .name-input:focus { outline: none; box-shadow: 0 0 15px rgba(0,255,242,0.3); }
+        /* Settings styles */
+        .toggle-row { display: flex; align-items: center; justify-content: center; margin: 15px 0; gap: 10px; font-size: 12px; min-width: 200px; }
+        .toggle { width: 40px; height: 20px; background: #333; border-radius: 10px; cursor: pointer; position: relative; transition: background 0.3s; }
+        .toggle.on { background: #00fff2; }
+        .toggle::after { content: ''; width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
+        .toggle.on::after { left: 22px; }
+        /* Jackpot slot machine styles */
+        .jdiv { display: flex; gap: 8px; margin: 15px 0; justify-content: center; }
+        .jr { width: 50px; height: 50px; background: #1a1a2e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 24px; color: #ffff00; position: relative; overflow: hidden; }
+        .jr.sp { animation: spin 0.08s linear; }
+        .jr.hit { border-color: #00ff88; box-shadow: 0 0 15px #00ff88; animation: jackpot-hit 0.5s ease-in-out infinite; }
+        .jr.win { border-color: #ffff00; box-shadow: 0 0 20px #ffff00, 0 0 40px #ffff00; animation: jackpot-win 0.3s ease-in-out infinite; }
+        .jr.lose { border-color: #ff2244; box-shadow: 0 0 10px #ff2244; }
+        .jr::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 30%; background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent); pointer-events: none; }
+        .jr::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 30%; background: linear-gradient(0deg, rgba(0,0,0,0.3), transparent); pointer-events: none; }
+        @keyframes spin { from { transform: rotateX(0deg); } to { transform: rotateX(360deg); } }
+        @keyframes jackpot-hit { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes jackpot-win { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.1) rotate(2deg); } }
+        @keyframes reel-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes coin-burst { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100px) scale(0); opacity: 0; } }
+        .jp-display { background: linear-gradient(180deg, #1a1a2e, #12121f); border: 2px solid #ff00ff; border-radius: 8px; padding: 8px 15px; margin-bottom: 10px; text-align: center; }
+        .jp-amount { font-size: 20px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
+        .jp-label { font-size: 10px; color: #8888aa; margin-bottom: 3px; }
+        .spins-left { font-size: 12px; color: #ffff00; margin-top: 10px; }
+        .spin-btn { background: linear-gradient(180deg, #ff00ff, #aa0088) !important; border-color: #ff00ff !important; color: #fff !important; animation: spin-ready 1s ease-in-out infinite; }
+        .spin-btn:hover { background: linear-gradient(180deg, #ff44aa, #ff00ff) !important; }
+        @keyframes spin-ready { 0%, 100% { box-shadow: 0 0 10px rgba(255,0,255,0.5); } 50% { box-shadow: 0 0 25px rgba(255,0,255,0.8), 0 0 40px rgba(255,0,255,0.4); } }
+        .spin-btn:disabled { animation: none; opacity: 0.5; cursor: not-allowed; }
+        .coin { position: absolute; font-size: 16px; animation: coin-burst 1s ease-out forwards; pointer-events: none; }
+        @keyframes prize-flash { 0%, 100% { color: #ff00ff; text-shadow: 0 0 10px #ff00ff; } 50% { color: #ffff00; text-shadow: 0 0 30px #ffff00, 0 0 50px #ff00ff; } }
+        @keyframes reel-stop { 0% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        /* Achievement styles */
+        .ach-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; max-width: 400px; }
+        .ach-item { background: #1a1a2e; border: 1px solid #555566; padding: 10px; text-align: center; }
+        .ach-item.locked { opacity: 0.4; }
+        .ach-item.unlocked { border-color: #ffff00; }
+        .ach-name { color: #ffff00; font-size: 12px; }
+        .ach-desc { color: #8888aa; font-size: 10px; margin-top: 5px; }
+        /* Matrix theme */
+        .theme-matrix #game-container #gc { background: #000800; border-color: #00ff00; box-shadow: 0 0 30px rgba(0,255,0,0.3); }
+        .theme-matrix { background: #000800; }
+        .theme-matrix #game-container .ov { background: rgba(0,8,0,0.95); }
+        .theme-matrix .ov h1, .theme-matrix .ov h2 { color: #00ff00; text-shadow: 0 0 20px #00ff00; }
+        .theme-matrix .btn { border-color: #00ff00; color: #00ff00; }
+        .theme-matrix .btn:hover { background: #00ff00; color: #000800; }
+        .theme-matrix .hs, .theme-matrix .hss, .theme-matrix .hsj, .theme-matrix .hsb { color: #00ff00; text-shadow: 0 0 10px #00ff00; }
+        /* Daily challenge styles */
+        .daily-mod { color: #ff00ff; font-size: 14px; margin: 10px 0; padding: 10px; border: 1px solid #ff00ff; background: rgba(255,0,255,0.1); }
+        /* Slot selector styles */
+        .slot-pos { width: 50px; height: 50px; background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
+        .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 10px rgba(0,255,242,0.3); }
+        .slot-pos.occupied { border-style: solid; cursor: grab; }
+        .slot-pos.highlight { border-color: #ffff00; background: rgba(255,255,0,0.1); transform: scale(1.1); }
+        .slot-pool-item { width: 50px; height: 50px; background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: grab; transition: all 0.2s; margin: 4px; }
+        .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 10px rgba(0,255,242,0.5); transform: scale(1.1); }
+        .slot-pool-item.dragging { opacity: 0.5; }
+        .slot-arranging-section { margin: 15px 0; text-align: center; }
+        .slot-arrows { color: #8888aa; margin: 0 10px; align-self: center; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gc" width="480" height="700"></canvas>
+        <div id="hud">
+            <div>
+                <div class="hs">FLOOR <span id="fn">1</span></div>
+                <div class="hss">SCORE <span id="sv">0</span></div>
+            </div>
+            <div style="text-align:right">
+                <div class="hsj">JACKPOT <span id="jv">500</span></div>
+                <div class="hsb">BALLS <span id="bv">5</span></div>
+            </div>
+        </div>
+        <div id="mul"><div id="mv">x1</div><div id="cb"><div id="cf"></div></div></div>
+        <div id="ol">HIT <span id="ot">15</span> PEGS</div>
+        <div id="ob"><div id="of"></div></div>
+        <div id="pi"><div class="ps" id="ps1">-</div><div class="ps" id="ps2">-</div></div>
+        <button id="sb">SHOP</button>
+        
+        <!-- MENU OVERLAY -->
+        <div id="menu" class="ov on">
+            <h1>SLOT PROTOCOL</h1>
+            <h2>Rogue Pachinko</h2>
+            <p>Drop balls through peg boards, hit targets, survive the floors.</p>
+            <div style="margin:15px;text-align:center;color:#8888aa;font-size:12px;">
+                <div class="stat-line"><span class="stat-label">Best Score:</span> <span class="stat-value" id="msc">0</span></div>
+                <div class="stat-line"><span class="stat-label">Best Floor:</span> <span class="stat-value" id="mfl">0</span></div>
+                <div class="stat-line"><span class="stat-label">Credits:</span> <span class="stat-value" id="mcr">0</span></div>
+                <div class="stat-line"><span class="stat-label">Total Runs:</span> <span class="stat-value" id="mtr">0</span></div>
+            </div>
+            <button class="btn" id="startb">INITIATE BREACH</button>
+            <button class="btn btn2" id="dailyb">DAILY</button>
+            <button class="btn btn2" id="tutb">TUTORIAL</button>
+            <div style="display:flex;gap:10px;margin-top:10px;">
+                <button class="btn btn2" id="achb">ACHIEVEMENTS</button>
+                <button class="btn btn2" id="lbb">LEADERBOARD</button>
+            </div>
+            <button class="btn btn2" id="settingsb" style="margin-top:10px;">SETTINGS</button>
+        </div>
+        
+        <!-- FLOOR COMPLETE OVERLAY -->
+        <div id="fc" class="ov">
+            <h2>FLOOR CLEARED</h2>
+            <div style="margin:15px;text-align:center">
+                <div class="stat-line"><span class="stat-label">Score:</span> <span class="stat-value" id="fsc">0</span></div>
+                <div class="stat-line"><span class="stat-label">Balls:</span> <span class="stat-value" id="fbl">5</span></div>
+            </div>
+            <div style="margin:15px;text-align:center;">
+                <p style="color:#ff00ff;font-size:12px;margin-bottom:10px;">JACKPOT</p>
+                <div class="jp-display"><div class="jp-label">PRIZE POOL</div><div class="jp-amount" id="fjpresult">0</div></div>
+                <div style="display:flex;gap:10px;justify-content:center;margin:15px 0;">
+                    <div class="jr" id="jreel0">-</div>
+                    <div class="jr" id="jreel1">-</div>
+                    <div class="jr" id="jreel2">-</div>
+                </div>
+                <div class="spins-left" id="spinsLeft">SPINS LEFT: <span id="spinsLeftNum">2</span></div>
+                <button class="btn btn2 spin-btn" id="spinjp" style="font-size:14px;padding:10px 25px;margin-top:10px;">SPIN</button>
+            </div>
+            <button class="btn" id="contb">CONTINUE</button>
+            <button class="btn btn2" id="endb">END RUN</button>
+        </div>
+        
+        <!-- RUN END OVERLAY -->
+        <div id="re" class="ov">
+            <h2>RUN COMPLETE</h2>
+            <div style="margin:20px;text-align:center">
+                <div class="stat-line"><span class="stat-label">Score:</span> <span class="stat-value" id="rsc">0</span></div>
+                <div class="stat-line"><span class="stat-label">Floors:</span> <span class="stat-value" id="rfl">0</span></div>
+                <div class="stat-line"><span class="stat-label">Best Combo:</span> <span class="stat-value" id="rbc">0</span></div>
+                <div class="stat-line"><span class="stat-label">Pegs Hit:</span> <span class="stat-value" id="rph">0</span></div>
+                <div class="stat-line"><span class="stat-label">Credits Earned:</span> <span class="stat-value" id="rcd">0</span></div>
+                <div id="nb" style="display:none;margin-top:10px;color:#ff00ff;font-size:16px;">NEW BEST!</div>
+            </div>
+            <button class="btn" id="retb">RETURN TO MENU</button>
+        </div>
+        
+        <!-- TUTORIAL OVERLAY -->
+        <div id="tut" class="ov">
+            <h2>HOW TO PLAY</h2>
+            <p style="max-width:350px;">
+                <strong>1.</strong> Click on the drop zone to release a ball.<br><br>
+                <strong>2.</strong> Balls bounce off pegs - hit as many as you can!<br><br>
+                <strong>3.</strong> Fill the progress bar to clear the floor.<br><br>
+                <strong>4.</strong> Chain hits for combo multipliers (x7 max).<br><br>
+                <strong>5.</strong> Collect slots at the bottom for bonus rewards.<br><br>
+                <strong>6.</strong> Use payloads for special abilities.<br><br>
+                <strong>7.</strong> Don't lose all balls before clearing the floor!
+            </p>
+            <button class="btn" id="tutcb">GOT IT</button>
+        </div>
+        
+        <!-- SHOP OVERLAY -->
+        <div id="shop" class="ov">
+            <h2>PAYLOAD SHOP</h2>
+            <p>Credits: <span id="scr">0</span></p>
+            <div class="sg" id="sg"></div>
+            <button class="btn btn2" id="clsb">CLOSE</button>
+        </div>
+        
+        <!-- TOAST -->
+        <div id="toast">
+            <div class="tn" id="tname">Achievement!</div>
+            <div class="td" id="tdesc"></div>
+        </div>
+        
+        <!-- ACHIEVEMENTS OVERLAY -->
+        <div id="ach" class="ov">
+            <h2>ACHIEVEMENTS</h2>
+            <div class="ach-grid" id="achgrid"></div>
+            <button class="btn btn2" id="achclb">CLOSE</button>
+        </div>
+        
+        <!-- LEADERBOARD OVERLAY -->
+        <div id="lb" class="ov">
+            <h2>LEADERBOARD</h2>
+            <p style="color:#8888aa;font-size:12px;">Top 10 Local Scores</p>
+            <div class="lb-list" id="lbgrid"></div>
+            <div id="lbentry" style="display:none;text-align:center;">
+                <p style="color:#ff00ff;font-size:14px;margin-bottom:10px;">NEW HIGH SCORE!</p>
+                <input type="text" class="name-input" id="lbname" maxlength="12" placeholder="Enter your name">
+                <button class="btn" id="lbsubmit">SUBMIT</button>
+            </div>
+            <button class="btn btn2" id="lbclb">CLOSE</button>
+        </div>
+        
+        <!-- SETTINGS OVERLAY -->
+        <div id="settings" class="ov">
+            <h2>SETTINGS</h2>
+            <div class="toggle-row">
+                <span>CONTRAST MODE</span>
+                <div class="toggle" id="contrasttoggle"></div>
+            </div>
+            <div class="toggle-row">
+                <span>MULTIBALL MODE</span>
+                <div class="toggle" id="multiballtoggle"></div>
+            </div>
+            <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
+                <div>BALL SKIN:</div>
+                <div id="ballSkinDisplay" style="color:#00fff2;margin:5px 0;">CYAN</div>
+                <div style="display:flex;gap:5px;justify-content:center;margin-top:5px;" id="ballSkinButtons">
+                    <button class="btn btn2 skin-btn" data-skin="#00fff2" style="padding:5px 10px;">CYAN</button>
+                    <button class="btn btn2 skin-btn" data-skin="#ff00ff" style="padding:5px 10px;">MAG</button>
+                    <button class="btn btn2 skin-btn" data-skin="#ffff00" style="padding:5px 10px;">GOLD</button>
+                    <button class="btn btn2 skin-btn" data-skin="#00ff88" style="padding:5px 10px;">GRN</button>
+                </div>
+            </div>
+            <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
+                <div>BOARD THEME:</div>
+                <div id="themeDisplay" style="color:#00fff2;margin:5px 0;">NEON</div>
+                <div style="display:flex;gap:5px;justify-content:center;margin-top:5px;" id="themeButtons">
+                    <button class="btn btn2 theme-btn" data-theme="default" style="padding:5px 10px;">NEON</button>
+                    <button class="btn btn2 theme-btn" data-theme="matrix" style="padding:5px 10px;">MATRIX</button>
+                </div>
+            </div>
+            <div style="margin-top:20px;">
+                <button class="btn btn3" id="resetb">RESET ALL DATA</button>
+            </div>
+            <button class="btn btn2" id="settclb">CLOSE</button>
+        </div>
+        
+        <!-- RESET CONFIRM OVERLAY -->
+        <div id="resetconfirm" class="ov">
+            <h2 style="color:#ff2244;text-shadow:0 0 15px #ff2244;">WARNING</h2>
+            <p style="max-width:300px;text-align:center;color:#ff2244;margin:15px 0;">This will delete ALL progress including credits, achievements, and unlocks. This cannot be undone.</p>
+            <button class="btn btn3" id="confirmsubmit">DELETE EVERYTHING</button>
+            <button class="btn btn2" id="resetcancel">CANCEL</button>
+        </div>
+        
+        <!-- SLOT SELECTOR OVERLAY -->
+        <div id="slot-selector" class="ov">
+            <h2 style="color:#ffff00;">ARRANGE YOUR SLOTS</h2>
+            <p style="max-width:350px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:15px;">Drag slots to unlocked positions or click locked slots to unlock them. You get 1 unlock per floor!</p>
+            
+            <div class="slot-arranging-section">
+                <div style="font-size:11px;color:#00fff2;margin-bottom:8px;">SLOT POSITIONS (Left to Right in Game):</div>
+                <div id="position-slots" style="display:flex;gap:6px;justify-content:center;margin-bottom:15px;"></div>
+            </div>
+            
+            <div style="text-align:center;color:#8888aa;font-size:12px;margin:10px 0;">↓ Drag from here ↓</div>
+            
+            <div class="slot-arranging-section">
+                <div id="slot-pool" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;max-width:420px;"></div>
+            </div>
+            
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:15px;">
+                <button class="btn btn2" id="auto-arrange">AUTO-ARRANGE</button>
+                <button class="btn" id="confirm-slots">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ========== CONSTANTS ==========
+    var C = {
+        W: 480, H: 700,
+        G: 0.18, FR: 0.995, MAXV: 14, MAXS: 21, BR: 7,
+        STUCK_F: 180, STUCK_D: 2, CHAIN_T: 30, FRENZY_T: 180, MAXM: 7,
+        TOP: 110, BOT: 480, PR: 8, PS: 50,
+        SY: 560, SH: 50, SC: 7, SW: 480/7,
+        PT: {N:0, C:1, T:2, S:3, E:4, D:5, G:6, I:7, F:8, M:9, H:10, O:11},
+        PSTATES: {D:0, N:1, GL:2, CH:3, EX:4},
+        PC: {0:'#00fff2', 1:'#ffff00', 2:'#9944ff', 3:'#ff6600', 4:'#ff2244', 5:'#444466', 6:'#00ff88', 7:'#88ddff', 8:'#ff8844', 9:'#ffffff', 10:'#ffcc00', 11:'#ff4488'},
+        // Contrast mode colors
+        PC_CONTRAST: {0:'#cccccc', 1:'#ffffff', 2:'#aaaaaa', 3:'#ffffff', 4:'#ffcccc', 5:'#888888', 6:'#ccffcc', 7:'#ddddff', 8:'#ffccaa', 9:'#ffffff', 10:'#ffffcc', 11:'#ffaaaa'},
+        ST: {E:0, CR:1, AM:2, PA:3, CM:4, SH:5, OC:6, JP:7},
+        ST_NAMES: ['EMPTY', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'OVERCLOCK', 'JACKPOT'],
+        ST_ICONS: ['-', '$', '+', '?', '#', '^', '*', '★'],
+        SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
+        DZY: 50,
+        // Multiball settings
+        MAX_BALLS: 3, MULTIBALL_THRESHOLD: 7
+    };
+
+    // ========== GS (GameState) ==========
+    var GS = {
+        scr: C.SCR.M, fl: 1, sc: 0, bl: 5, mx: 1, bd: [], obj: {},
+        jp: 500, fa: false, ft: 0, pl: [], cc: 0, ct: 0,
+        pegsHit: 0, floorScore: 0, jackpotWon: 0, bestCombo: 0, maxComboHits: 0, floorBallsLeft: 5,
+        canDrop: true, mouseX: 240, ball: null,
+        gravityMult: 1, // for OVERCLOCK slot
+        shielded: false, // for SHIELD slot
+        lockedSlots: [], // which slots are locked this floor
+        overload: false, // overload penalty active
+        whiteFlash: false, // white flash effect
+        jackpotWins: 0, // count of jackpots won this run
+        creditsEarned: 0, // credits earned this run
+        pegTypesHit: [], // track peg types hit this run
+        speedDemonTimer: 0, // for speed demon achievement
+        speedDemonHits: 0, // pegs hit in speed demon window
+        // Ghost payload effect tracking
+        ghostEffect: false, // chromatic aberration active
+        // Slow-mo effect tracking
+        slowmoEffect: false, // octagonal blue tint active
+        ballSkin: '#00fff2', // current ball skin color
+        // Multiball tracking
+        activeBalls: [], // array of all active balls for multiball
+        // Slot arrangement system - player chooses which slot to unlock
+        slotsArranged: false, // have slots been arranged this floor?
+        unlockedSlots: [], // array of unlocked position indices [0-6]
+        canUnlockThisFloor: true, // can player unlock a slot this floor?
+        slotArrangement: [], // player's choices for each position [index] = slotType
+        slotPool: [], // available slots to choose from this floor (7 new random each floor)
+        // Drag state
+        isDraggingSlot: false,
+        draggingSlotType: null,
+        draggingFromPos: -1, // -1 means from pool, >= 0 means from position
+        draggingPoolIdx: -1
+    };
+
+    // ========== PERSIST ==========
+    var PERSIST = {
+        lb: 0, lf: 0, ls: 0, br: 0, ur: [], pu: {}, ach: [],
+        hasTut: false, daily: {}, streak: 0, lastDay: '', tr: 0,
+        leaderboard: [], contrastMode: false,
+        totalPegsHit: 0, // for peg_collector achievement
+        ballSaverCount: 0, // for ball_saver achievement
+        // Multiball settings
+        multiballEnabled: false,
+        // Board theme skins
+        boardThemes: ['default', 'neon', 'matrix'],
+        currentBoardTheme: 'default',
+        // Ball color skins
+        ballSkins: ['#00fff2', '#ff00ff', '#ffff00', '#00ff88', '#ff6600', '#ffffff'],
+        currentBallSkin: '#00fff2',
+        unlockedBallSkins: ['#00fff2'],
+        unlockedBoardThemes: ['default'],
+        stormyModifier: false // peg stormy modifier
+    };
+    
+    // ========== ACHIEVEMENTS ==========
+    var ACHIEVEMENTS = [
+        { id: 'first_blood', name: 'First Blood', desc: 'Hit your first peg', check: function() { return GS.pegsHit >= 1; } },
+        { id: 'streak_master', name: 'Streak Master', desc: 'Get a x5 combo', check: function() { return GS.bestCombo >= 5; } },
+        { id: 'jackpot_winner', name: 'Jackpot Winner', desc: 'Win the jackpot', check: function() { return GS.jackpotWon >= 500; } },
+        { id: 'floor5_plus', name: 'Floor 5+', desc: 'Reach floor 5', check: function() { return GS.fl >= 5; } },
+        { id: 'ball_hog', name: 'Ball Hog', desc: 'Complete floor with 5+ balls', check: function() { return GS.floorBallsLeft >= 5; } },
+        { id: 'survivor', name: 'Survivor', desc: 'Complete 10 runs', check: function() { return PERSIST.tr >= 10; } },
+        { id: 'combo_master', name: 'Combo Master', desc: 'Reach x7 combo', check: function() { return GS.cc >= 7; } },
+        { id: 'high_scorer', name: 'High Scorer', desc: 'Score 10,000+', check: function() { return GS.sc >= 10000; } },
+        { id: 'dedicated', name: 'Dedicated', desc: 'Complete 50 runs', check: function() { return PERSIST.tr >= 50; } },
+        { id: 'max_combo', name: 'Max Combo', desc: 'Reach x7 combo 5 times in one run', check: function() { return GS.maxComboHits >= 5; } },
+        { id: 'peg_collector', name: 'Peg Collector', desc: 'Hit 100 pegs total', check: function() { return PERSIST.totalPegsHit >= 100; } },
+        { id: 'mega_combo', name: 'Mega Combo', desc: 'Reach x7 combo 10 times in one run', check: function() { return GS.maxComboHits >= 10; } },
+        { id: 'jackpot_hunter', name: 'Jackpot Hunter', desc: 'Win the jackpot 5 times', check: function() { return GS.jackpotWins >= 5; } },
+        { id: 'floor_10_master', name: 'Floor 10 Master', desc: 'Reach floor 10', check: function() { return GS.fl >= 10; } },
+        { id: 'floor_20_legend', name: 'Floor 20 Legend', desc: 'Reach floor 20', check: function() { return GS.fl >= 20; } },
+        { id: 'credit_rich', name: 'Credit Rich', desc: 'Earn 1000 credits in a single run', check: function() { return GS.creditsEarned >= 1000; } },
+        { id: 'ball_saver', name: 'Ball Saver', desc: 'Complete 3 floors with 5 balls left', check: function() { return PERSIST.ballSaverCount >= 3; } }
+    ];
+    
+    // Achievement system
+    function checkAchievements() {
+        for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+            var ach = ACHIEVEMENTS[i];
+            if (PERSIST.ach.indexOf(ach.id) === -1 && ach.check()) {
+                unlockAchievement(ach);
+            }
+        }
+    }
+    
+    function unlockAchievement(ach) {
+        PERSIST.ach.push(ach.id);
+        showToast(ach.name, ach.desc);
+        savePersist();
+    }
+    
+    var toastTimer = null;
+    function showToast(title, desc) {
+        var toast = document.getElementById('toast');
+        document.getElementById('tname').textContent = title;
+        document.getElementById('tdesc').textContent = desc;
+        toast.classList.add('on');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() {
+            toast.classList.remove('on');
+        }, 3000);
+    }
+    
+    function updateAchievementsUI() {
+        var grid = document.getElementById('achgrid');
+        grid.innerHTML = '';
+        for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+            var ach = ACHIEVEMENTS[i];
+            var unlocked = PERSIST.ach.indexOf(ach.id) !== -1;
+            var div = document.createElement('div');
+            div.className = 'ach-item ' + (unlocked ? 'unlocked' : 'locked');
+            div.innerHTML = '<div class="ach-name">' + ach.name + '</div><div class="ach-desc">' + ach.desc + '</div>';
+            grid.appendChild(div);
+        }
+    }
+    
+    // ========== DAILY CHALLENGE ==========
+    function getDailySeed() {
+        var today = new Date();
+        var dateStr = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
+        // Simple seeded random from date string
+        var seed = 0;
+        for (var i = 0; i < dateStr.length; i++) {
+            seed = ((seed << 5) - seed) + dateStr.charCodeAt(i);
+            seed = seed & seed;
+        }
+        return Math.abs(seed);
+    }
+    
+    function seededRandom(seed) {
+        var x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+    }
+    
+    function getDailyModifiers() {
+        var seed = getDailySeed();
+        var mods = [
+            { id: 'gravity', name: 'Heavy Gravity', desc: '1.5x gravity', fn: function() { GS.gravityMult *= 1.5; } },
+            { id: 'fewer_pegs', name: 'Sparse Field', desc: '30% fewer pegs', fn: function() { /* handled in board gen */ } },
+            { id: 'small_ball', name: 'Tiny Ball', desc: 'Ball is 60% size', fn: function() { /* handled in ball creation */ } },
+            { id: 'fast_timer', name: 'Ticking Clock', desc: 'Pegs deactivate faster', fn: function() { /* handled in peg update */ } },
+            { id: 'multiplier', name: 'Lower Multiplier', desc: 'Max combo is x4', fn: function() { /* handled in combo calc */ } },
+            { id: 'double_pegs', name: 'Double Trouble', desc: 'Pegs worth half', fn: function() { /* handled in score */ } }
+        ];
+        var mod1 = mods[Math.floor(seededRandom(seed) * mods.length)];
+        var mod2 = mods[Math.floor(seededRandom(seed + 1) * mods.length)];
+        return [mod1, mod2];
+    }
+    
+    function startDailyChallenge() {
+        var mods = getDailyModifiers();
+        // Check if already played today
+        var today = new Date().toDateString();
+        if (PERSIST.daily && PERSIST.daily.date === today && PERSIST.daily.completed) {
+            alert('You\'ve already completed today\'s daily challenge!');
+            return;
+        }
+        // Apply modifiers
+        for (var i = 0; i < mods.length; i++) {
+            if (mods[i].fn) mods[i].fn();
+        }
+        PERSIST.daily = { date: today, completed: false };
+        startGame();
+        // Store modifier names for display
+        GS.dailyMods = mods;
+    }
+    
+    // ========== JACKPOT SYSTEM ==========
+    var jackpotReels = [0, 0, 0];
+    var jackpotSpinning = false;
+    var jackpotSpinsLeft = 2; // 2 spins per floor
+    var jackpotWonThisFloor = false;
+    
+    function resetJackpotSpins() {
+        jackpotSpinsLeft = 2;
+        jackpotWonThisFloor = false;
+        jackpotReels = ['-', '-', '-'];
+        updateSpinsLeftUI();
+        updateSpinButtonState();
+        updateJackpotUI();
+    }
+    
+    function updateSpinsLeftUI() {
+        var el = document.getElementById('spinsLeftNum');
+        if (el) el.textContent = jackpotSpinsLeft;
+    }
+    
+    function updateSpinButtonState() {
+        var btn = document.getElementById('spinjp');
+        if (!btn) return;
+        if (jackpotSpinsLeft <= 0 || jackpotWonThisFloor || jackpotSpinning) {
+            btn.disabled = true;
+            btn.textContent = jackpotWonThisFloor ? 'JACKPOT WON!' : 'NO SPINS LEFT';
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'SPIN' + (jackpotSpinsLeft === 2 ? ' (2 LEFT)' : ' (1 LEFT)');
+        }
+    }
+    
+    // Spawn coin burst effect
+    function spawnCoinBurst(x, y) {
+        var symbols = ['★', '$', '✦', '●'];
+        for (var i = 0; i < 8; i++) {
+            var coin = document.createElement('div');
+            coin.className = 'coin';
+            coin.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+            coin.style.left = (x - 8 + Math.random() * 16) + 'px';
+            coin.style.top = (y + Math.random() * 20) + 'px';
+            coin.style.color = ['#ffff00', '#ff00ff', '#00fff2', '#00ff88'][Math.floor(Math.random() * 4)];
+            document.getElementById('fc').appendChild(coin);
+            setTimeout(function() { if (coin.parentNode) coin.parentNode.removeChild(coin); }, 1000);
+        }
+    }
+    
+    function spinJackpot(callback) {
+        if (jackpotSpinning) return;
+        if (jackpotSpinsLeft <= 0 || jackpotWonThisFloor) return;
+        
+        jackpotSpinning = true;
+        jackpotSpinsLeft--;
+        updateSpinsLeftUI();
+        updateSpinButtonState();
+        
+        var reelSymbols = ['★', '$', '+', '?', '#', '^'];
+        var timePerReel = 60; // Much faster spinning
+        var spins = 8; // Fewer spins for faster result
+        
+        // Sound effect simulation via visual feedback
+        var soundPulse = 0;
+        
+        function spinReel(reelIdx, totalSpins, finalCallback) {
+            var el = document.getElementById('jreel' + reelIdx);
+            el.classList.add('sp');
+            var count = 0;
+            
+            // Create visual blur effect during spin
+            el.style.textShadow = '0 0 20px #00fff2';
+            
+            var interval = setInterval(function() {
+                // Rapid symbol cycling
+                jackpotReels[reelIdx] = reelSymbols[Math.floor(Math.random() * reelSymbols.length)];
+                el.textContent = jackpotReels[reelIdx];
+                
+                // Add slight movement effect
+                el.style.transform = 'translateY(' + (Math.sin(count * 0.5) * 2) + 'px)';
+                
+                count++;
+                
+                // Sound-like visual pulse every few frames
+                if (count % 3 === 0) {
+                    el.style.textShadow = '0 0 ' + (15 + Math.random() * 15) + 'px #00fff2';
+                }
+                
+                // Slow down this reel's final spins (near-miss drama)
+                if (count > totalSpins - 5) {
+                    timePerReel = 80 + (count - (totalSpins - 5)) * 15;
+                }
+                
+                if (count >= totalSpins) {
+                    clearInterval(interval);
+                    el.classList.remove('sp');
+                    el.style.textShadow = '';
+                    el.style.transform = '';
+                    
+                    // Final stopping effect
+                    el.style.animation = 'none';
+                    el.offsetHeight; // Force reflow
+                    el.style.animation = 'reel-stop 0.3s ease-out';
+                    
+                    setTimeout(function() {
+                        el.style.animation = '';
+                        if (finalCallback) finalCallback();
+                    }, 100);
+                }
+            }, timePerReel);
+        }
+        
+        // Chain reels with tight timing for excitement
+        spinReel(0, spins, function() {
+            // First reel stops - check if it matches potential
+            var el0 = document.getElementById('jreel0');
+            el0.classList.add('hit');
+            
+            spinReel(1, spins + 4, function() {
+                // Second reel stops - building tension!
+                var el1 = document.getElementById('jreel1');
+                if (jackpotReels[1] === jackpotReels[0]) {
+                    el1.classList.add('win'); // Both matching = potential win!
+                } else {
+                    el1.classList.add('hit');
+                }
+                
+                setTimeout(function() {
+                    spinReel(2, spins + 8, function() {
+                        // All reels stopped!
+                        jackpotSpinning = false;
+                        
+                        // Remove hit classes
+                        ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+                            document.getElementById(id).classList.remove('hit', 'win');
+                        });
+                        
+                        // Check for jackpot (3 of a kind)
+                        if (jackpotReels[0] === jackpotReels[1] && jackpotReels[1] === jackpotReels[2]) {
+                            // JACKPOT BONANZA!
+                            jackpotWonThisFloor = true;
+                            
+                            // Add win animation to all reels
+                            ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+                                document.getElementById(id).classList.add('win');
+                            });
+                            
+                            // Massive screen effects
+                            triggerScreenShake(12);
+                            triggerWhiteFlash();
+                            triggerWhiteFlash(); // Double flash!
+                            
+                            // Spawn coin bursts
+                            var fcEl = document.getElementById('fc');
+                            var rect = fcEl.getBoundingClientRect();
+                            for (var burst = 0; burst < 3; burst++) {
+                                setTimeout(function() {
+                                    spawnCoinBurst(200 + Math.random() * 80, 250);
+                                }, burst * 200);
+                            }
+                            
+                            // Flash the prize amount
+                            var resultEl = document.getElementById('fjpresult');
+                            if (resultEl) {
+                                resultEl.style.animation = 'none';
+                                resultEl.offsetHeight;
+                                resultEl.style.animation = 'prize-flash 0.5s ease-in-out 3';
+                            }
+                            
+                            // Award jackpot
+                            GS.sc += GS.jp;
+                            GS.jackpotWon = GS.jp;
+                            GS.jackpotWins++;
+                            GS.jp = Math.floor(500 * GS.fl); // Reset jackpot
+                            
+                            createFloat(C.W / 2, C.H / 2 - 50, '★ JACKPOT! ★', '#ff00ff');
+                            createFloat(C.W / 2, C.H / 2, '+' + GS.jp, '#ffff00');
+                            
+                            checkAchievements();
+                        } else {
+                            // No jackpot - show it respectfully
+                            ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+                                document.getElementById(id).classList.add('lose');
+                                setTimeout(function() {
+                                    document.getElementById(id).classList.remove('lose');
+                                }, 500);
+                            });
+                            
+                            // Grow jackpot
+                            GS.jp = Math.floor(GS.jp * 1.15);
+                            createFloat(C.W / 2, C.H / 2, 'TRY AGAIN...', '#8888aa');
+                        }
+                        
+                        updateJackpotUI();
+                        updateSpinButtonState();
+                        
+                        if (callback) callback();
+                    });
+                }, 200);
+            });
+        });
+    }
+    
+    function fastSpinAllReels(callback) {
+        // Quick blur through symbols without stopping
+        var reels = ['jreel0', 'jreel1', 'jreel2'];
+        var symbols = ['★', '$', '+', '?', '#', '^'];
+        
+        reels.forEach(function(reelId, idx) {
+            var el = document.getElementById(reelId);
+            var stopAfter = 8 + idx * 3;
+            var count = 0;
+            
+            var interval = setInterval(function() {
+                el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                count++;
+                if (count >= stopAfter) {
+                    clearInterval(interval);
+                }
+            }, 40);
+        });
+    }
+    
+    function updateJackpotUI() {
+        var reels = ['jreel0', 'jreel1', 'jreel2'];
+        for (var i = 0; i < 3; i++) {
+            var el = document.getElementById(reels[i]);
+            if (el) el.textContent = jackpotReels[i];
+        }
+        var resultEl = document.getElementById('fjpresult');
+        if (resultEl) resultEl.textContent = GS.jp;
+    }
+    
+    // ========== CONTRAST MODE ==========
+    function contrastToggle() {
+        PERSIST.contrastMode = !PERSIST.contrastMode;
+        document.body.classList.toggle('contrast-mode', PERSIST.contrastMode);
+        document.getElementById('contrasttoggle').classList.toggle('on', PERSIST.contrastMode);
+        savePersist();
+    }
+    
+    function applyContrastMode() {
+        if (PERSIST.contrastMode) {
+            document.body.classList.add('contrast-mode');
+            document.getElementById('contrasttoggle').classList.add('on');
+        }
+    }
+    
+    // ========== LEADERBOARD ==========
+    function getLeaderboard() {
+        return PERSIST.leaderboard || [];
+    }
+    
+    function addToLeaderboard(name, score, floor) {
+        var lb = getLeaderboard();
+        lb.push({ name: name, score: score, floor: floor, date: new Date().toLocaleDateString() });
+        lb.sort(function(a, b) { return b.score - a.score; });
+        lb = lb.slice(0, 10); // Keep top 10
+        PERSIST.leaderboard = lb;
+        savePersist();
+    }
+    
+    function isNewHighScore(score) {
+        var lb = getLeaderboard();
+        if (lb.length < 10) return true;
+        return score > lb[lb.length - 1].score;
+    }
+    
+    function updateLeaderboardUI() {
+        var grid = document.getElementById('lbgrid');
+        var lb = getLeaderboard();
+        var displayEntry = isNewHighScore(GS.sc) && GS.sc > 0;
+        
+        // Show entry form if new high score
+        document.getElementById('lbentry').style.display = displayEntry ? 'block' : 'none';
+        
+        grid.innerHTML = '';
+        if (lb.length === 0 && !displayEntry) {
+            grid.innerHTML = '<div style="color:#8888aa;text-align:center;padding:20px;">No scores yet. Play a game!</div>';
+            return;
+        }
+        for (var i = 0; i < lb.length; i++) {
+            var entry = lb[i];
+            var div = document.createElement('div');
+            div.className = 'lb-item ' + (i < 3 ? 'top3' : '');
+            div.innerHTML = '<span class="lb-rank">#' + (i + 1) + '</span><span class="lb-name">' + entry.name + '</span><span class="lb-score">' + entry.score + '</span><span class="lb-date">F' + entry.floor + '</span>';
+            grid.appendChild(div);
+        }
+    }
+    
+    function submitHighScore() {
+        var nameInput = document.getElementById('lbname');
+        var name = nameInput.value.trim() || 'Anonymous';
+        addToLeaderboard(name, GS.sc, GS.fl);
+        document.getElementById('lbentry').style.display = 'none';
+        updateLeaderboardUI();
+    }
+
+    // ========== BALL CLASS ==========
+    function Ball(x, y, vx, vy, payloads) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.r = C.BR;
+        this.on = true;
+        this.tr = [];
+        this.hp = {};
+        this.pl = payloads || [];
+        this.dm = 1;
+        this.gp = false;
+        this.wp = false;
+        this.slow = false;
+        this.cl = false;
+        this.mb = [];
+        this.sh = GS.shielded; // inherit shield status
+        this.ol = false;
+        this.sf = 0;
+        this.lastX = x;
+        this.lastY = y;
+        this.skin = GS.ballSkin || PERSIST.currentBallSkin; // ball skin color
+        this.ghostMode = false; // for ghost payload chromatic aberration
+        this.slowmoMode = false; // for slowmo payload
+        this.slotChecked = false; // track if slot has been triggered for this ball
+    }
+
+    Ball.prototype.update = function(dt) {
+        if (!this.on) return;
+        var dt60 = dt * 60;
+        
+        // Apply gravity with OVERCLOCK modifier
+        this.vy += C.G * GS.gravityMult * dt60;
+        
+        this.vx *= Math.pow(C.FR, dt60);
+        this.vy *= Math.pow(C.FR, dt60);
+        if (this.slow) {
+            this.vx *= 0.5;
+            this.vy *= 0.5;
+        }
+        var sp = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+        if (sp > C.MAXS) {
+            this.vx = this.vx / sp * C.MAXS;
+            this.vy = this.vy / sp * C.MAXS;
+        }
+        this.x += this.vx * dt60;
+        this.y += this.vy * dt60;
+        this.tr.push({x: this.x, y: this.y});
+        if (this.tr.length > 10) this.tr.shift();
+        
+        // Check if ball entered slot zone
+        if (!this.slotChecked && this.y >= C.SY) {
+            this.slotChecked = true;
+            checkSlot(this.x, this.y);
+        }
+        
+        var dx = this.x - this.lastX;
+        var dy = this.y - this.lastY;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d < C.STUCK_D) this.sf++;
+        else {
+            this.sf = 0;
+            this.lastX = this.x;
+            this.lastY = this.y;
+        }
+        if (this.sf >= C.STUCK_F) {
+            this.vx += (Math.random() - 0.5) * 8;
+            this.vy += (Math.random() - 0.5) * 8;
+            this.sf = 0;
+        }
+        if (this.x < this.r) {
+            this.x = this.r;
+            this.vx = Math.abs(this.vx) * 0.8;
+        }
+        if (this.x > C.W - this.r) {
+            this.x = C.W - this.r;
+            this.vx = -Math.abs(this.vx) * 0.8;
+        }
+        if (this.cl && this.mb.length === 0 && this.tr.length < 5) {
+            this.cl = false;
+            for (var i = 0; i < 3; i++) {
+                var b = new Ball(this.x, this.y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, []);
+                b.r = this.r * 0.6;
+                this.mb.push(b);
+            }
+        }
+        for (var i = 0; i < this.mb.length; i++) {
+            this.mb[i].update(dt);
+        }
+        if (this.y > C.H + 50) {
+            // Shield protects ball from overload
+            if (this.sh && !GS.overload) {
+                this.sh = false;
+                GS.shielded = false;
+                this.y = C.SY - 10;
+                this.vy = -Math.abs(this.vy) * 0.5;
+                createFloat(this.x, this.y, 'SHIELDED!', '#00fff2');
+                return;
+            }
+            this.on = false;
+        }
+    };
+
+    // ========== PEG CLASS ==========
+    function Peg(x, y, type, id) {
+        this.x = x;
+        this.y = y;
+        this.r = C.PR;
+        this.t = type;
+        this.st = C.PSTATES.N;
+        this.bc = 0.8;
+        // Bounce coefficients by peg type
+        this.hr = type === C.PT.E ? 3 : (type === C.PT.S ? 2 : 999);
+        this.id = id;
+        this.hc = 0;
+        this.paired = false;
+        // Special properties for new peg types
+        this.frozen = false; // for ice peg
+        this.fiberHits = 0; // for fiber peg
+        this.mirrorDir = Math.random() > 0.5 ? 1 : -1; // for mirror peg
+        this.attractCount = 0; // for honeypot peg
+    }
+    Peg.prototype.hit = function() {
+        this.hc++;
+        var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+        
+        // Track peg types hit for achievements
+        if (GS.pegTypesHit.indexOf(this.t) === -1) {
+            GS.pegTypesHit.push(this.t);
+        }
+        
+        if (this.t === C.PT.C) {
+            GS.sc += 200 + GS.cc * 50;
+            createFloat(this.x, this.y, '+' + (200 + GS.cc * 50), '#ffff00');
+        } else if (this.t === C.PT.S) {
+            GS.sc += 100;
+            createFloat(this.x, this.y, '+100', '#ff6600');
+            spawnShockwave(this.x, this.y);
+            triggerWhiteFlash();
+            triggerScreenShake(3);
+        } else if (this.t === C.PT.E) {
+            GS.sc *= 3;
+            createFloat(this.x, this.y, 'x3', '#ff2244');
+            triggerPegExplosion(this);
+        } else if (this.t === C.PT.T) {
+            var pair = null;
+            for (var i = 0; i < GS.bd.length; i++) {
+                var p = GS.bd[i];
+                if (p !== this && p.t === C.PT.T && !p.paired) {
+                    pair = p;
+                    break;
+                }
+            }
+            if (pair) {
+                this.x = pair.x;
+                this.y = pair.y;
+                pair.paired = true;
+                this.paired = true;
+            }
+            GS.sc += bonus;
+        } else if (this.t === C.PT.D && this.st === C.PSTATES.D) {
+            this.st = C.PSTATES.N;
+            GS.sc += bonus;
+        } else if (this.t === C.PT.I) {
+            // ICE PEG: Freezes ball briefly, bonus on second hit
+            if (this.frozen) {
+                GS.sc += 150 + GS.cc * 75;
+                createFloat(this.x, this.y, 'FROZEN! +' + (150 + GS.cc * 75), '#88ddff');
+                this.frozen = false;
+            } else {
+                GS.sc += bonus;
+                this.frozen = true;
+                createFloat(this.x, this.y, 'ICE!', '#88ddff');
+            }
+            // Ice has low bounce (0.5)
+            this.bc = 0.5;
+        } else if (this.t === C.PT.F) {
+            // FIBER PEG: Multi-hit bonus, breaks after 3 hits
+            this.fiberHits++;
+            if (this.fiberHits >= 3) {
+                GS.sc += 300 + GS.cc * 100;
+                createFloat(this.x, this.y, 'FIBER BREAK! +' + (300 + GS.cc * 100), '#ff8844');
+                // Remove peg
+                var idx = GS.bd.indexOf(this);
+                if (idx !== -1) GS.bd.splice(idx, 1);
+                GS.obj.prg++;
+                spawnFragments(this);
+            } else {
+                GS.sc += 75 * this.fiberHits;
+                createFloat(this.x, this.y, 'x' + this.fiberHits, '#ff8844');
+            }
+            // Fiber has high bounce (1.2)
+            this.bc = 1.2;
+        } else if (this.t === C.PT.M) {
+            // MIRROR PEG: Deflects ball in a specific direction
+            GS.sc += 100 + GS.cc * 25;
+            createFloat(this.x, this.y, 'MIRROR!', '#ffffff');
+            // Store the mirror direction for collision handling
+            this.mirrorDir = this.mirrorDir;
+        } else if (this.t === C.PT.H) {
+            // HONEYCOMB PEG: Attracts nearby pegs, bonus on 5th hit
+            this.attractCount++;
+            if (this.attractCount >= 5) {
+                GS.sc += 500 + GS.cc * 150;
+                createFloat(this.x, this.y, 'HONEYCOMB! +' + (500 + GS.cc * 150), '#ffcc00');
+                // Attract nearby pegs and remove them for bonus
+                for (var i = GS.bd.length - 1; i >= 0; i--) {
+                    var p = GS.bd[i];
+                    var d = Math.sqrt((p.x - this.x) * (p.x - this.x) + (p.y - this.y) * (p.y - this.y));
+                    if (d < 80 && d > 0 && p !== this && p.t !== C.PT.E && p.t !== C.PT.S) {
+                        GS.sc += 25 * (GS.cc + 1);
+                        GS.obj.prg++;
+                        spawnFragments(p);
+                        GS.bd.splice(i, 1);
+                    }
+                }
+            } else {
+                GS.sc += 50 + this.attractCount * 20;
+                createFloat(this.x, this.y, '+' + (50 + this.attractCount * 20), '#ffcc00');
+            }
+        } else if (this.t === C.PT.O) {
+            // OVERLOAD PEG: Drains jackpot on hit, high risk/reward
+            GS.sc += 75;
+            var jackpotDrain = Math.floor(GS.jp * 0.1);
+            GS.jp = Math.max(500, GS.jp - jackpotDrain);
+            createFloat(this.x, this.y, 'OVERLOAD! -' + jackpotDrain, '#ff4488');
+            triggerScreenShake(2);
+            // Overload has erratic bounce
+            this.bc = 0.6 + Math.random() * 0.4;
+        } else {
+            GS.sc += bonus;
+        }
+        if (this.st < C.PSTATES.EX) this.st++;
+        spawnParticles(C.PC[this.t] || '#00fff2', this.x, this.y, 20, 4);
+    };
+
+    // ========== BOARD GENERATION ==========
+    function genBoard() {
+        GS.bd = [];
+        var rows = 7 + Math.floor(GS.fl / 3);
+        var spacing = (C.BOT - C.TOP) / (rows + 1);
+        var id = 0;
+        for (var r = 0; r < rows; r++) {
+            var y = C.TOP + spacing * (r + 1);
+            var offset = (r % 2 === 0) ? 0 : C.PS / 2;
+            var cols = Math.floor((C.W - 60) / C.PS);
+            var startX = (C.W - cols * C.PS) / 2 + offset;
+            for (var c = 0; c < cols; c++) {
+                var x = startX + c * C.PS;
+                var t = C.PT.N;
+                var rand = Math.random();
+                // Peg spawn probabilities (scale with floor)
+                var pExpl = 0.01 + GS.fl * 0.003;
+                var pSeis = 0.015 + GS.fl * 0.008;
+                var pCache = 0.02 + GS.fl * 0.008;
+                var pSpcl = 0.04 + GS.fl * 0.015;
+                var pDorm = 0.04;
+                // New peg type probabilities (introduced at higher floors)
+                var pIce = GS.fl >= 3 ? 0.02 + GS.fl * 0.005 : 0;
+                var pFiber = GS.fl >= 5 ? 0.015 + GS.fl * 0.004 : 0;
+                var pMirror = GS.fl >= 7 ? 0.01 + GS.fl * 0.003 : 0;
+                var pHoney = GS.fl >= 9 ? 0.008 + GS.fl * 0.002 : 0;
+                var pOverload = GS.fl >= 11 ? 0.005 + GS.fl * 0.001 : 0;
+                
+                var cumulative = 0;
+                if (rand < (cumulative += pExpl)) t = C.PT.E;
+                else if (rand < (cumulative += pSeis)) t = C.PT.S;
+                else if (rand < (cumulative += pCache)) t = C.PT.C;
+                else if (rand < (cumulative += pSpcl) && r > 0) t = C.PT.T;
+                else if (rand < (cumulative += pDorm)) t = C.PT.D;
+                else if (rand < (cumulative += pIce)) t = C.PT.I;
+                else if (rand < (cumulative += pFiber)) t = C.PT.F;
+                else if (rand < (cumulative += pMirror)) t = C.PT.M;
+                else if (rand < (cumulative += pHoney)) t = C.PT.H;
+                else if (rand < (cumulative += pOverload)) t = C.PT.O;
+                
+                GS.bd.push(new Peg(x, y, t, id++));
+            }
+        }
+        var tele = [];
+        for (var i = 0; i < GS.bd.length; i++) {
+            if (GS.bd[i].t === C.PT.T) tele.push(GS.bd[i]);
+        }
+        for (var i = 0; i < tele.length; i += 2) {
+            if (i + 1 < tele.length) {
+                tele[i].paired = false;
+                tele[i + 1].paired = false;
+            }
+        }
+        // Add stormy pegs for stormy modifier
+        if (PERSIST.stormyModifier) {
+            addExtraPegs();
+        }
+    }
+    
+    // Add extra pegs rows for stormy modifier
+    function addExtraPegs() {
+        var extraRows = Math.min(3, Math.floor(GS.fl / 5) + 1);
+        var spacing = (C.BOT - C.TOP) / 9;
+        var startY = C.TOP + spacing * 4;
+        var id = GS.bd.length;
+        
+        for (var r = 0; r < extraRows; r++) {
+            var y = startY + r * spacing * 1.5;
+            var offset = (r % 2 === 0) ? C.PS / 4 : 0;
+            var cols = Math.floor((C.W - 80) / C.PS);
+            var startX = (C.W - cols * C.PS) / 2 + offset;
+            
+            for (var c = 0; c < cols; c++) {
+                var x = startX + c * C.PS;
+                // Check for overlap with existing pegs
+                var overlap = false;
+                for (var i = 0; i < GS.bd.length; i++) {
+                    var p = GS.bd[i];
+                    var dist = Math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y));
+                    if (dist < C.PS * 0.8) {
+                        overlap = true;
+                        break;
+                    }
+                }
+                if (!overlap) {
+                    // Stormy pegs are more unstable
+                    var rand = Math.random();
+                    var t = C.PT.N;
+                    if (rand < 0.02) t = C.PT.E;
+                    else if (rand < 0.05) t = C.PT.S;
+                    else if (rand < 0.10) t = C.PT.C;
+                    GS.bd.push(new Peg(x, y, t, id++));
+                }
+            }
+        }
+    }
+
+    function setupObj() {
+        var targets = [15, 20, 25, 30];
+        var idx = Math.min(Math.floor(GS.fl / 3), targets.length - 1);
+        var t = targets[idx] + GS.fl;
+        GS.obj = { tp: 'standard', tgt: t, prg: 0 };
+        document.getElementById('ot').textContent = t;
+    }
+
+    // ========== PHYSICS ==========
+    function checkCols(b) {
+        for (var i = 0; i < GS.bd.length; i++) {
+            var p = GS.bd[i];
+            if (b.hp[p.id]) continue;
+            if (p.t === C.PT.D && p.st === C.PSTATES.D) continue;
+            var dx = b.x - p.x;
+            var dy = b.y - p.y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            var minD = b.r + p.r;
+            if (dist < minD && dist > 0) {
+                var nx = dx / dist;
+                var ny = dy / dist;
+                var overlap = minD - dist;
+                b.x += nx * overlap;
+                b.y += ny * overlap;
+                var dot = b.vx * nx + b.vy * ny;
+                
+                // Apply bounce coefficient based on peg type
+                var bounceCoeff = p.bc;
+                
+                // Mirror peg: deflect ball in specific direction
+                if (p.t === C.PT.M) {
+                    // Use stored mirror direction
+                    var mirrorFactor = p.mirrorDir;
+                    // Deflect horizontally more based on direction
+                    b.vx = (Math.abs(b.vx) * mirrorFactor + b.vy * 0.5) * bounceCoeff;
+                    b.vy = (b.vy + Math.abs(b.vx) * 0.3) * bounceCoeff;
+                    
+                    // Ensure minimum horizontal velocity
+                    if (Math.abs(b.vx) < 3) {
+                        b.vx = 3 * mirrorFactor;
+                    }
+                } else if (p.t === C.PT.I && p.frozen) {
+                    // Ice peg (already hit): slow down the ball
+                    bounceCoeff = 0.3;
+                    b.vx = (b.vx - 2 * dot * nx) * bounceCoeff;
+                    b.vy = (b.vy - 2 * dot * ny) * bounceCoeff;
+                    b.slow = true;
+                    setTimeout(function() { b.slow = false; }, 500);
+                } else {
+                    // Standard bounce
+                    b.vx = (b.vx - 2 * dot * nx) * bounceCoeff;
+                    b.vy = (b.vy - 2 * dot * ny) * bounceCoeff;
+                }
+                
+                b.hp[p.id] = true;
+                p.hit();
+                GS.obj.prg++;
+                GS.pegsHit++;
+                PERSIST.totalPegsHit++;
+                GS.cc = Math.min(GS.cc + 1, C.MAXM);
+                GS.ct = C.CHAIN_T;
+                if (GS.cc >= 5) {
+                    GS.fa = true;
+                    GS.ft = C.FRENZY_T;
+                }
+                if (GS.cc >= 7) {
+                    GS.maxComboHits++;
+                    spawnFloatText(b.x, b.y - 20, 'MAX COMBO!', '#ffff00');
+                    triggerWhiteFlash();
+                }
+                if (GS.cc > GS.bestCombo) GS.bestCombo = GS.cc;
+                createPart(b.x, b.y, C.PC[p.t] || '#00fff2');
+            }
+        }
+    }
+
+    function updateBalls(dt) {
+        // Get all active balls (supports multiball)
+        var activeBalls = [];
+        if (GS.ball) {
+            activeBalls.push(GS.ball);
+            activeBalls = activeBalls.concat(GS.ball.mb);
+        }
+        
+        // Update all balls
+        for (var i = 0; i < activeBalls.length; i++) {
+            var b = activeBalls[i];
+            if (b && b.on) {
+                b.update(dt);
+                // Only check collisions if not in ghost mode (phase through pegs)
+                if (!b.ghostMode) {
+                    checkCols(b);
+                }
+                checkDormantActivation(b);
+            }
+        }
+        
+        // Clean up inactive mini balls from main ball
+        if (GS.ball) {
+            GS.ball.mb = GS.ball.mb.filter(function(mb) { return mb.on; });
+        }
+        
+        // Count how many main balls have exited
+        var ballsExited = 0;
+        
+        // Check main ball
+        if (GS.ball && !GS.ball.on) {
+            checkBallExit(GS.ball);
+            GS.ball = GS.activeBalls.length > 1 ? GS.activeBalls[1] : null;
+            ballsExited++;
+        }
+        
+        // Check mini balls (if not in multiball mode)
+        if (!PERSIST.multiballEnabled) {
+            for (var i = 0; i < activeBalls.length; i++) {
+                var mb = activeBalls[i];
+                if (mb && mb !== GS.ball && !mb.on) {
+                    ballsExited++;
+                    checkBallExit(mb);
+                }
+            }
+        }
+        
+        // Check mini balls in GS.ball.mb
+        if (GS.ball && GS.ball.mb) {
+            for (var i = GS.ball.mb.length - 1; i >= 0; i--) {
+                var mb = GS.ball.mb[i];
+                if (!mb.on) {
+                    // Mini ball exited - trigger overflow and remove
+                    if (!PERSIST.multiballEnabled) {
+                        triggerOverflow(mb.x);
+                        GS.bl--; // Consume a ball count for mini ball exit
+                    }
+                    // Remove from mini ball array
+                    GS.ball.mb.splice(i, 1);
+                    // Reset multiplier on mini ball exit
+                    GS.cc = 0;
+                    GS.ct = 0;
+                    GS.fa = false;
+                    GS.gravityMult = 1;
+                }
+            }
+        }
+        
+        // Update active balls in GS for multiball tracking
+        GS.activeBalls = activeBalls.filter(function(b) { return b && b.on; });
+        
+        // Check if run should end (all balls gone and objective not met)
+        if (GS.activeBalls.length === 0 && GS.bl <= 0 && GS.obj.prg < GS.obj.tgt) {
+            GS.scr = C.SCR.RE;
+            showScreen('re');
+            updateRunEnd();
+        }
+    }
+    
+    // Handle ball exit logic
+    function checkBallExit(ball) {
+        // Check if we already counted this slot
+        if (ball.slotChecked) {
+            // Already triggered slot effect in update()
+        }
+        
+        // Ball consumed
+        GS.bl--;
+        
+        // Reset multiplier on ball exit (cascade)
+        GS.cc = 0;
+        GS.ct = 0;
+        GS.fa = false;
+        
+        // Reset gravity modifier
+        GS.gravityMult = 1;
+    }
+    // ========== SLOT COLLECTOR ==========
+    var slots = [C.ST.E, C.ST.CR, C.ST.AM, C.ST.PA, C.ST.CM, C.ST.SH, C.ST.OC];
+
+    // Get slot X position (center of slot)
+    function getSlotX(slotIdx) {
+        return slotIdx * C.SW + C.SW / 2;
+    }
+
+    // Get slot index for a given X position
+    function getSlotForX(x) {
+        return Math.floor(x / C.SW);
+    }
+
+    // Check if a slot position is unlocked
+    function isSlotUnlocked(slotIdx) {
+        return GS.unlockedSlots.indexOf(slotIdx) !== -1;
+    }
+
+    // Check if ball entered a slot (only unlocked slots)
+    function checkSlot(bx, by) {
+        // Ball must enter slot zone
+        if (by < C.SY) return;
+
+        var si = getSlotForX(bx);
+        if (si < 0 || si >= C.SC) return;
+
+        // Only check unlocked slots!
+        if (!isSlotUnlocked(si)) return;
+
+        console.log('SLOT HIT - pos:', si, 'type:', slots[si], 'name:', C.ST_NAMES[slots[si]]);
+
+        var st = slots[si];
+        triggerSlotCollected(si, st);
+    }
+
+    // ========== EFFECTS ==========
+
+    // Trigger slot effect
+    function triggerSlotCollected(slotIdx, slotType) {
+        var slotName = C.ST_NAMES[slotType];
+        createFloat(getSlotX(slotIdx), C.SY + C.SH / 2, slotName, '#00fff2');
+        
+        switch(slotType) {
+            case C.ST.CR: // CREDITS: +50 × multiplier credits
+                var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+                GS.sc += bonus;
+                createFloat(C.W / 2, C.SY - 20, '+' + bonus, '#00ff88');
+                break;
+                
+            case C.ST.AM: // AMPLIFY: +1 multiplier + 180 chain timer
+                GS.cc = Math.min(GS.cc + 1, C.MAXM);
+                GS.ct = Math.max(GS.ct, C.CHAIN_T + 180);
+                createFloat(C.W / 2, C.SY - 20, '+COMBO', '#ff00ff');
+                break;
+                
+            case C.ST.PA: // PAYLOAD: Add free payload
+                if (GS.pl.length < 2) {
+                    var payloads = ['scrambler', 'trojan', 'worm', 'logicbomb', 'daemon', 'ghost', 'cluster', 'explosive', 'slowmo'];
+                    GS.pl.push([payloads[Math.floor(Math.random() * payloads.length)]]);
+                    createFloat(C.W / 2, C.SY - 20, '+PAYLOAD', '#9944ff');
+                }
+                break;
+                
+            case C.ST.CM: // CRUMBLE: Destroy 3 random pegs
+                var crumbleCount = 0;
+                for (var i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
+                    var p = GS.bd[i];
+                    if (p.t !== C.PT.E && p.t !== C.PT.S) {
+                        createFrag(p.x, p.y);
+                        GS.bd.splice(i, 1);
+                        crumbleCount++;
+                        GS.obj.prg++;
+                    }
+                }
+                createFloat(C.W / 2, C.SY - 20, 'CRUMBLE!', '#ff6600');
+                break;
+                
+            case C.ST.SH: // SHIELD: Next ball protected from overflow
+                GS.shielded = true;
+                createFloat(C.W / 2, C.SY - 20, 'SHIELD READY', '#00fff2');
+                break;
+                
+            case C.ST.OC: // OVERCLOCK: 1.5× gravity for this ball
+                GS.gravityMult = 1.5;
+                createFloat(C.W / 2, C.SY - 20, 'OVERCLOCK!', '#ffff00');
+                break;
+                
+            case C.ST.JP: // JACKPOT: Win jackpot
+                GS.sc += GS.jp;
+                createFloat(C.W / 2, C.SY - 30, '+JACKPOT ' + GS.jp, '#ff00ff');
+                GS.jackpotWon += GS.jp;
+                GS.jackpotWins++;
+                GS.jp = Math.floor(500 * GS.fl * 1.15); // Grow jackpot for next
+                triggerScreenShake(5);
+                // Check jackpot achievements
+                checkAchievements();
+                break;
+                
+            case C.ST.E: // EMPTY: Nothing happens
+            default:
+                break;
+        }
+    }
+
+    // Trigger overflow penalty when ball exits without hitting slot
+    function triggerOverflow(ballX) {
+        GS.overload = true;
+        
+        // Floor-scaled penalty: -1 life, -3 score per floor, jackpot drain
+        var penalty = GS.fl * 3;
+        GS.sc = Math.max(0, GS.sc - penalty);
+        
+        // Drain jackpot (lose 15% of current jackpot)
+        var jackpotLoss = Math.floor(GS.jp * 0.15);
+        GS.jp = Math.max(500, GS.jp - jackpotLoss);
+        
+        // Reset multiplier
+        GS.cc = 0;
+        GS.ct = 0;
+        
+        createFloat(ballX, C.SY - 20, 'OVERFLOW -' + penalty, '#ff2244');
+        triggerScreenShake(3);
+        
+        setTimeout(function() { GS.overload = false; }, 1000);
+    }
+
+    function genSlots() {
+        for (var i = 0; i < slots.length; i++) {
+            var r = Math.random();
+            if (r < 0.03) slots[i] = C.ST.JP; // 3% jackpot
+            else if (r < 0.10) slots[i] = C.ST.OC; // 7% overclock
+            else if (r < 0.18) slots[i] = C.ST.SH; // 8% shield
+            else if (r < 0.28) slots[i] = C.ST.CM; // 10% crumble
+            else if (r < 0.38) slots[i] = C.ST.AM; // 10% amplify
+            else if (r < 0.50) slots[i] = C.ST.PA; // 12% payload
+            else if (r < 0.65) slots[i] = C.ST.CR; // 15% credits
+            else slots[i] = C.ST.E; // 35% empty
+        }
+    }
+    
+    // ========== SLOT SELECTOR ==========
+    function initSlotArrangement() {
+        // Initialize unlocked slots array for new runs
+        // Start with NO slots unlocked - player chooses which to unlock each floor
+        if (GS.unlockedSlots.length === 0) {
+            GS.unlockedSlots = [];
+        }
+
+        // Determine if player can unlock a new slot this floor
+        // Player unlocks 1 slot per floor until all 7 are unlocked
+        GS.canUnlockThisFloor = (GS.unlockedSlots.length < 7);
+
+        // Copy existing slot assignments from confirmed slots array
+        // This preserves slots from previous floors
+        GS.slotArrangement = slots.slice();
+
+        // Generate 7 NEW random slot effects as the pool for this floor
+        var poolSlots = [];
+        for (var i = 0; i < C.SC; i++) {
+            var r = Math.random();
+            if (r < 0.03) poolSlots.push(C.ST.JP);
+            else if (r < 0.10) poolSlots.push(C.ST.OC);
+            else if (r < 0.18) poolSlots.push(C.ST.SH);
+            else if (r < 0.28) poolSlots.push(C.ST.CM);
+            else if (r < 0.38) poolSlots.push(C.ST.AM);
+            else if (r < 0.50) poolSlots.push(C.ST.PA);
+            else if (r < 0.65) poolSlots.push(C.ST.CR);
+            else poolSlots.push(C.ST.E);
+        }
+
+        // Initialize state
+        GS.slotPool = poolSlots; // 7 new random slots to choose from this floor
+        GS.slotsArranged = false; // Player must arrange slots before playing
+        GS.scr = C.SCR.P; // Set game state
+
+        // Show slot selector and HUD
+        showScreen('slot-selector');
+        showHUD(true);
+        renderSlotSelector();
+    }
+    
+    function getSlotColor(slotType) {
+        switch(slotType) {
+            case C.ST.JP: return '#ff00ff';
+            case C.ST.AM: return '#ff00ff';
+            case C.ST.CR: return '#00ff88';
+            case C.ST.OC: return '#ffff00';
+            case C.ST.SH: return '#00fff2';
+            case C.ST.CM: return '#ff6600';
+            case C.ST.PA: return '#9944ff';
+            default: return '#8888aa';
+        }
+    }
+    
+    function renderSlotSelector() {
+        var posContainer = document.getElementById('position-slots');
+        var poolContainer = document.getElementById('slot-pool');
+
+        // Build position slots (0-6)
+        posContainer.innerHTML = '';
+        for (var i = 0; i < C.SC; i++) {
+            var isUnlocked = GS.unlockedSlots.indexOf(i) !== -1;
+            var slotType = GS.slotArrangement[i];
+            var hasSlot = slotType !== undefined && slotType !== null;
+
+            var div = document.createElement('div');
+            div.className = 'slot-pos' + (hasSlot ? ' occupied' : '');
+            div.dataset.pos = i;
+
+            if (isUnlocked) {
+                // Position is unlocked
+                if (hasSlot) {
+                    // Has a slot assigned - show it and allow rearrangement
+                    var col = getSlotColor(slotType);
+                    var icon = C.ST_ICONS[slotType];
+                    var name = C.ST_NAMES[slotType];
+                    div.style.background = col + '55';
+                    div.style.borderColor = col;
+                    div.style.color = col;
+                    div.textContent = icon;
+                    div.title = name + ' - Position ' + (i + 1);
+                    div.draggable = true;
+
+                    div.addEventListener('dragstart', function(e) {
+                        GS.isDraggingSlot = true;
+                        GS.draggingFromPos = parseInt(this.dataset.pos);
+                        GS.draggingSlotType = GS.slotArrangement[GS.draggingFromPos];
+                        this.style.opacity = '0.4';
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    div.addEventListener('dragend', function() {
+                        this.style.opacity = '1';
+                        GS.isDraggingSlot = false;
+                        GS.draggingSlotType = null;
+                        GS.draggingFromPos = -1;
+                    });
+                    div.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        this.style.transform = 'scale(1.15)';
+                        this.style.boxShadow = '0 0 20px rgba(0,255,242,0.8)';
+                    });
+                    div.addEventListener('dragleave', function() {
+                        this.style.transform = '';
+                        this.style.boxShadow = '';
+                    });
+                    div.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        this.style.transform = '';
+                        this.style.boxShadow = '';
+                        var targetPos = parseInt(this.dataset.pos);
+                        handleSlotDrop(targetPos);
+                    });
+                } else {
+                    // Unlocked but no slot yet - drop target for new slot
+                    div.style.background = 'rgba(255,255,0,0.3)';
+                    div.style.borderColor = '#ffff00';
+                    div.style.borderStyle = 'dashed';
+                    div.style.color = '#ffff00';
+                    div.textContent = '+';
+                    div.title = 'Drop a slot here!';
+
+                    div.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        this.style.transform = 'scale(1.15)';
+                        this.style.boxShadow = '0 0 30px rgba(255,255,0,0.8)';
+                    });
+                    div.addEventListener('dragleave', function() {
+                        this.style.transform = '';
+                        this.style.boxShadow = '';
+                    });
+                    div.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        this.style.transform = '';
+                        this.style.boxShadow = '';
+                        var targetPos = parseInt(this.dataset.pos);
+                        handlePoolDrop(targetPos);
+                    });
+                }
+            } else {
+                // Position is locked - show as locked/unlockable
+                if (GS.canUnlockThisFloor) {
+                    // Player can unlock this slot - show as unlockable
+                    div.style.background = 'rgba(255,0,255,0.2)';
+                    div.style.borderColor = '#ff00ff';
+                    div.style.borderStyle = 'dashed';
+                    div.style.color = '#ff00ff';
+                    div.textContent = '?';
+                    div.title = 'Drag and drop a slot to UNLOCK!';
+
+                    div.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        this.style.transform = 'scale(1.15)';
+                        this.style.boxShadow = '0 0 30px rgba(255,0,255,0.8)';
+                    });
+                    div.addEventListener('dragleave', function() {
+                        this.style.transform = '';
+                        this.style.boxShadow = '';
+                    });
+                    div.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        this.style.transform = '';
+                        this.style.boxShadow = '';
+                        var targetPos = parseInt(this.dataset.pos);
+                        handlePoolDrop(targetPos, true); // true = also unlock
+                    });
+                } else {
+                    // All slots unlocked or can't unlock this floor
+                    div.style.background = 'rgba(85,85,102,0.3)';
+                    div.style.borderColor = '#555566';
+                    div.style.color = '#555566';
+                    div.textContent = '?';
+                    div.title = 'Already unlocked';
+                }
+            }
+
+            posContainer.appendChild(div);
+        }
+
+        // Build pool of available slots to choose from
+        poolContainer.innerHTML = '';
+
+        // Show info about unlocking
+        var infoDiv = document.createElement('div');
+        infoDiv.style.cssText = 'color:#00fff2;font-size:11px;margin-bottom:8px;width:100%;text-align:center;';
+        if (GS.canUnlockThisFloor) {
+            var nextLocked = -1;
+            for (var k = 0; k < C.SC; k++) {
+                if (GS.unlockedSlots.indexOf(k) === -1) {
+                    nextLocked = k;
+                    break;
+                }
+            }
+            if (nextLocked !== -1) {
+                infoDiv.textContent = 'Drag and drop to unlock a slot!';
+            }
+        } else if (GS.unlockedSlots.length < 7) {
+            infoDiv.textContent = 'All positions unlocked! Rearrange as needed.';
+        } else {
+            infoDiv.textContent = 'All slots unlocked! Rearrange as needed.';
+        }
+        poolContainer.appendChild(infoDiv);
+
+        for (var j = 0; j < GS.slotPool.length; j++) {
+            var poolSlotType = GS.slotPool[j];
+            var col = getSlotColor(poolSlotType);
+            var icon = C.ST_ICONS[poolSlotType];
+            var name = C.ST_NAMES[poolSlotType];
+
+            var poolDiv = document.createElement('div');
+            poolDiv.className = 'slot-pool-item';
+            poolDiv.style.background = col + '55';
+            poolDiv.style.borderColor = col;
+            poolDiv.style.color = col;
+            poolDiv.textContent = icon;
+            poolDiv.title = name;
+            poolDiv.dataset.poolIdx = j;
+            poolDiv.dataset.slotType = poolSlotType;
+            poolDiv.draggable = true;
+
+            poolDiv.addEventListener('dragstart', function(e) {
+                GS.isDraggingSlot = true;
+                GS.draggingFromPos = -1; // from pool
+                GS.draggingSlotType = parseInt(this.dataset.slotType);
+                GS.draggingPoolIdx = parseInt(this.dataset.poolIdx);
+                this.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+            poolDiv.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+                GS.isDraggingSlot = false;
+                GS.draggingSlotType = null;
+                GS.draggingFromPos = -1;
+                GS.draggingPoolIdx = -1;
+            });
+
+            poolContainer.appendChild(poolDiv);
+        }
+    }
+
+    function handleSlotDrop(targetPos) {
+        if (!GS.isDraggingSlot) return;
+
+        var fromPos = GS.draggingFromPos;
+
+        // If dragging from pool (fromPos < 0) to unlocked position
+        if (fromPos < 0) {
+            // Handle pool drop to unlocked position with existing slot
+            if (isSlotUnlocked(targetPos) && GS.draggingFromPos === -1) {
+                var poolIdx = GS.draggingPoolIdx;
+                var slotType = GS.draggingSlotType;
+
+                if (poolIdx < 0 || poolIdx >= GS.slotPool.length) return;
+
+                // Add the existing slot back to pool
+                if (GS.slotArrangement[targetPos] !== undefined && GS.slotArrangement[targetPos] !== null) {
+                    GS.slotPool.push(GS.slotArrangement[targetPos]);
+                }
+
+                // Assign new slot
+                GS.slotArrangement[targetPos] = slotType;
+                GS.slotPool.splice(poolIdx, 1);
+
+                GS.isDraggingSlot = false;
+                GS.draggingSlotType = null;
+                GS.draggingFromPos = -1;
+                GS.draggingPoolIdx = -1;
+
+                renderSlotSelector();
+                return;
+            }
+            return;
+        }
+
+        if (fromPos === targetPos) return; // Same slot
+        if (!isSlotUnlocked(targetPos)) return; // Can only swap with unlocked positions
+
+        // Swap the slot types between positions
+        var temp = GS.slotArrangement[targetPos];
+        GS.slotArrangement[targetPos] = GS.slotArrangement[fromPos];
+        GS.slotArrangement[fromPos] = temp;
+
+        renderSlotSelector();
+    }
+
+    function handlePoolDrop(targetPos, alsoUnlock) {
+        alsoUnlock = alsoUnlock || false;
+
+        if (!GS.isDraggingSlot || GS.draggingFromPos !== -1) return;
+
+        var slotType = GS.draggingSlotType;
+        var poolIdx = GS.draggingPoolIdx;
+
+        if (poolIdx < 0 || poolIdx >= GS.slotPool.length) return;
+
+        // If position is locked and we want to unlock it
+        if (!isSlotUnlocked(targetPos) && GS.canUnlockThisFloor) {
+            unlockSlotPosition(targetPos);
+        }
+
+        // Only assign if now unlocked
+        if (!isSlotUnlocked(targetPos)) return;
+
+        // Assign this slot type to the target position
+        GS.slotArrangement[targetPos] = slotType;
+
+        // Remove from pool
+        GS.slotPool.splice(poolIdx, 1);
+
+        GS.isDraggingSlot = false;
+        GS.draggingSlotType = null;
+        GS.draggingFromPos = -1;
+        GS.draggingPoolIdx = -1;
+
+        renderSlotSelector();
+    }
+
+    function unlockSlotPosition(pos) {
+        if (GS.unlockedSlots.indexOf(pos) !== -1) return; // Already unlocked
+        if (!GS.canUnlockThisFloor) return; // Can't unlock this floor
+
+        GS.unlockedSlots.push(pos);
+        GS.unlockedSlots.sort(function(a, b) { return a - b; });
+
+        // After unlocking, prevent any more unlocks this floor
+        GS.canUnlockThisFloor = false;
+
+        renderSlotSelector();
+    }
+
+    function autoArrangeSlots() {
+        // Auto-unlock next position if available
+        if (GS.canUnlockThisFloor && GS.unlockedSlots.length < 7) {
+            // Find first locked position
+            for (var k = 0; k < C.SC; k++) {
+                if (GS.unlockedSlots.indexOf(k) === -1) {
+                    unlockSlotPosition(k);
+                    break;
+                }
+            }
+        }
+
+        // Auto-assign remaining pool slots to any unlocked positions without slots
+        for (var i = 0; i < GS.unlockedSlots.length && GS.slotPool.length > 0; i++) {
+            var pos = GS.unlockedSlots[i];
+            if (GS.slotArrangement[pos] === undefined || GS.slotArrangement[pos] === null) {
+                GS.slotArrangement[pos] = GS.slotPool.shift();
+            }
+        }
+
+        renderSlotSelector();
+    }
+
+    function confirmSlotArrangement() {
+        // Ensure all unlocked positions have a slot assigned
+        for (var i = 0; i < GS.unlockedSlots.length; i++) {
+            var pos = GS.unlockedSlots[i];
+            if ((GS.slotArrangement[pos] === undefined || GS.slotArrangement[pos] === null) && GS.slotPool.length > 0) {
+                GS.slotArrangement[pos] = GS.slotPool.shift();
+            }
+        }
+
+        // Fill any undefined positions with empty slot type
+        for (var i = 0; i < C.SC; i++) {
+            if (GS.slotArrangement[i] === undefined || GS.slotArrangement[i] === null) {
+                GS.slotArrangement[i] = C.ST.E;
+            }
+        }
+        
+        // Copy arrangement to actual slots array
+        for (var i = 0; i < C.SC; i++) {
+            slots[i] = GS.slotArrangement[i];
+        }
+        GS.slotsArranged = true;
+
+        // Show the game board
+        showScreen('none');
+    }
+    
+    function ensureSlotsArranged() {
+        if (!GS.slotsArranged) {
+            // Auto-assign a slot to the new position if player didn't arrange before first ball
+            autoArrangeSlots();
+            confirmSlotArrangement();
+        }
+    }
+
+    // ========== EFFECTS ==========
+    var parts = [];
+    var floats = [];
+    var frags = [];
+    var waves = [];
+    var screenShake = { x: 0, y: 0, dur: 0 };
+    
+    // Helper function to darken a hex color
+    function darkenColor(hex, factor) {
+        var r = parseInt(hex.slice(1, 3), 16);
+        var g = parseInt(hex.slice(3, 5), 16);
+        var b = parseInt(hex.slice(5, 7), 16);
+        r = Math.floor(r * factor);
+        g = Math.floor(g * factor);
+        b = Math.floor(b * factor);
+        return '#' + (r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0'));
+    }
+    
+    function triggerScreenShake(intensity) {
+        screenShake.dur = intensity * 5;
+        screenShake.intensity = intensity;
+    }
+    
+    function triggerWhiteFlash() {
+        GS.whiteFlash = true;
+        setTimeout(function() { GS.whiteFlash = false; }, 100);
+    }
+    
+    function spawnParticles(color, x, y, count, spread) {
+        count = count || 20;
+        spread = spread || 4;
+        // Safety cap: prevent unbounded growth (max 500 particles)
+        var maxParticles = 500;
+        if (parts.length >= maxParticles) {
+            // Remove oldest particles to make room
+            var toRemove = count;
+            while (toRemove > 0 && parts.length > 0) {
+                parts.shift();
+                toRemove--;
+            }
+        }
+        for (var i = 0; i < count; i++) {
+            var a = Math.random() * Math.PI * 2;
+            var s = 1 + Math.random() * spread;
+            parts.push({x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c: color, l: 30});
+        }
+    }
+    
+    function spawnFragments(peg) {
+        var col = C.PC[peg.t] || '#00fff2';
+        // Safety cap: prevent unbounded growth (max 300 fragments)
+        var maxFragments = 300;
+        if (frags.length >= maxFragments) {
+            // Remove oldest fragments to make room
+            var toRemove = 8;
+            while (toRemove > 0 && frags.length > 0) {
+                frags.shift();
+                toRemove--;
+            }
+        }
+        for (var i = 0; i < 8; i++) {
+            var a = Math.random() * Math.PI * 2;
+            frags.push({
+                x: peg.x, y: peg.y,
+                vx: Math.cos(a) * (2 + Math.random() * 3),
+                vy: Math.sin(a) * (2 + Math.random() * 3),
+                col: col,
+                size: 2 + Math.random() * 4,
+                l: 40
+            });
+        }
+    }
+    
+    function spawnShockwave(x, y) {
+        waves.push({x: x, y: y, r: 0, m: 60, c: '#ff6600'});
+    }
+    
+    function spawnFloatText(x, y, text, color) {
+        // Safety cap: prevent unbounded growth (max 200 float texts)
+        var maxFloats = 200;
+        if (floats.length >= maxFloats) {
+            floats.shift(); // Remove oldest
+        }
+        floats.push({x: x, y: y, t: text, c: color, l: 60});
+    }
+    
+    // Peg evolution system
+    function checkDormantActivation(ball) {
+        for (var i = 0; i < GS.bd.length; i++) {
+            var p = GS.bd[i];
+            if (p.t === C.PT.D && p.st === C.PSTATES.D) {
+                var dx = ball.x - p.x;
+                var dy = ball.y - p.y;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 40) {
+                    p.st = C.PSTATES.N;
+                    spawnFloatText(p.x, p.y, 'REVEAL!', '#00ff88');
+                }
+            }
+        }
+    }
+    
+    function triggerPegExplosion(peg) {
+        // Explosive peg: x3 self score, x1.5 adjacent
+        var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+        GS.sc += bonus * 3;
+        createFloat(peg.x, peg.y, 'x3!', '#ff2244');
+        
+        // Damage adjacent pegs
+        for (var i = 0; i < GS.bd.length; i++) {
+            var p = GS.bd[i];
+            var d = Math.sqrt((p.x - peg.x) * (p.x - peg.x) + (p.y - peg.y) * (p.y - peg.y));
+            if (d < 60 && d > 0 && p !== peg) {
+                GS.sc += Math.floor(bonus * 1.5);
+                if (p.st < C.PSTATES.EX) p.st++;
+            }
+        }
+        
+        triggerWhiteFlash();
+        triggerScreenShake(5);
+        spawnParticles('#ff2244', peg.x, peg.y, 30, 8);
+        
+        // Remove explosion peg
+        var idx = GS.bd.indexOf(peg);
+        if (idx !== -1) {
+            GS.bd.splice(idx, 1);
+        }
+        GS.obj.prg++;
+    }
+
+    function createPart(x, y, col) {
+        spawnParticles(col || '#00fff2', x, y, 8, 4);
+    }
+
+    function createFloat(x, y, txt, col) {
+        spawnFloatText(x, y, txt, col || '#00fff2');
+    }
+
+    function createFrag(x, y) {
+        spawnFragments({x: x, y: y, t: 0});
+    }
+
+    function triggerSeismic(x, y) {
+        spawnShockwave(x, y);
+    }
+
+    function triggerExplosion(x, y) {
+        for (var i = 0; i < GS.bd.length; i++) {
+            var p = GS.bd[i];
+            var d = Math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y));
+            if (d < 80 && p.t !== C.PT.E) {
+                createFrag(p.x, p.y);
+                GS.obj.prg++;
+            }
+        }
+    }
+
+    function updateFX(dt) {
+        var dt60 = dt * 60;
+        for (var i = parts.length - 1; i >= 0; i--) {
+            var p = parts[i];
+            p.x += p.vx * dt60;
+            p.y += p.vy * dt60;
+            p.l -= dt60;
+            if (p.l <= 0) parts.splice(i, 1);
+        }
+        for (var i = floats.length - 1; i >= 0; i--) {
+            floats[i].y -= 1 * dt60;
+            floats[i].l -= dt60;
+            if (floats[i].l <= 0) floats.splice(i, 1);
+        }
+        for (var i = frags.length - 1; i >= 0; i--) {
+            var f = frags[i];
+            f.x += f.vx * dt60;
+            f.y += f.vy * dt60;
+            f.vy += 0.1 * dt60;
+            f.l -= dt60;
+            if (f.l <= 0) frags.splice(i, 1);
+        }
+        for (var i = waves.length - 1; i >= 0; i--) {
+            waves[i].r += 3 * dt60;
+            if (waves[i].r >= waves[i].m) waves.splice(i, 1);
+        }
+        // Update screen shake
+        if (screenShake.dur > 0) {
+            screenShake.x = (Math.random() - 0.5) * screenShake.intensity * 2;
+            screenShake.y = (Math.random() - 0.5) * screenShake.intensity * 2;
+            screenShake.dur -= dt60;
+        } else {
+            screenShake.x = 0;
+            screenShake.y = 0;
+        }
+    }
+
+    // ========== UI ==========
+    function showScreen(id) {
+        var screens = ['menu', 'fc', 're', 'shop', 'tut', 'ach', 'lb', 'settings', 'resetconfirm', 'slot-selector'];
+        for (var i = 0; i < screens.length; i++) {
+            var el = document.getElementById(screens[i]);
+            if (el) el.classList.remove('on');
+        }
+        if (id && id !== 'none') {
+            var el = document.getElementById(id);
+            if (el) el.classList.add('on');
+        }
+    }
+
+    function showHUD(show) {
+        var hud = document.getElementById('hud');
+        var mul = document.getElementById('mul');
+        var ol = document.getElementById('ol');
+        var ob = document.getElementById('ob');
+        var pi = document.getElementById('pi');
+        var sb = document.getElementById('sb');
+        
+        hud.classList.toggle('on', show);
+        mul.classList.toggle('on', show);
+        ol.classList.toggle('on', show);
+        ob.classList.toggle('on', show);
+        pi.classList.toggle('on', show);
+        sb.classList.toggle('on', show);
+    }
+
+    function updateHUD() {
+        document.getElementById('fn').textContent = GS.fl;
+        document.getElementById('sv').textContent = GS.sc;
+        document.getElementById('jv').textContent = GS.jp;
+        document.getElementById('bv').textContent = GS.bl;
+        
+        // Chain multiplier display with color coding
+        var mult = GS.cc + 1;
+        var mv = document.getElementById('mv');
+        mv.textContent = 'x' + mult;
+        
+        // Color based on multiplier level
+        if (GS.fa) {
+            mv.style.color = '#ff00ff'; // Frenzy magenta
+            mv.style.textShadow = '0 0 30px #ff00ff';
+        } else if (GS.cc >= 5) {
+            mv.style.color = '#ff00ff'; // High combo magenta
+            mv.style.textShadow = '0 0 25px #ff00ff';
+        } else if (GS.cc >= 3) {
+            mv.style.color = '#ffff00'; // Mid combo gold
+            mv.style.textShadow = '0 0 20px #ffff00';
+        } else {
+            mv.style.color = '#00fff2'; // Normal cyan
+            mv.style.textShadow = '0 0 20px #00fff2';
+        }
+        
+        // Chain timer bar
+        document.getElementById('cf').style.width = Math.max(0, (GS.ct / C.CHAIN_T * 100)) + '%';
+        
+        // Objective progress bar
+        document.getElementById('of').style.width = Math.min(100, (GS.obj.prg / GS.obj.tgt) * 100) + '%';
+        
+        // Payload inventory
+        var ps1 = document.getElementById('ps1');
+        var ps2 = document.getElementById('ps2');
+        if (GS.pl[0]) {
+            ps1.textContent = GS.pl[0][0].charAt(0).toUpperCase();
+            ps1.className = 'ps on';
+        } else {
+            ps1.textContent = '-';
+            ps1.className = 'ps';
+        }
+        if (GS.pl[1]) {
+            ps2.textContent = GS.pl[1][0].charAt(0).toUpperCase();
+            ps2.className = 'ps on';
+        } else {
+            ps2.textContent = '-';
+            ps2.className = 'ps';
+        }
+        
+        // Update menu stats
+        document.getElementById('msc').textContent = PERSIST.ls;
+        document.getElementById('mfl').textContent = PERSIST.lf;
+        document.getElementById('mcr').textContent = PERSIST.br;
+        document.getElementById('mtr').textContent = PERSIST.tr || 0;
+    }
+
+    function updateRunEnd() {
+        document.getElementById('rsc').textContent = GS.sc;
+        document.getElementById('rfl').textContent = GS.fl - 1;
+        document.getElementById('rbc').textContent = GS.bestCombo;
+        document.getElementById('rph').textContent = GS.pegsHit;
+        document.getElementById('rcd').textContent = Math.floor(GS.sc / 10);
+        document.getElementById('nb').style.display = (GS.sc >= PERSIST.ls) ? 'block' : 'none';
+    }
+
+    function updateShop() {
+        document.getElementById('scr').textContent = PERSIST.br;
+        var grid = document.getElementById('sg');
+        grid.innerHTML = '';
+        var items = [
+            {n: 'Scrambler', c: 50, d: 'Reverses direction'},
+            {n: 'Trojan', c: 75, d: 'Spawns clone balls'},
+            {n: 'Worm', c: 60, d: 'Passes through pegs'},
+            {n: 'Logic Bomb', c: 100, d: 'x3 score on hit'},
+            {n: 'Daemon', c: 80, d: 'Shields one ball'},
+            {n: 'Ghost', c: 70, d: 'Phase through pegs'},
+            {n: 'Cluster', c: 90, d: 'Splits into 3 balls'},
+            {n: 'Explosive', c: 85, d: 'Chain explosions'},
+            {n: 'Slowmo', c: 55, d: 'Slows ball speed'}
+        ];
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var div = document.createElement('div');
+            div.className = 'si';
+            div.innerHTML = '<div class="in">' + item.n + '</div><div class="ic">' + item.c + '</div><div class="ii">' + item.d + '</div>';
+            div.addEventListener('click', (function(it) {
+                return function() {
+                    if (PERSIST.br >= it.c) {
+                        PERSIST.br -= it.c;
+                        if (GS.pl.length < 2) GS.pl.push([it.n.toLowerCase()]);
+                        updateShop();
+                    }
+                };
+            })(item));
+            grid.appendChild(div);
+        }
+    }
+    // ========== RENDER ==========
+    var canvas = document.getElementById('gc');
+    var ctx = canvas.getContext('2d');
+
+    function render() {
+        ctx.clearRect(0, 0, C.W, C.H);
+        
+        // Apply screen shake
+        ctx.save();
+        ctx.translate(screenShake.x, screenShake.y);
+        
+        // Grid background with theme support
+        var gridColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.03)' : 'rgba(0,255,242,0.05)';
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        for (var x = 0; x < C.W; x += 30) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, C.H);
+            ctx.stroke();
+        }
+        for (var y = 0; y < C.H; y += 30) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(C.W, y);
+            ctx.stroke();
+        }
+        
+        // Drop zone
+        if (GS.scr === C.SCR.P) {
+            var dzColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.1)' : 'rgba(0,255,242,0.1)';
+            var dzBorderColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.5)' : 'rgba(0,255,242,0.5)';
+            var trajColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.3)' : 'rgba(0,255,242,0.3)';
+            ctx.fillStyle = dzColor;
+            ctx.fillRect(0, 0, C.W, C.DZY);
+            ctx.strokeStyle = dzBorderColor;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, C.DZY);
+            ctx.lineTo(C.W, C.DZY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Trajectory preview with OVERCLOCK modifier
+            ctx.strokeStyle = trajColor;
+            ctx.beginPath();
+            var tx = GS.mouseX;
+            var ty = C.DZY + 10;
+            var tvx = 0;
+            var tvy = 2;
+            ctx.moveTo(tx, ty);
+            for (var i = 0; i < 30; i++) {
+                tvx *= C.FR;
+                tvy += C.G * GS.gravityMult;
+                if (tvy > C.MAXV) tvy = C.MAXV;
+                tx += tvx;
+                ty += tvy;
+                if (ty > C.H) break;
+                ctx.lineTo(tx, ty);
+            }
+            ctx.stroke();
+        }
+        
+        // Slot collector - only show unlocked slots, styled by type
+        for (var i = 0; i < C.SC; i++) {
+            var x = i * C.SW;
+            var unlocked = isSlotUnlocked(i);
+
+            // Only render if slot is unlocked
+            if (!unlocked) continue;
+
+            var slotType = slots[i];
+
+            // Get slot colors based on type
+            var slotColor;
+            switch(slotType) {
+                case C.ST.JP: slotColor = '#ffcc00'; break; // Gold - jackpot (money/winning)
+                case C.ST.AM: slotColor = '#ff00ff'; break; // Magenta - amplify (boost/combo)
+                case C.ST.CR: slotColor = '#00ff88'; break; // Green - credits
+                case C.ST.OC: slotColor = '#ffff00'; break; // Yellow - overclock
+                case C.ST.SH: slotColor = '#00fff2'; break; // Cyan - shield
+                case C.ST.CM: slotColor = '#ff6600'; break; // Orange - crumble
+                case C.ST.PA: slotColor = '#9944ff'; break; // Purple - payload
+                default: slotColor = '#8888aa'; // Grey - empty
+            }
+
+            var slotFillColor = slotColor + '33'; // 20% opacity
+            var slotBorderColor = slotColor;
+
+            ctx.fillStyle = slotFillColor;
+            ctx.fillRect(x + 2, C.SY, C.SW - 4, C.SH);
+            ctx.strokeStyle = slotBorderColor;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 2, C.SY, C.SW - 4, C.SH);
+            ctx.lineWidth = 1;
+
+            // Draw slot icon
+            ctx.font = '16px Courier New';
+            ctx.fillStyle = slotColor;
+            ctx.textAlign = 'center';
+            ctx.fillText(C.ST_ICONS[slotType], x + C.SW / 2, C.SY + C.SH / 2 + 6);
+        }
+        
+        // Pegs
+        for (var i = 0; i < GS.bd.length; i++) {
+            var p = GS.bd[i];
+            var col = PERSIST.contrastMode ? (C.PC_CONTRAST[p.t] || '#cccccc') : (C.PC[p.t] || '#00fff2');
+            if (p.st === C.PSTATES.D) col = PERSIST.contrastMode ? '#666666' : '#444466';
+            else if (p.st === C.PSTATES.GL) col = PERSIST.contrastMode ? '#ffffff' : '#88ffff';
+            else if (p.st === C.PSTATES.CH) col = PERSIST.contrastMode ? '#ffffcc' : '#ffff88';
+            else if (p.st === C.PSTATES.EX) col = PERSIST.contrastMode ? '#ffaaaa' : '#ff4488';
+            
+            var glow = p.st > C.PSTATES.N ? 2 : 0;
+            
+            // Special rendering for new peg types
+            if (p.t === C.PT.I) {
+                // ICE PEG: Crystalline appearance with frost effect
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + glow, 0, Math.PI * 2);
+                ctx.fillStyle = p.frozen ? '#aaddff' : col;
+                ctx.fill();
+                // Ice crystal effect
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // Draw frost rays
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 1;
+                for (var ray = 0; ray < 6; ray++) {
+                    var angle = (ray / 6) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x + Math.cos(angle) * (p.r + 2), p.y + Math.sin(angle) * (p.r + 2));
+                    ctx.lineTo(p.x + Math.cos(angle) * (p.r + 6), p.y + Math.sin(angle) * (p.r + 6));
+                    ctx.stroke();
+                }
+            } else if (p.t === C.PT.F) {
+                // FIBER PEG: Striated appearance showing hit count
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + glow, 0, Math.PI * 2);
+                var fiberGrad = ctx.createLinearGradient(p.x - p.r, p.y, p.x + p.r, p.y);
+                fiberGrad.addColorStop(0, '#ff6633');
+                fiberGrad.addColorStop(0.5 + p.fiberHits * 0.15, '#ffaa66');
+                fiberGrad.addColorStop(1, '#ff6633');
+                ctx.fillStyle = fiberGrad;
+                ctx.fill();
+                // Draw fiber strands
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                for (var strand = 0; strand <= p.fiberHits; strand++) {
+                    var strandY = p.y - p.r + (p.r * 2 / 3) * (strand / 3);
+                    ctx.beginPath();
+                    ctx.moveTo(p.x - p.r + 2, strandY);
+                    ctx.lineTo(p.x + p.r - 2, strandY);
+                    ctx.stroke();
+                }
+            } else if (p.t === C.PT.M) {
+                // MIRROR PEG: Reflective appearance with directional arrow
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + glow, 0, Math.PI * 2);
+                var mirrorGrad = ctx.createRadialGradient(p.x - 2, p.y - 2, 0, p.x, p.y, p.r);
+                mirrorGrad.addColorStop(0, '#ffffff');
+                mirrorGrad.addColorStop(0.5, '#dddddd');
+                mirrorGrad.addColorStop(1, '#aaaaaa');
+                ctx.fillStyle = mirrorGrad;
+                ctx.fill();
+                // Draw direction indicator
+                ctx.fillStyle = '#666666';
+                ctx.beginPath();
+                var arrowDir = p.mirrorDir;
+                ctx.moveTo(p.x + arrowDir * 4, p.y - 3);
+                ctx.lineTo(p.x + arrowDir * 4, p.y + 3);
+                ctx.lineTo(p.x + arrowDir * 8, p.y);
+                ctx.closePath();
+                ctx.fill();
+            } else if (p.t === C.PT.H) {
+                // HONEYCOMB PEG: Hexagonal with honeycomb pattern
+                ctx.beginPath();
+                var hexRadius = p.r + glow;
+                for (var h = 0; h < 6; h++) {
+                    var hx = p.x + Math.cos((h / 6) * Math.PI * 2 - Math.PI / 2) * hexRadius;
+                    var hy = p.y + Math.sin((h / 6) * Math.PI * 2 - Math.PI / 2) * hexRadius;
+                    if (h === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                var honeyGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+                honeyGrad.addColorStop(0, '#ffee88');
+                honeyGrad.addColorStop(1, '#ffcc00');
+                ctx.fillStyle = honeyGrad;
+                ctx.fill();
+                // Draw honeycomb inner pattern
+                ctx.strokeStyle = 'rgba(200,150,0,0.5)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (var h2 = 0; h2 < 6; h2++) {
+                    var hx2 = p.x + Math.cos((h2 / 6) * Math.PI * 2 - Math.PI / 2) * (p.r * 0.5);
+                    var hy2 = p.y + Math.sin((h2 / 6) * Math.PI * 2 - Math.PI / 2) * (p.r * 0.5);
+                    if (h2 === 0) ctx.moveTo(hx2, hy2);
+                    else ctx.lineTo(hx2, hy2);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            } else if (p.t === C.PT.O) {
+                // OVERLOAD PEG: Pulsing danger appearance
+                var pulsePhase = (Date.now() / 200) % (Math.PI * 2);
+                var pulseSize = Math.sin(pulsePhase) * 2;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + glow + pulseSize, 0, Math.PI * 2);
+                ctx.fillStyle = col;
+                ctx.fill();
+                // Draw lightning bolt
+                ctx.strokeStyle = '#ff88aa';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(p.x - 2, p.y - 4);
+                ctx.lineTo(p.x + 1, p.y);
+                ctx.lineTo(p.x - 1, p.y);
+                ctx.lineTo(p.x + 2, p.y + 4);
+                ctx.stroke();
+            } else {
+                // Standard peg rendering
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + glow, 0, Math.PI * 2);
+                ctx.fillStyle = col;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+        
+        // Shockwaves
+        for (var i = 0; i < waves.length; i++) {
+            var w = waves[i];
+            ctx.beginPath();
+            ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+            ctx.strokeStyle = w.c;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 1 - w.r / w.m;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        
+        // Fragments
+        for (var i = 0; i < frags.length; i++) {
+            var f = frags[i];
+            ctx.globalAlpha = f.l / 40;
+            ctx.fillStyle = f.col || '#00fff2';
+            ctx.fillRect(f.x - f.size / 2, f.y - f.size / 2, f.size, f.size);
+        }
+        ctx.globalAlpha = 1;
+        
+        // Ball rendering with support for multiball
+        var allBalls = GS.activeBalls || (GS.ball ? [GS.ball] : []);
+        for (var ballIdx = 0; ballIdx < allBalls.length; ballIdx++) {
+            var b = allBalls[ballIdx];
+            if (!b || !b.on) continue;
+            
+            // Trail
+            for (var i = 0; i < b.tr.length; i++) {
+                var t = b.tr[i];
+                ctx.globalAlpha = (i / b.tr.length) * 0.5;
+                ctx.fillStyle = GS.cc >= 5 ? '#ff00ff' : (GS.cc >= 3 ? '#ffff00' : '#00fff2');
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, b.r * (i / b.tr.length), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            
+            // Ghost ball chromatic aberration effect
+            if (b.ghostMode) {
+                // Draw RGB offset copies for chromatic aberration
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(b.x - 2, b.y, b.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(b.x + 2, b.y, b.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#0000ff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y - 2, b.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 0.7;
+                ctx.fillStyle = '#88ddff';
+            } else {
+                ctx.fillStyle = b.skin || '#00fff2';
+            }
+            
+            // Ball body
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+            var grad = ctx.createRadialGradient(b.x - 2, b.y - 2, 0, b.x, b.y, b.r);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.5, b.ol ? '#ff2244' : (b.skin || '#00fff2'));
+            grad.addColorStop(1, b.ol ? '#aa0022' : (darkenColor(b.skin || '#00fff2', 0.5)));
+            ctx.fillStyle = grad;
+            ctx.fill();
+            
+            // Shield ring for shielded balls
+            if (b.sh) {
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 3;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.r + 5, 0, Math.PI * 2);
+                ctx.stroke();
+                // Glow effect
+                ctx.strokeStyle = 'rgba(0,255,136,0.3)';
+                ctx.lineWidth = 6;
+                ctx.stroke();
+            }
+            
+            ctx.globalAlpha = 1;
+            
+            // Mini balls (cluster payload)
+            ctx.fillStyle = '#9944ff';
+            for (var i = 0; i < b.mb.length; i++) {
+                var mb = b.mb[i];
+                if (!mb.on) continue;
+                ctx.beginPath();
+                ctx.arc(mb.x, mb.y, mb.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Slow-mo effect: octagonal blue tint overlay
+        if (GS.slowmoEffect) {
+            ctx.fillStyle = 'rgba(0,0,255,0.1)';
+            ctx.beginPath();
+            var octSize = Math.min(C.W, C.H) * 0.4;
+            for (var o = 0; o < 8; o++) {
+                var ox = C.W / 2 + Math.cos((o / 8) * Math.PI * 2 - Math.PI / 8) * octSize * 1.5;
+                var oy = C.H / 2 + Math.sin((o / 8) * Math.PI * 2 - Math.PI / 8) * octSize * 1.5;
+                if (o === 0) ctx.moveTo(ox, oy);
+                else ctx.lineTo(ox, oy);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Edge glow for octagon
+            ctx.strokeStyle = 'rgba(0,100,255,0.3)';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+        
+        // Particles
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i];
+            ctx.globalAlpha = p.l / 30;
+            ctx.fillStyle = p.c;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        
+        // Float text
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'center';
+        for (var i = 0; i < floats.length; i++) {
+            var f = floats[i];
+            ctx.globalAlpha = f.l / 60;
+            ctx.fillStyle = f.c;
+            ctx.fillText(f.t, f.x, f.y);
+        }
+        ctx.globalAlpha = 1;
+        
+        // Frenzy indicator
+        if (GS.fa) {
+            ctx.font = '16px Courier New';
+            ctx.fillStyle = '#ff00ff';
+            ctx.textAlign = 'center';
+            ctx.fillText('FRENZY x3!', C.W / 2, C.H - 20);
+        }
+        
+        // Overload indicator
+        if (GS.overload) {
+            ctx.fillStyle = 'rgba(255,34,68,0.2)';
+            ctx.fillRect(0, 0, C.W, C.H);
+        }
+        
+        // White flash effect
+        if (GS.whiteFlash) {
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillRect(0, 0, C.W, C.H);
+        }
+        
+        // Restore from screen shake
+        ctx.restore();
+    }
+
+    // ========== GAME LOOP ==========
+    var lastT = 0;
+
+    function loop(ts) {
+        var dt = Math.min((ts - lastT) / 1000, 0.05);
+        lastT = ts;
+        
+        if (GS.scr === C.SCR.P) {
+            // Chain timer
+            if (GS.ct > 0) {
+                GS.ct -= dt * 60;
+                if (GS.ct <= 0) GS.cc = 0;
+            }
+            // Frenzy timer
+            if (GS.ft > 0) {
+                GS.ft -= dt * 60;
+                if (GS.ft <= 0) GS.fa = false;
+            }
+            updateBalls(dt);
+            updateFX(dt);
+            
+            // Check floor complete
+            if (GS.obj.prg >= GS.obj.tgt && GS.activeBalls.length === 0) {
+                GS.scr = C.SCR.FC;
+                GS.floorScore = GS.sc;
+                GS.jackpotWon = GS.jp;
+                var floorCredits = Math.floor(GS.sc / 10);
+                GS.creditsEarned += floorCredits;
+                PERSIST.br += floorCredits;
+                if (GS.fl > PERSIST.lf) PERSIST.lf = GS.fl;
+                if (GS.sc > PERSIST.ls) PERSIST.ls = GS.sc;
+                
+                // Track ball saver achievement (5 balls remaining)
+                if (GS.bl >= 5) {
+                    PERSIST.ballSaverCount++;
+                }
+                
+                // Check floor-related achievements
+                checkAchievements();
+                
+                showScreen('fc');
+                document.getElementById('fsc').textContent = GS.sc;
+                document.getElementById('fbl').textContent = GS.bl;
+                // Reset jackpot spins for new floor
+                resetJackpotSpins();
+            }
+        }
+        
+        render();
+        updateHUD();
+        requestAnimationFrame(loop);
+    }
+
+    // ========== GAME CONTROL ==========
+    function startGame() {
+        GS.scr = C.SCR.P;
+        GS.fl = 1;
+        GS.sc = 0;
+        GS.bl = 5;
+        GS.cc = 0;
+        GS.ct = 0;
+        GS.fa = false;
+        GS.ft = 0;
+        GS.pegsHit = 0;
+        GS.bestCombo = 0;
+        GS.maxComboHits = 0;
+        GS.floorBallsLeft = 5;
+        GS.jp = 500;
+        GS.pl = [];
+        GS.ball = null;
+        GS.gravityMult = 1;
+        GS.shielded = false;
+        GS.overload = false;
+        GS.whiteFlash = false;
+        GS.dailyMods = [];
+        GS.jackpotWins = 0;
+        GS.creditsEarned = 0;
+        GS.pegTypesHit = [];
+        GS.speedDemonTimer = 0;
+        GS.speedDemonHits = 0;
+        GS.activeBalls = [];
+        GS.ballSkin = PERSIST.currentBallSkin;
+        GS.ghostEffect = false;
+        GS.slowmoEffect = false;
+        // Reset slot system for new run - no slots unlocked, player chooses each floor
+        GS.unlockedSlots = [];
+        GS.slotsArranged = false;
+        GS.slotArrangement = [];
+        GS.slotPool = [];
+        GS.canUnlockThisFloor = true;
+        PERSIST.tr++;
+        // Reset jackpot spins for new run
+        resetJackpotSpins();
+        genBoard();
+        setupObj();
+        // Initialize slot arrangement (this shows the selector)
+        initSlotArrangement();
+    }
+
+    function dropBall() {
+        if (!GS.canDrop || GS.bl <= 0) return;
+        
+        // Ensure slots are arranged before first ball
+        ensureSlotsArranged();
+        
+        // Payload injection protection: enforce max payload limit
+        var MAX_PAYLOADS = 2;
+        if (GS.pl.length > MAX_PAYLOADS) {
+            console.warn('Payload limit exceeded, truncating to max ' + MAX_PAYLOADS);
+            GS.pl = GS.pl.slice(0, MAX_PAYLOADS);
+        }
+        
+        // Check if we can drop more balls (multiball mode)
+        var currentBalls = GS.ball ? 1 : 0;
+        if (GS.ball) {
+            currentBalls += GS.ball.mb.filter(function(mb) { return mb.on; }).length;
+        }
+        
+        // In multiball mode, allow up to MAX_BALLS concurrently
+        // In normal mode, require previous ball to be gone
+        if (PERSIST.multiballEnabled && currentBalls >= C.MAX_BALLS) return;
+        if (!PERSIST.multiballEnabled && GS.ball) return;
+        
+        GS.canDrop = false;
+        var pl = GS.pl.shift() || [];
+        
+        var newBall = new Ball(GS.mouseX, C.DZY + 10, 0, 2, pl);
+        
+        // Apply payload effects to ball
+        if (pl.indexOf('ghost') !== -1) {
+            newBall.ghostMode = true;
+            GS.ghostEffect = true;
+        }
+        if (pl.indexOf('slowmo') !== -1) {
+            newBall.slowmoMode = true;
+            GS.slowmoEffect = true;
+        }
+        
+        if (PERSIST.multiballEnabled && GS.ball) {
+            // Add to existing ball's mini-balls array for rendering
+            GS.ball.mb.push(newBall);
+        } else {
+            GS.ball = newBall;
+        }
+        
+        GS.activeBalls = GS.activeBalls || [];
+        GS.activeBalls.push(newBall);
+        
+        setTimeout(function() { GS.canDrop = true; }, 500);
+    }
+
+    // ========== INPUT ==========
+    canvas.addEventListener('mousemove', function(e) {
+        var rect = canvas.getBoundingClientRect();
+        GS.mouseX = (e.clientX - rect.left) * (C.W / rect.width);
+    });
+
+    canvas.addEventListener('click', function() {
+        if (GS.scr === C.SCR.P) dropBall();
+    });
+
+    // ========== BUTTONS ==========
+    document.getElementById('startb').addEventListener('click', function() {
+        startGame();
+    });
+
+    document.getElementById('dailyb').addEventListener('click', function() {
+        alert('Daily Challenge coming soon!');
+    });
+
+    document.getElementById('tutb').addEventListener('click', function() {
+        GS.scr = C.SCR.TU;
+        showScreen('tut');
+    });
+
+    document.getElementById('tutcb').addEventListener('click', function() {
+        PERSIST.hasTut = true;
+        GS.scr = C.SCR.M;
+        showScreen('menu');
+    });
+
+    document.getElementById('contb').addEventListener('click', function() {
+        GS.floorBallsLeft = GS.bl;
+        GS.fl++;
+        GS.bl = 5;
+        GS.scr = C.SCR.P;
+        GS.obj.prg = 0;
+        GS.ball = null;
+        GS.gravityMult = 1;
+        GS.shielded = false;
+        GS.cc = 0;
+        GS.ct = 0;
+        GS.fa = false;
+        GS.maxComboHits = 0;
+        // Reset jackpot spins for new floor
+        resetJackpotSpins();
+        genBoard();
+        setupObj();
+        // Initialize slot arrangement (this shows the selector)
+        initSlotArrangement();
+    });
+
+    document.getElementById('endb').addEventListener('click', function() {
+        GS.scr = C.SCR.RE;
+        showScreen('re');
+        updateRunEnd();
+    });
+
+    document.getElementById('retb').addEventListener('click', function() {
+        GS.scr = C.SCR.M;
+        showScreen('menu');
+        showHUD(false);
+        PERSIST.br += Math.floor(GS.sc / 10);
+        if (GS.fl > PERSIST.lf) PERSIST.lf = GS.fl;
+        if (GS.sc > PERSIST.ls) PERSIST.ls = GS.sc;
+        
+        // Check achievements at end of run
+        checkAchievements();
+        
+        // Update leaderboard with score
+        if (GS.sc > 0 && isNewHighScore(GS.sc)) {
+            updateLeaderboardUI();
+            document.getElementById('lbname').value = '';
+            showScreen('lb');
+        }
+        
+        savePersist();
+    });
+
+    document.getElementById('sb').addEventListener('click', function() {
+        GS.scr = C.SCR.SH;
+        showScreen('shop');
+        updateShop();
+    });
+
+    document.getElementById('clsb').addEventListener('click', function() {
+        GS.scr = C.SCR.P;
+        showScreen('none');
+    });
+    
+    // ========== ACHIEVEMENTS BUTTON ==========
+    document.getElementById('achb').addEventListener('click', function() {
+        updateAchievementsUI();
+        showScreen('ach');
+    });
+    
+    document.getElementById('achclb').addEventListener('click', function() {
+        showScreen('menu');
+    });
+    
+    // ========== LEADERBOARD BUTTON ==========
+    document.getElementById('lbb').addEventListener('click', function() {
+        updateLeaderboardUI();
+        showScreen('lb');
+    });
+    
+    document.getElementById('lbsubmit').addEventListener('click', submitHighScore);
+    
+    document.getElementById('lbclb').addEventListener('click', function() {
+        showScreen('menu');
+    });
+    
+    // ========== SETTINGS BUTTONS ==========
+    document.getElementById('settingsb').addEventListener('click', function() {
+        showScreen('settings');
+    });
+    
+    document.getElementById('settclb').addEventListener('click', function() {
+        showScreen('menu');
+    });
+    
+    document.getElementById('contrasttoggle').addEventListener('click', contrastToggle);
+    
+    document.getElementById('resetb').addEventListener('click', function() {
+        showScreen('resetconfirm');
+    });
+    
+    document.getElementById('confirmsubmit').addEventListener('click', function() {
+        localStorage.removeItem('slotProtocol');
+        PERSIST = { lb: 0, lf: 0, ls: 0, br: 0, ur: [], pu: {}, ach: [],
+            hasTut: false, daily: {}, streak: 0, lastDay: '', tr: 0,
+            leaderboard: [], contrastMode: false, totalPegsHit: 0, ballSaverCount: 0,
+            multiballEnabled: false, currentBallSkin: '#00fff2', currentBoardTheme: 'default',
+            stormyModifier: false };
+        // Reload page to reset everything
+        window.location.reload();
+    });
+    
+    document.getElementById('resetcancel').addEventListener('click', function() {
+        showScreen('settings');
+    });
+    
+    // ========== DAILY CHALLENGE BUTTON ==========
+    document.getElementById('dailyb').addEventListener('click', function() {
+        var mods = getDailyModifiers();
+        var msg = 'Daily Challenge modifiers:\n';
+        for (var i = 0; i < mods.length; i++) {
+            msg += '• ' + mods[i].name + ': ' + mods[i].desc + '\n';
+        }
+        msg += '\nStart the challenge?';
+        if (confirm(msg)) {
+            startDailyChallenge();
+            showHUD(true);
+        }
+    });
+    
+    // ========== ACHIEVEMENT CHECKING ==========
+    function checkAchievements() {
+        for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+            var ach = ACHIEVEMENTS[i];
+            if (PERSIST.ach.indexOf(ach.id) === -1 && ach.check()) {
+                unlockAchievement(ach);
+            }
+        }
+    }
+    
+    document.getElementById('spinjp').addEventListener('click', function() {
+        spinJackpot(function() {
+            updateJackpotUI();
+        });
+    });
+    
+    // Slot selector buttons
+    document.getElementById('auto-arrange').addEventListener('click', function() {
+        autoArrangeSlots();
+    });
+    
+    document.getElementById('confirm-slots').addEventListener('click', function() {
+        confirmSlotArrangement();
+    });
+    
+    PERSIST.ach = PERSIST.ach || [];
+
+    // ========== NEW SETTINGS HANDLERS ==========
+    function initSettings() {
+        // Apply contrast mode state
+        applyContrastMode();
+        
+        // Apply multiball toggle state
+        document.getElementById('multiballtoggle').classList.toggle('on', PERSIST.multiballEnabled);
+        
+        // Apply ball skin display
+        updateBallSkinDisplay();
+        
+        // Apply board theme display
+        updateThemeDisplay();
+    }
+    
+    function updateBallSkinDisplay() {
+        var names = {
+            '#00fff2': 'CYAN',
+            '#ff00ff': 'MAGENTA',
+            '#ffff00': 'GOLD',
+            '#00ff88': 'GREEN',
+            '#ff6600': 'ORANGE',
+            '#ffffff': 'WHITE'
+        };
+        document.getElementById('ballSkinDisplay').textContent = names[PERSIST.currentBallSkin] || 'CYAN';
+        document.getElementById('ballSkinDisplay').style.color = PERSIST.currentBallSkin;
+    }
+    
+    function updateThemeDisplay() {
+        var names = {
+            'default': 'NEON',
+            'neon': 'NEON',
+            'matrix': 'MATRIX'
+        };
+        document.getElementById('themeDisplay').textContent = names[PERSIST.currentBoardTheme] || 'NEON';
+    }
+    
+    function multiballToggle() {
+        PERSIST.multiballEnabled = !PERSIST.multiballEnabled;
+        document.getElementById('multiballtoggle').classList.toggle('on', PERSIST.multiballEnabled);
+        savePersist();
+    }
+    
+    document.getElementById('multiballtoggle').addEventListener('click', multiballToggle);
+    
+    // Ball skin buttons
+    document.querySelectorAll('.skin-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var skin = btn.getAttribute('data-skin');
+            if (PERSIST.unlockedBallSkins.indexOf(skin) !== -1 || true) { // Allow all for now
+                PERSIST.currentBallSkin = skin;
+                updateBallSkinDisplay();
+                savePersist();
+            }
+        });
+    });
+    
+    // Theme buttons
+    document.querySelectorAll('.theme-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var theme = btn.getAttribute('data-theme');
+            if (PERSIST.unlockedBoardThemes.indexOf(theme) !== -1 || true) { // Allow all for now
+                PERSIST.currentBoardTheme = theme;
+                updateThemeDisplay();
+                applyBoardTheme();
+                savePersist();
+            }
+        });
+    });
+    
+    function applyBoardTheme() {
+        var body = document.body;
+        body.classList.remove('theme-neon', 'theme-matrix');
+        if (PERSIST.currentBoardTheme === 'matrix') {
+            body.classList.add('theme-matrix');
+        }
+    }
+    
+    // ========== PERSISTENCE ==========
+    function loadPersist() {
+        try {
+            var data = localStorage.getItem('slotProtocol');
+            if (data) {
+                var saved = JSON.parse(data);
+                // Validate that saved data is an object (not array, not null)
+                if (typeof saved === 'object' && saved !== null && !Array.isArray(saved)) {
+                    for (var key in saved) {
+                        PERSIST[key] = saved[key];
+                    }
+                } else {
+                    // Corrupted data - reset to defaults
+                    console.warn('Corrupted localStorage data - resetting to defaults');
+                    localStorage.removeItem('slotProtocol');
+                }
+            }
+        } catch (e) {
+            // Graceful fallback on any error (JSON parse, type check, etc.)
+            console.warn('localStorage parse failed - using default PERSIST:', e.message);
+        }
+        // Ensure all required fields have default values
+        PERSIST.br = PERSIST.br || 0;
+        PERSIST.lf = PERSIST.lf || 0;
+        PERSIST.ls = PERSIST.ls || 0;
+        PERSIST.tr = PERSIST.tr || 0;
+        PERSIST.leaderboard = PERSIST.leaderboard || [];
+        PERSIST.ach = PERSIST.ach || [];
+        PERSIST.totalPegsHit = PERSIST.totalPegsHit || 0;
+        PERSIST.ballSaverCount = PERSIST.ballSaverCount || 0;
+        PERSIST.multiballEnabled = PERSIST.multiballEnabled || false;
+        PERSIST.currentBallSkin = PERSIST.currentBallSkin || '#00fff2';
+        PERSIST.currentBoardTheme = PERSIST.currentBoardTheme || 'default';
+        PERSIST.stormyModifier = PERSIST.stormyModifier || false;
+        PERSIST.unlockedBallSkins = PERSIST.unlockedBallSkins || ['#00fff2'];
+        PERSIST.unlockedBoardThemes = PERSIST.unlockedBoardThemes || ['default'];
+        applyContrastMode();
+        initSettings();
+    }
+
+    function savePersist() {
+        try {
+            localStorage.setItem('slotProtocol', JSON.stringify(PERSIST));
+        } catch (e) {
+            console.warn('localStorage save failed:', e.message);
+        }
+    }
+
+    window.addEventListener('beforeunload', savePersist);
+
+        // ========== INIT ==========
+    loadPersist();
+    
+    // Initialize jackpot reels (startGame resets spins)
+    jackpotReels = ['-', '-', '-'];
+    resetJackpotSpins();
+    
+    // Check if first time player
+    if (!PERSIST.hasTut && !PERSIST.tr) {
+        // Show tutorial on first visit
+        GS.scr = C.SCR.TU;
+        showScreen('tut');
+    } else {
+        showScreen('menu');
+        showHUD(false);
+    }
+    
+    requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
