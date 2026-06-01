@@ -163,8 +163,9 @@ SVG_ICONS.getPayloadIcon(type) // Returns payload icon by index
 - [x] Ball skin preview with SVG icons - ✅ DONE
 - [x] Daily challenge modifiers with icons - ✅ DONE (Styled modal with icons)
 
-## Phase 3: Gameplay Visual Enhancements
+## Phase 3: Gameplay Visual Enhancements 🔄 READY TO START
 **Goal:** Add visual flair to actual gameplay canvas
+**Status: [ ] READY
 
 ### Ball Effects
 - [ ] Glowing trails by multiplier
