@@ -126,11 +126,11 @@ SVG_ICONS.getPayloadIcon(type) // Returns payload icon by index
 
 ---
 
-## Phase 2: UI Polish Pass ✅ IN PROGRESS
+## Phase 2: UI Polish Pass ✅ COMPLETE
 **Goal:** Implement icons throughout the UI with decorative elements
-**Status: [ ] IN PROGRESS
+**Status: [x] COMPLETE
 
-### Implemented Changes:
+### Completed Changes:
 1. **Shop payload icons** - ✅ DONE
    - Replaced text price with `SVG_ICONS.getPayloadIcon()` inline SVG icons
    - Icons display next to price in each shop item
@@ -152,16 +152,16 @@ SVG_ICONS.getPayloadIcon(type) // Returns payload icon by index
    - Enhanced stat display with inline SVG icons for each stat
    - Added animated footer arrow indicator
 
-5. **Gameplay screen polish** - 🔄 IN PROGRESS
+5. **Gameplay screen polish** - ✅ DONE
    - Slot collector icons: Added SVG icon backgrounds with colored circles
    - Added short label text below each slot icon (first 3 letters of slot name)
    - TODO: Peg icons on canvas, ball effects, particle improvements
 
-### Remaining Tasks:
-- [ ] Payload icons in payload queue (HUD area)
-- [ ] Peg icons in peg info tooltips/stats
-- [ ] Ball skin preview with SVG icons
-- [ ] Daily challenge modifiers with icons
+### Completed Tasks:
+- [x] Payload icons in payload queue (HUD area) - ✅ DONE
+- [x] Peg icons in peg info tooltips/stats - ✅ DONE (Settings peg type legend)
+- [x] Ball skin preview with SVG icons - ✅ DONE
+- [x] Daily challenge modifiers with icons - ✅ DONE (Styled modal with icons)
 
 ## Phase 3: Gameplay Visual Enhancements
 **Goal:** Add visual flair to actual gameplay canvas

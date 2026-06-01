@@ -69,8 +69,11 @@
         .in { font-size: 12px; color: #00fff2; margin-bottom: 5px; }
         .ic { font-size: 14px; color: #ff00ff; }
         .ii { font-size: 10px; color: #8888aa; margin-top: 3px; }
-        .ps { width: 24px; height: 24px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; }
-        .ps.on { border-color: #9944ff; color: #9944ff; }
+        /* Payload slot styles */
+        .ps { width: 32px; height: 32px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; border-radius: 4px; }
+        .ps.on { border-color: #9944ff; background: rgba(153,68,255,0.2); }
+        .ps-icon { width: 24px; height: 24px; }
+        .ps-icon svg { width: 100%; height: 100%; }
         #pi { position: absolute; bottom: 15px; left: 15px; display: none; gap: 5px; }
         #pi.on { display: flex; }
         .slot-icon { font-size: 20px; margin: 5px 0; }
@@ -155,8 +158,15 @@
         .theme-matrix .btn { border-color: #00ff00; color: #00ff00; }
         .theme-matrix .btn:hover { background: #00ff00; color: #000800; }
         .theme-matrix .hs, .theme-matrix .hss, .theme-matrix .hsj, .theme-matrix .hsb { color: #00ff00; text-shadow: 0 0 10px #00ff00; }
-        /* Daily challenge styles */
-        .daily-mod { color: #ff00ff; font-size: 14px; margin: 10px 0; padding: 10px; border: 1px solid #ff00ff; background: rgba(255,0,255,0.1); }
+        /* Ball skin preview styles */
+        .skin-preview { width: 40px; height: 40px; margin: 10px auto; display: flex; justify-content: center; align-items: center; }
+        .skin-preview svg { width: 100%; height: 100%; filter: drop-shadow(0 0 5px currentColor); }
+        /* Daily challenge modifier styles */
+        .daily-mod { color: #ff00ff; font-size: 14px; margin: 10px 0; padding: 10px; border: 1px solid #ff00ff; background: rgba(255,0,255,0.1); border-radius: 4px; display: flex; align-items: center; gap: 10px; }
+        .daily-mod-icon { width: 24px; height: 24px; flex-shrink: 0; }
+        .daily-mod-icon svg { width: 100%; height: 100%; }
+        .daily-mod-text { flex: 1; }
+        .daily-mods-container { margin: 15px 0; display: flex; flex-direction: column; gap: 10px; }
         /* Slot selector styles */
         .slot-pos { width: 50px; height: 50px; background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
         .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 10px rgba(0,255,242,0.3); }
@@ -179,6 +189,8 @@
         .menu-footer-decor { margin-top: 15px; opacity: 0.5; }
         .footer-icon { display: inline-block; animation: pulse-right 2s ease-in-out infinite; }
         @keyframes pulse-right { 0%, 100% { transform: translateX(0); opacity: 0.3; } 50% { transform: translateX(5px); opacity: 0.7; } }
+        .btn-icon { display: inline-flex; margin-right: 6px; vertical-align: middle; }
+        .btn-icon svg { vertical-align: middle; }
         .slot-arrows { color: #8888aa; margin: 0 10px; align-self: center; }
         /* ========== SVG ICON DEFINITIONS ========== */
         .svg-icon { display: inline-block; width: 24px; height: 24px; vertical-align: middle; }
@@ -225,13 +237,29 @@
                 <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3L22 12L12 21L2 12Z" fill="#ffff00"/><text x="12" y="15" text-anchor="middle" fill="#996600" font-size="10" font-weight="bold">$</text></svg></span><span class="stat-label">Total Runs:</span> <span class="stat-value" id="mtr">0</span></div>
             </div>
             <button class="btn" id="startb">INITIATE BREACH</button>
-            <button class="btn btn2" id="dailyb">DAILY</button>
-            <button class="btn btn2" id="tutb">TUTORIAL</button>
+            <div id="daily-info" style="margin:5px 0;text-align:center;display:none;"></div>
+            <button class="btn btn2" id="dailyb">
+                <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10H21" stroke="currentColor" stroke-width="2"/><path d="M8 2V6M16 2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                DAILY
+            </button>
+            <button class="btn btn2" id="tutb">
+                <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 16V12M12 8H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                TUTORIAL
+            </button>
             <div style="display:flex;gap:10px;margin-top:10px;">
-                <button class="btn btn2" id="achb">ACHIEVEMENTS</button>
-                <button class="btn btn2" id="lbb">LEADERBOARD</button>
+                <button class="btn btn2" id="achb">
+                    <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 21H16M12 17V21M12 17C9 17 6 14 6 11.5C6 8.5 9 5 12 3C15 5 18 8.5 18 11.5C18 14 15 17 12 17Z" fill="#ffcc00" stroke="#ff8800" stroke-width="1"/></svg></span>
+                    ACHIEVEMENTS
+                </button>
+                <button class="btn btn2" id="lbb">
+                    <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 17C15 17 18 14 18 10V4H6V10C6 14 9 17 12 17Z" fill="#ffcc00"/><rect x="8" y="20" width="8" height="2" rx="1" fill="#ff8800"/></svg></span>
+                    LEADERBOARD
+                </button>
             </div>
-            <button class="btn btn2" id="settingsb" style="margin-top:10px;">SETTINGS</button>
+            <button class="btn btn2" id="settingsb" style="margin-top:10px;">
+                <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+                SETTINGS
+            </button>
             <div class="menu-footer-decor">
                 <span class="footer-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12H19M13 6L19 12L13 18" stroke="#00fff2" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
             </div>
@@ -339,11 +367,23 @@
             <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
                 <div>BALL SKIN:</div>
                 <div id="ballSkinDisplay" style="color:#00fff2;margin:5px 0;">CYAN</div>
+                <div class="skin-preview" id="ballSkinPreview"></div>
                 <div style="display:flex;gap:5px;justify-content:center;margin-top:5px;" id="ballSkinButtons">
-                    <button class="btn btn2 skin-btn" data-skin="#00fff2" style="padding:5px 10px;">CYAN</button>
-                    <button class="btn btn2 skin-btn" data-skin="#ff00ff" style="padding:5px 10px;">MAG</button>
-                    <button class="btn btn2 skin-btn" data-skin="#ffff00" style="padding:5px 10px;">GOLD</button>
-                    <button class="btn btn2 skin-btn" data-skin="#00ff88" style="padding:5px 10px;">GRN</button>
+                    <button class="btn btn2 skin-btn" data-skin="#00fff2" data-name="CYAN" style="padding:5px 10px;">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#00fff2"/></svg>
+                    </button>
+                    <button class="btn btn2 skin-btn" data-skin="#ff00ff" data-name="MAG" style="padding:5px 10px;">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#ff00ff"/></svg>
+                    </button>
+                    <button class="btn btn2 skin-btn" data-skin="#ffff00" data-name="GOLD" style="padding:5px 10px;">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#ffff00"/></svg>
+                    </button>
+                    <button class="btn btn2 skin-btn" data-skin="#00ff88" data-name="GRN" style="padding:5px 10px;">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#00ff88"/></svg>
+                    </button>
+                    <button class="btn btn2 skin-btn" data-skin="#ff6600" data-name="ORG" style="padding:5px 10px;">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#ff6600"/></svg>
+                    </button>
                 </div>
             </div>
             <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
@@ -353,6 +393,10 @@
                     <button class="btn btn2 theme-btn" data-theme="default" style="padding:5px 10px;">NEON</button>
                     <button class="btn btn2 theme-btn" data-theme="matrix" style="padding:5px 10px;">MATRIX</button>
                 </div>
+            </div>
+            <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
+                <div>PEG TYPES:</div>
+                <div id="pegTypeLegend" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px;max-width:300px;margin-left:auto;margin-right:auto;"></div>
             </div>
             <div style="margin-top:20px;">
                 <button class="btn btn3" id="resetb">RESET ALL DATA</button>
@@ -2187,17 +2231,21 @@
         var ps1 = document.getElementById('ps1');
         var ps2 = document.getElementById('ps2');
         if (GS.pl[0]) {
-            ps1.textContent = GS.pl[0][0].charAt(0).toUpperCase();
+            var payload0Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[0][0]);
+            var payload0Icon = SVG_ICONS.getPayloadIcon(payload0Type >= 0 ? payload0Type : 0);
+            ps1.innerHTML = '<span class="ps-icon">' + payload0Icon + '</span>';
             ps1.className = 'ps on';
         } else {
-            ps1.textContent = '-';
+            ps1.innerHTML = '<span style="color:#555566;">-</span>';
             ps1.className = 'ps';
         }
         if (GS.pl[1]) {
-            ps2.textContent = GS.pl[1][0].charAt(0).toUpperCase();
+            var payload1Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[1][0]);
+            var payload1Icon = SVG_ICONS.getPayloadIcon(payload1Type >= 0 ? payload1Type : 0);
+            ps2.innerHTML = '<span class="ps-icon">' + payload1Icon + '</span>';
             ps2.className = 'ps on';
         } else {
-            ps2.textContent = '-';
+            ps2.innerHTML = '<span style="color:#555566;">-</span>';
             ps2.className = 'ps';
         }
         
@@ -2958,15 +3006,59 @@
     // ========== DAILY CHALLENGE BUTTON ==========
     document.getElementById('dailyb').addEventListener('click', function() {
         var mods = getDailyModifiers();
+        var modIcons = {
+            'gravity': '<svg viewBox="0 0 24 24"><path d="M12 3V21M12 3L6 9M12 3L18 9M6 15H18" stroke="#ff6600" stroke-width="2" stroke-linecap="round"/></svg>',
+            'fewer_pegs': '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" fill="#8888aa"/><circle cx="16" cy="12" r="3" fill="#8888aa"/><circle cx="10" cy="18" r="3" fill="#8888aa"/></svg>',
+            'small_ball': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#00fff2"/><circle cx="10" cy="10" r="1.5" fill="rgba(255,255,255,0.5)"/></svg>',
+            'fast_timer': '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="9" fill="none" stroke="#ff2244" stroke-width="2"/><path d="M12 7V13L15 15" stroke="#ff2244" stroke-width="2" stroke-linecap="round"/></svg>',
+            'multiplier': '<svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffff00"/><text x="12" y="16" text-anchor="middle" fill="#996600" font-size="8" font-weight="bold">X4</text></svg>',
+            'double_pegs': '<svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4" fill="#00fff2"/><circle cx="16" cy="12" r="4" fill="#00fff2" opacity="0.5" stroke="#00fff2" stroke-dasharray="2 2"/></svg>'
+        };
+        var modNames = {
+            'gravity': 'Heavy Gravity',
+            'fewer_pegs': 'Sparse Field',
+            'small_ball': 'Tiny Ball',
+            'fast_timer': 'Ticking Clock',
+            'multiplier': 'Lower Multiplier',
+            'double_pegs': 'Double Trouble'
+        };
+        var modDescs = {
+            'gravity': '1.5x gravity',
+            'fewer_pegs': '30% fewer pegs',
+            'small_ball': 'Ball is 60% size',
+            'fast_timer': 'Pegs deactivate faster',
+            'multiplier': 'Max combo is x4',
+            'double_pegs': 'Pegs worth half'
+        };
+        
         var msg = 'Daily Challenge modifiers:\n';
+        var modList = '<div class="daily-mods-container">';
         for (var i = 0; i < mods.length; i++) {
             msg += '• ' + mods[i].name + ': ' + mods[i].desc + '\n';
+            modList += '<div class="daily-mod">' +
+                '<span class="daily-mod-icon">' + (modIcons[mods[i].id] || modIcons['gravity']) + '</span>' +
+                '<div class="daily-mod-text">' +
+                '<div style="font-weight:bold;">' + (modNames[mods[i].id] || mods[i].name) + '</div>' +
+                '<div style="font-size:11px;color:#cc88cc;">' + (modDescs[mods[i].id] || mods[i].desc) + '</div>' +
+                '</div></div>';
         }
+        modList += '</div>';
         msg += '\nStart the challenge?';
-        if (confirm(msg)) {
+        
+        // Show in a styled div instead of alert
+        var dailyDiv = document.createElement('div');
+        dailyDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a2e;border:2px solid #ff00ff;box-shadow:0 0 30px rgba(255,0,255,0.3);padding:20px;border-radius:8px;z-index:200;max-width:350px;text-align:center;';
+        dailyDiv.innerHTML = '<h2 style="color:#ff00ff;margin-bottom:15px;">DAILY CHALLENGE</h2>' + modList + '<p style="color:#8888aa;font-size:12px;margin:15px 0;">These modifiers are active for today only!</p><div style="display:flex;gap:10px;justify-content:center;"><button id="daily-start" class="btn">START</button><button id="daily-cancel" class="btn btn2">CANCEL</button></div>';
+        document.body.appendChild(dailyDiv);
+        
+        document.getElementById('daily-start').addEventListener('click', function() {
             startDailyChallenge();
             showHUD(true);
-        }
+            document.body.removeChild(dailyDiv);
+        });
+        document.getElementById('daily-cancel').addEventListener('click', function() {
+            document.body.removeChild(dailyDiv);
+        });
     });
     
     // ========== ACHIEVEMENT CHECKING ==========
@@ -3009,6 +3101,38 @@
         
         // Apply board theme display
         updateThemeDisplay();
+        
+        // Populate peg type legend
+        updatePegTypeLegend();
+    }
+    
+    function updatePegTypeLegend() {
+        var legend = document.getElementById('pegTypeLegend');
+        if (!legend) return;
+        
+        var pegTypes = [
+            { name: 'Node', color: '#00fff2', idx: 0 },
+            { name: 'Cache', color: '#ffff00', idx: 1 },
+            { name: 'Teleport', color: '#9944ff', idx: 2 },
+            { name: 'Seismic', color: '#ff6600', idx: 3 },
+            { name: 'Explosive', color: '#ff2244', idx: 4 },
+            { name: 'Dormant', color: '#444466', idx: 5 },
+            { name: 'Ice', color: '#88ddff', idx: 6 },
+            { name: 'Fiber', color: '#ff8844', idx: 7 },
+            { name: 'Mirror', color: '#eeeeee', idx: 8 },
+            { name: 'Honeypot', color: '#ffcc00', idx: 9 },
+            { name: 'Overload', color: '#ff4488', idx: 10 }
+        ];
+        
+        legend.innerHTML = '';
+        for (var i = 0; i < pegTypes.length; i++) {
+            var peg = pegTypes[i];
+            var iconSvg = SVG_ICONS.getPegIcon(peg.idx);
+            var item = document.createElement('div');
+            item.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:9px;color:' + peg.color + ';white-space:nowrap;';
+            item.innerHTML = '<span style="width:12px;height:12px;display:inline-block;">' + iconSvg + '</span><span>' + peg.name + '</span>';
+            legend.appendChild(item);
+        }
     }
     
     function updateBallSkinDisplay() {
@@ -3022,6 +3146,12 @@
         };
         document.getElementById('ballSkinDisplay').textContent = names[PERSIST.currentBallSkin] || 'CYAN';
         document.getElementById('ballSkinDisplay').style.color = PERSIST.currentBallSkin;
+        // Update ball preview SVG
+        var preview = document.getElementById('ballSkinPreview');
+        if (preview) {
+            preview.innerHTML = '<svg viewBox="0 0 24 24" style="color:' + PERSIST.currentBallSkin + ';"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="9" cy="9" r="3" fill="rgba(255,255,255,0.3)"/></svg>';
+            preview.style.color = PERSIST.currentBallSkin;
+        }
     }
     
     function updateThemeDisplay() {
