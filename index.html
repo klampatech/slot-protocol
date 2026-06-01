@@ -475,6 +475,10 @@
                 <span>SOUND EFFECTS</span>
                 <div class="toggle" id="soundtoggle"></div>
             </div>
+            <div class="toggle-row">
+                <span>MUSIC</span>
+                <div class="toggle" id="musictoggle"></div>
+            </div>
             <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
                 <div>BALL SKIN:</div>
                 <div id="ballSkinDisplay" style="color:#00fff2;margin:5px 0;">CYAN</div>
@@ -545,6 +549,24 @@
             </div>
         </div>
     </div>
+
+    <!-- ========== BACKGROUND MUSIC (Phase 4 Music Port) ========== -->
+    <!-- HTML5 audio elements for BGM. Looping tracks use loop; one-shot stingers (connection-lost) do not. -->
+    <audio id="bgm-title" preload="auto" loop>
+        <source src="audio/title-screen.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="bgm-gameplay" preload="auto" loop>
+        <source src="audio/gameplay-bgm.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="bgm-slot-spin" preload="auto" loop>
+        <source src="audio/slot-machine.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="bgm-ending" preload="auto" loop>
+        <source src="audio/ending-screen.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="bgm-connection-lost" preload="auto">
+        <source src="audio/connection-lost.mp3" type="audio/mpeg">
+    </audio>
 
 <script src="svg-icons.js"></script>
 <script>
@@ -855,6 +877,138 @@
         playReelTick: function() {
             if (!this.initialized || this.muted) return;
             this._tone(1000, 0.03, 'square', 0.15);
+        },
+
+        // ========== BGM (Phase 4 Music Port) ==========
+        // HTML5 audio element-based background music. Distinct from the SFX
+        // mute state so the player can mute one but keep the other.
+        bgmTracks: {},       // id -> HTMLAudioElement
+        currentBgmId: null,  // id of currently-active track
+        currentBgmEl: null,  // ref to currently-active element
+        bgmVolume: 0.3,      // 0..1
+        bgmMuted: false,
+        bgmArmed: false,     // becomes true after first user gesture on title
+
+        // Wire up the <audio> elements + apply initial volume / mute state.
+        // Safe to call multiple times.
+        initBgm: function() {
+            var ids = ['title', 'gameplay', 'slot-spin', 'ending', 'connection-lost'];
+            for (var i = 0; i < ids.length; i++) {
+                var id = ids[i];
+                var el = document.getElementById('bgm-' + id);
+                if (!el) continue;
+                el.volume = this.bgmMuted ? 0 : this.bgmVolume;
+                this.bgmTracks[id] = el;
+            }
+        },
+
+        // Switch to a BGM track. If the same track is already playing,
+        // this is a no-op. If a different track is active, it is paused
+        // and rewound so the new track starts from the top.
+        playBgm: function(trackId) {
+            // Always make sure the elements are wired up (idempotent).
+            if (!this.bgmTracks.title) this.initBgm();
+            if (this.bgmMuted) {
+                // Still record what should be playing so unmute resumes correctly
+                this.currentBgmId = trackId;
+                return;
+            }
+            var track = this.bgmTracks[trackId];
+            if (!track) return;
+            if (this.currentBgmId === trackId && !track.paused) return;
+            // Pause any other track
+            if (this.currentBgmEl && this.currentBgmEl !== track) {
+                this.currentBgmEl.pause();
+                this.currentBgmEl.currentTime = 0;
+            }
+            track.volume = this.bgmVolume;
+            this.currentBgmId = trackId;
+            this.currentBgmEl = track;
+            // play() returns a promise that may reject if not yet ready;
+            // catch silently so we don't spam the console.
+            var p = track.play();
+            if (p && typeof p.catch === 'function') p.catch(function() {});
+        },
+
+        // Stop the currently playing BGM. immediate=true rewinds to 0.
+        stopBgm: function(immediate) {
+            if (!this.currentBgmEl) {
+                this.currentBgmId = null;
+                return;
+            }
+            this.currentBgmEl.pause();
+            if (immediate) this.currentBgmEl.currentTime = 0;
+            this.currentBgmEl = null;
+            this.currentBgmId = null;
+        },
+
+        setBgmMuted: function(muted) {
+            this.bgmMuted = muted;
+            if (muted) {
+                if (this.currentBgmEl) this.currentBgmEl.volume = 0;
+            } else {
+                if (this.currentBgmEl) this.currentBgmEl.volume = this.bgmVolume;
+            }
+        },
+
+        toggleBgmMute: function() {
+            this.setBgmMuted(!this.bgmMuted);
+            return this.bgmMuted;
+        },
+
+        setBgmVolume: function(vol) {
+            this.bgmVolume = Math.max(0, Math.min(1, vol));
+            if (!this.bgmMuted && this.currentBgmEl) {
+                this.currentBgmEl.volume = this.bgmVolume;
+            }
+        },
+
+        // Map a UI screen id to the BGM track that should play while it is shown.
+        // Return values:
+        //   <trackId>  - switch to this track
+        //   'continue' - leave whatever is currently playing alone
+        //   null       - stop the BGM (silence)
+        trackForScreen: function(id) {
+            switch (id) {
+                case 'menu':            return 'title';
+                // 'none' / undefined mean "no overlay shown" — this is the
+                // gameplay state (e.g. after closing the shop with
+                // showScreen('none')). Keep whatever BGM is already playing
+                // (gameplay) rather than swapping to the title track.
+                case 'none':            return 'continue';
+                case undefined:         return 'continue';
+                case 'slot-selector':   return 'gameplay';
+                case 'fc':              return null;  // silent during floor-complete (matches rogue-pachinko)
+                // Run-end BGM is set explicitly by the caller (endb handler,
+                // game-over check). Returning 'continue' prevents the screen
+                // transition from clobbering the music the caller just chose.
+                case 're':              return 'continue';
+                // Modal overlays opened on top of title or gameplay: keep
+                // whatever BGM was playing (title track on the menu, gameplay
+                // track mid-run) so opening/closing doesn't cut the music.
+                case 'shop':            return 'continue';
+                case 'tut':             return 'continue';
+                case 'ach':             return 'continue';
+                case 'lb':              return 'continue';
+                case 'settings':        return 'continue';
+                case 'resetconfirm':    return 'continue';
+                default:                return null;
+            }
+        },
+
+        // Centralized screen→BGM switch. Called by showScreen() and by code
+        // that needs an explicit track (e.g. run-end, slot-spin start).
+        applyBgmForScreen: function(id) {
+            var track = this.trackForScreen(id);
+            if (track === 'continue') {
+                // Leave the current BGM playing untouched
+                return;
+            }
+            if (track === null) {
+                this.stopBgm(true);
+            } else {
+                this.playBgm(track);
+            }
         }
     };
 
@@ -863,6 +1017,7 @@
         scr: C.SCR.M, fl: 1, sc: 0, bl: 5, mx: 1, bd: [], obj: {},
         jp: 500, fa: false, ft: 0, pl: [], cc: 0, ct: 0,
         pegsHit: 0, floorScore: 0, jackpotWon: 0, bestCombo: 0, maxComboHits: 0, floorBallsLeft: 5,
+        lbHandled: false, // leaderboard entry for this run has been prompted (set in retb, reset in startGame)
         canDrop: true, mouseX: 240, ball: null,
         gravityMult: 1, // for OVERCLOCK slot
         shielded: false, // for SHIELD slot
@@ -911,7 +1066,10 @@
         currentBallSkin: '#00fff2',
         unlockedBallSkins: ['#00fff2'],
         unlockedBoardThemes: ['default'],
-        stormyModifier: false // peg stormy modifier
+        stormyModifier: false, // peg stormy modifier
+        // Phase 4 Music Port: SFX and BGM are independently mutable
+        audioMuted: false,
+        bgmMuted: false
     };
     
     // ========== ACHIEVEMENTS ==========
@@ -1095,8 +1253,10 @@
     function spinJackpot(callback) {
         if (jackpotSpinning) return;
         if (jackpotSpinsLeft <= 0 || jackpotWonThisFloor) return;
-        
+
         jackpotSpinning = true;
+        // Phase 4 Music Port: switch to slot-spin BGM for the duration of the spin
+        Audio.playBgm('slot-spin');
         jackpotSpinsLeft--;
         updateSpinsLeftUI();
         updateSpinButtonState();
@@ -1177,7 +1337,10 @@
                     spinReel(2, spins + 8, function() {
                         // All reels stopped!
                         jackpotSpinning = false;
-                        
+                        // Phase 4 Music Port: stop slot-spin BGM now that the spin is over
+                        // (floor-complete screen is silent between spins, matching rogue-pachinko)
+                        Audio.stopBgm(true);
+
                         // Remove hit classes
                         ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
                             document.getElementById(id).classList.remove('hit', 'win');
@@ -1317,8 +1480,12 @@
     function updateLeaderboardUI() {
         var grid = document.getElementById('lbgrid');
         var lb = getLeaderboard();
-        var displayEntry = isNewHighScore(GS.sc) && GS.sc > 0;
-        
+        // Only prompt for an entry once per run. lbHandled is set by the
+        // retb handler as soon as the form is shown (or by submitHighScore),
+        // so subsequent updateLeaderboardUI() calls — including the one
+        // inside submitHighScore() — won't bring the form back.
+        var displayEntry = !GS.lbHandled && isNewHighScore(GS.sc) && GS.sc > 0;
+
         // Show entry form if new high score
         document.getElementById('lbentry').style.display = displayEntry ? 'block' : 'none';
         
@@ -1874,6 +2041,8 @@
         if (GS.activeBalls.length === 0 && GS.bl <= 0 && GS.obj.prg < GS.obj.tgt) {
             // Audio: game over descending tone
             Audio.playGameOver();
+            // Phase 4 Music Port: switch to run-end BGM (one-shot, not looped)
+            Audio.playBgm('connection-lost');
             GS.scr = C.SCR.RE;
             showScreen('re');
             updateRunEnd();
@@ -2827,6 +2996,8 @@
         } else {
             stopMenuParticles();
         }
+        // Phase 4 Music Port: switch BGM to match the visible screen
+        Audio.applyBgmForScreen(id);
     }
 
     // ========== PHASE 4: AMBIENT MENU PARTICLES ==========
@@ -3878,6 +4049,9 @@
         GS.slotArrangement = [];
         GS.slotPool = [];
         GS.canUnlockThisFloor = true;
+        // Reset per-run leaderboard prompt state so a new high score can
+        // prompt the player for their name on the next run end.
+        GS.lbHandled = false;
         PERSIST.tr++;
         // Reset jackpot spins for new run
         resetJackpotSpins();
@@ -4007,6 +4181,8 @@
     });
 
     document.getElementById('endb').addEventListener('click', function() {
+        // Phase 4 Music Port: same one-shot BGM for a manually ended run
+        Audio.playBgm('connection-lost');
         GS.scr = C.SCR.RE;
         showScreen('re');
         updateRunEnd();
@@ -4023,9 +4199,13 @@
         // Check achievements at end of run
         checkAchievements();
         
-        // Update leaderboard with score
-        if (GS.sc > 0 && isNewHighScore(GS.sc)) {
+        // Update leaderboard with score. Only prompt for a name once per
+        // run: lbHandled is set after the form is first shown so the form
+        // can't re-appear (e.g. from the updateLeaderboardUI() call inside
+        // submitHighScore, or from re-opening the lb screen from the menu).
+        if (GS.sc > 0 && isNewHighScore(GS.sc) && !GS.lbHandled) {
             updateLeaderboardUI();
+            GS.lbHandled = true;
             document.getElementById('lbname').value = '';
             showScreen('lb');
         }
@@ -4087,7 +4267,7 @@
             hasTut: false, daily: {}, streak: 0, lastDay: '', tr: 0,
             leaderboard: [], contrastMode: false, totalPegsHit: 0, ballSaverCount: 0,
             multiballEnabled: false, currentBallSkin: '#00fff2', currentBoardTheme: 'default',
-            stormyModifier: false };
+            stormyModifier: false, audioMuted: false, bgmMuted: false };
         // Reload page to reset everything
         window.location.reload();
     });
@@ -4192,6 +4372,9 @@
         // Apply sound toggle state (on = sound on)
         document.getElementById('soundtoggle').classList.toggle('on', !PERSIST.audioMuted);
 
+        // Apply music toggle state (on = music on)
+        document.getElementById('musictoggle').classList.toggle('on', !PERSIST.bgmMuted);
+
         // Apply ball skin display
         updateBallSkinDisplay();
         
@@ -4277,8 +4460,32 @@
         if (!muted) Audio.playButtonClick();
     }
 
+    function musicToggle() {
+        // Make sure audio + BGM are initialized before toggling
+        Audio.init();
+        Audio.resume();
+        if (!Audio.bgmTracks.title) Audio.initBgm();
+        var wasMuted = Audio.bgmMuted;
+        var muted = Audio.toggleBgmMute();
+        PERSIST.bgmMuted = muted;
+        document.getElementById('musictoggle').classList.toggle('on', !muted);
+        // If we just unmuted, resume playback of the track appropriate to
+        // the current screen (or the one playBgm had staged while muted).
+        if (wasMuted && !muted) {
+            if (Audio.currentBgmId) {
+                Audio.playBgm(Audio.currentBgmId);
+            } else {
+                var menuEl = document.getElementById('menu');
+                var isMenu = menuEl && menuEl.classList.contains('on');
+                Audio.applyBgmForScreen(isMenu ? 'menu' : GS.scr === C.SCR.P ? 'slot-selector' : 'menu');
+            }
+        }
+        savePersist();
+    }
+
     document.getElementById('multiballtoggle').addEventListener('click', multiballToggle);
     document.getElementById('soundtoggle').addEventListener('click', soundToggle);
+    document.getElementById('musictoggle').addEventListener('click', musicToggle);
     
     // Ball skin buttons
     document.querySelectorAll('.skin-btn').forEach(function(btn) {
@@ -4350,6 +4557,7 @@
         PERSIST.unlockedBallSkins = PERSIST.unlockedBallSkins || ['#00fff2'];
         PERSIST.unlockedBoardThemes = PERSIST.unlockedBoardThemes || ['default'];
         PERSIST.audioMuted = PERSIST.audioMuted || false;
+        PERSIST.bgmMuted = PERSIST.bgmMuted || false;
         applyContrastMode();
         initSettings();
     }
@@ -4380,6 +4588,34 @@
     document.addEventListener('click', audioInitOnce);
     document.addEventListener('keydown', audioInitOnce);
     document.addEventListener('touchstart', audioInitOnce);
+
+    // ========== PHASE 4 MUSIC PORT: INIT BGM ==========
+    // Wire up the <audio> elements and apply persisted mute state.
+    Audio.initBgm();
+    if (PERSIST.bgmMuted) Audio.setBgmMuted(true);
+
+    // First-load title-screen music trigger.
+    // Browsers block HTML5 audio.play() until a user gesture, and the menu
+    // is the first interactive surface the user sees. We listen for the
+    // first mousemove on the title screen and start the title track there.
+    // After firing once, the listener is removed and any subsequent
+    // showScreen('menu') calls can start BGM directly because the page
+    // now has user activation.
+    function firstMoveStartTitleBgm(e) {
+        // Only fire when the title screen (menu) is the active screen.
+        // If the tutorial is up on first load, the user dismisses it via
+        // click (not mousemove) which already initializes audio via
+        // audioInitOnce; showScreen('menu') in that handler will then
+        // kick off the BGM directly.
+        var menuEl = document.getElementById('menu');
+        if (!menuEl || !menuEl.classList.contains('on')) return;
+        // Mark armed so this never fires again
+        Audio.bgmArmed = true;
+        document.removeEventListener('mousemove', firstMoveStartTitleBgm);
+        // Start the title track
+        Audio.playBgm('title');
+    }
+    document.addEventListener('mousemove', firstMoveStartTitleBgm);
 
     // Initialize jackpot reels (startGame resets spins)
     jackpotReels = ['-', '-', '-'];
