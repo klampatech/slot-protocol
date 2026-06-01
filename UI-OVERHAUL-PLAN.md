@@ -163,43 +163,50 @@ SVG_ICONS.getPayloadIcon(type) // Returns payload icon by index
 - [x] Ball skin preview with SVG icons - ✅ DONE
 - [x] Daily challenge modifiers with icons - ✅ DONE (Styled modal with icons)
 
-## Phase 3: Gameplay Visual Enhancements 🔄 READY TO START
+## Phase 3: Gameplay Visual Enhancements ✅ COMPLETE
 **Goal:** Add visual flair to actual gameplay canvas
-**Status: [ ] READY
+**Status: [x] COMPLETE
 
-### Ball Effects
-- [ ] Glowing trails by multiplier
-- [ ] Payload effect indicators
-- [ ] Shield ring visualization
-- [ ] Multi-ball visual distinction
-- [ ] Ghost mode chromatic aberration
+### Ball Effects - ✅ DONE
+- [x] Glowing trails by multiplier with gradient fade and outer glow
+- [x] Payload effect indicators with color-coded names
+- [x] Shield ring visualization with pulsing animated ring and energy sparks
+- [x] Multi-ball visual distinction with numbered indicators and alternate colors
+- [x] Ghost mode chromatic aberration (RGB offset copies with ghost trail)
 
-### Peg Effects
-- [ ] Evolution state animations (glow pulse)
-- [ ] Hit ripple effects
-- [ ] Shatter/debris for fiber pegs
-- [ ] Ice crystallization effect
-- [ ] Teleport portal animation
+### Peg Effects - ✅ DONE
+- [x] Evolution state animations with glow pulse for dormant peg activation
+- [x] Hit ripple effects expanding outward from collision points
+- [x] Shatter/debris for fiber pegs with rotating fading fragments
+- [x] Ice crystallization effect spawning radial shards on freeze
+- [x] Teleport portal animation with spiral effect
 
-### Collisions
-- [ ] Particle bursts on hit
-- [ ] Screen shake intensity levels
-- [ ] Flash effects scaled to event
-- [ ] Floating score numbers
+### Collisions - ✅ DONE
+- [x] Particle bursts on hit with 20 particle spawn
+- [x] Screen shake intensity scaled by event (2-12 range)
+- [x] Flash effects at collision points with color halos
+- [x] Floating score numbers with glow and fade
 
-### Drop Zone
-- [ ] Animated trajectory preview
-- [ ] Ball selection indicator
-- [ ] Payload queue visualization
-- [ ] Pulsing drop point
+### Drop Zone - ✅ DONE
+- [x] Animated trajectory preview with dash animation and fading effect
+- [x] Ball selection indicator showing next payload with color-coded name
+- [x] Payload queue visualization in HUD
+- [x] Pulsing drop point with crosshair and animated outer glow
 
-### HUD Enhancements
-- [ ] Animated multiplier bar
-- [ ] Jackpot counter animation
-- [ ] Life ball indicators
-- [ ] Objective progress animation
+### HUD Enhancements - ✅ DONE
+- [x] Animated multiplier bar with scale effect on combos
+- [x] Jackpot counter animation with pulse effect
+- [x] Life ball indicators with staggered pulse animation
+- [x] Objective progress animation with shimmer and glow at >80%
+- [x] Color-coded chain timer bar (green/yellow/red based on time remaining)
 
-### Status: [ ] NOT STARTED
+### Implementation Details
+- Added visual enhancement tracking variables (pegRipples, teleportPortals, evolutionPulses, collisionFlashes)
+- Created helper functions for each effect type
+- Integrated effects into Peg.hit() and render loop
+- Added CSS transitions for smooth animations throughout HUD
+
+### Status: ✅ COMPLETE - 100%
 
 ---
 
@@ -257,7 +264,7 @@ index.html
 ---
 
 ## Current Status
-**Project Phase:** Phase 1 COMPLETE - Phase 2 (UI Polish) Pending
+**Project Phase:** Phase 1-3 COMPLETE - Phase 4 (Sound & Motion) PENDING
 **Last Updated:** 2026-06-01
 
 ## Session Log
@@ -272,3 +279,25 @@ index.html
     - 9 Payload icons
     - 6 UI icons
     - Helper functions for icon retrieval by type index
+
+- **Session 2 (2026-06-01):**
+  - **Phase 2 COMPLETE:** UI Polish Pass
+    - Payload icons in shop and HUD
+    - Slot selector icons with drag-drop
+    - Achievement toast with trophy animation
+    - Menu decorative improvements
+    - Gameplay slot collector icons
+    - Ball skin preview with SVG
+    - Daily challenge modal with icons
+    - Settings peg type legend
+    - Drag-drop functionality with visual feedback
+    - Contrast mode and theme support
+
+- **Session 3 (2026-06-01):**
+  - **Phase 3 COMPLETE:** Gameplay Visual Enhancements
+    - Ball effects: glowing trails, ghost chromatic aberration, shield ring, multi-ball distinction
+    - Peg effects: hit ripples, shatter/debris, ice crystals, teleport portals, evolution glow pulse
+    - Collisions: particle bursts, screen shake, flash effects, floating scores
+    - Drop zone: animated trajectory, pulsing drop point, ball selection indicator
+    - HUD: animated multiplier bar, jackpot counter, life indicators, progress animation
+    - Added 569 lines of visual enhancements (48 removed, 617 modified)
