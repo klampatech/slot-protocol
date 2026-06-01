@@ -2,15 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Slot Protocol</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a12; min-height: 100vh; display: flex; justify-content: center; align-items: center; font-family: Courier New, monospace; color: #e0e0ff; overflow: hidden; }
-        #game-container { position: relative; width: 480px; height: 700px; }
-        #gc { display: block; background: #12121f; border: 2px solid #00fff2; box-shadow: 0 0 30px rgba(0,255,242,0.3); }
-        .ov { position: absolute; top: 0; left: 0; width: 480px; height: 700px; background: rgba(10,10,18,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        body { background: #0a0a12; min-height: 100dvh; display: flex; justify-content: center; align-items: center; font-family: Courier New, monospace; color: #e0e0ff; overflow: hidden; }
+        #game-container { position: relative; width: 480px; height: 700px; margin: 0 auto; flex-shrink: 0; }
+        #gc { display: block; background: #12121f; }
+        .ov { position: absolute; top: 0; left: 0; width: 480px; height: 700px; background: rgba(10,10,18,0.98); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; border-radius: 2px; }
         .ov.on { display: flex; }
+        /* Default overlay border - cyan like board */
+        #menu, #tut, #lb { border: 2px solid #00fff2; box-shadow: 0 0 30px rgba(0,255,242,0.3); }
+        #fc { border: 2px solid #00ff88; box-shadow: 0 0 30px rgba(0,255,136,0.3); }
+        #re { border: 2px solid #ff2244; box-shadow: 0 0 30px rgba(255,34,68,0.3); }
+        #shop, #resetconfirm { border: 2px solid #ff00ff; box-shadow: 0 0 30px rgba(255,0,255,0.3); }
+        #ach { border: 2px solid #ffff00; box-shadow: 0 0 30px rgba(255,255,0,0.3); }
+        #settings { border: 2px solid #ffffff; box-shadow: 0 0 30px rgba(255,255,255,0.2); }
+        #slot-selector { border: 2px solid #ff6600; box-shadow: 0 0 30px rgba(255,102,0,0.3); }
         .ov h1 { font-size: 32px; margin-bottom: 20px; text-shadow: 0 0 20px #00fff2; letter-spacing: 4px; }
         .ov h2 { font-size: 24px; margin-bottom: 15px; }
         .ov .stat-line { font-size: 14px; margin: 5px 0; }
@@ -45,7 +53,7 @@
         #sb { position: absolute; bottom: 15px; right: 15px; padding: 8px 16px; background: transparent; border: 1px solid #ff00ff; color: #ff00ff; font-family: Courier New, monospace; font-size: 12px; cursor: pointer; pointer-events: auto; display: none; z-index: 15; }
         #sb.on { display: block; }
         #sb:hover { background: #ff00ff; color: #0a0a12; }
-        #toast { position: absolute; bottom: 80px; right: 15px; background: #1a1a2e; border: 1px solid #ffff00; padding: 10px 15px; opacity: 0; transform: translateX(100px); transition: all 0.3s; pointer-events: none; z-index: 50; }
+        #toast { position: absolute; bottom: 80px; right: 15px; background: #1a1a2e; border: 2px solid #ffff00; box-shadow: 0 0 15px rgba(255,255,0,0.3); padding: 10px 15px; opacity: 0; transform: translateX(100px); transition: all 0.3s; pointer-events: none; z-index: 50; border-radius: 2px; }
         #toast.on { opacity: 1; transform: translateX(0); }
         .tn { font-size: 14px; color: #ffff00; text-shadow: 0 0 10px #ffff00; }
         .td { font-size: 11px; color: #8888aa; margin-top: 3px; }
@@ -62,8 +70,8 @@
         #pi.on { display: flex; }
         .slot-icon { font-size: 20px; margin: 5px 0; }
         /* Contrast mode styles - fully replaces neon colors with white/grey on dark */
-        .contrast-mode #game-container #gc { background: #1a1a1a; border-color: #ffffff; box-shadow: none; }
-        .contrast-mode #game-container .ov { background: rgba(20,20,20,0.95); }
+        .contrast-mode #game-container #gc { background: #1a1a1a; }
+        .contrast-mode #game-container .ov { background: rgba(20,20,20,0.98); }
         .contrast-mode .ov h2 { color: #ffffff !important; }
         .contrast-mode #fc h2 { color: #00ff00 !important; }
         .contrast-mode #re h2 { color: #ff4444 !important; }
@@ -81,7 +89,7 @@
         .contrast-mode #sb { border-color: #ffffff; color: #ffffff; }
         .contrast-mode #sb:hover { background: #ffffff; color: #000000; }
         .contrast-mode #mv { color: #ffffff !important; text-shadow: none !important; }
-        .contrast-mode #toast { border-color: #ffffff; background: #1a1a1a; }
+        .contrast-mode #toast { border-color: #ffffff; background: #1a1a1a; border-radius: 2px; }
         .contrast-mode #toast .tn { color: #ffffff; text-shadow: none; }
         .contrast-mode .stat-value { color: #ffffff; }
         .contrast-mode .toggle.on { background: #ffffff; }
@@ -135,9 +143,9 @@
         .ach-name { color: #ffff00; font-size: 12px; }
         .ach-desc { color: #8888aa; font-size: 10px; margin-top: 5px; }
         /* Matrix theme */
-        .theme-matrix #game-container #gc { background: #000800; border-color: #00ff00; box-shadow: 0 0 30px rgba(0,255,0,0.3); }
+        .theme-matrix #game-container #gc { background: #000800; }
         .theme-matrix { background: #000800; }
-        .theme-matrix #game-container .ov { background: rgba(0,8,0,0.95); }
+        .theme-matrix #game-container .ov { background: rgba(0,8,0,0.98); }
         .theme-matrix .ov h1, .theme-matrix .ov h2 { color: #00ff00; text-shadow: 0 0 20px #00ff00; }
         .theme-matrix .btn { border-color: #00ff00; color: #00ff00; }
         .theme-matrix .btn:hover { background: #00ff00; color: #000800; }
@@ -154,6 +162,11 @@
         .slot-pool-item.dragging { opacity: 0.5; }
         .slot-arranging-section { margin: 15px 0; text-align: center; }
         .slot-arrows { color: #8888aa; margin: 0 10px; align-self: center; }
+        /* ========== SVG ICON DEFINITIONS ========== */
+        .svg-icon { display: inline-block; width: 24px; height: 24px; vertical-align: middle; }
+        .svg-icon-16 { width: 16px; height: 16px; }
+        .svg-icon-20 { width: 20px; height: 20px; }
+        .svg-icon-32 { width: 32px; height: 32px; }
     </style>
 </head>
 <body>
@@ -347,6 +360,7 @@
         </div>
     </div>
 
+<script src="svg-icons.js"></script>
 <script>
     // ========== CONSTANTS ==========
     var C = {
