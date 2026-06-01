@@ -36,10 +36,12 @@ jobs:
         with:
           # Only ship the static site files — keeps node_modules, tests,
           # source plans, and dev artifacts out of the public deployment.
-          path: |
-            index.html
-            svg-icons.js
-            audio
+          # List form (not multi-line string) is required for this action
+          # to expand each path as a separate argument.
+          path:
+            - index.html
+            - svg-icons.js
+            - audio
 
       - name: Deploy to GitHub Pages
         id: deployment
