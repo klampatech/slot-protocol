@@ -210,22 +210,54 @@ SVG_ICONS.getPayloadIcon(type) // Returns payload icon by index
 
 ---
 
-## Phase 4: Sound & Motion Integration
+## Phase 4: Sound & Motion Integration ✅ COMPLETE
 **Goal:** Coordinate visual feedback with motion/feel
+**Status: [x] COMPLETE
 
-### Transitions
-- [ ] Overlay open/close animations
-- [ ] Button press feedback
-- [ ] Drag-drop visual feedback
-- [ ] Slot spin animations
+### Transitions - ✅ DONE
+- [x] Overlay open/close animations - CSS keyframes (overlay-fade-in with scale, 0.3s ease-out)
+- [x] Button press feedback - :active state with scale(0.96), translateY(1px), ripple effect via ::after pseudo-element
+- [x] Drag-drop visual feedback - .dragging class (opacity 0.4, scale 0.95), .drop-hover class (yellow glow, scale 1.2)
+- [x] Slot spin animations - Enhanced with reel-glow keyframe (inset glow + outer pulse)
 
-### Continuous Effects
-- [ ] Ambient glow animations
-- [ ] Floating particles in menu
-- [ ] Score tick-up animation
-- [ ] Combo countdown urgency
+### Continuous Effects - ✅ DONE
+- [x] Ambient glow animations - 7 color-coded keyframes (cyan, magenta, green, red, white, yellow, orange) for each overlay type
+- [x] Floating particles in menu - 8-10 SVG-free particles with random colors, 6-10s float animation, stopped on overlay change
+- [x] Score tick-up animation - score-tick class with scale 1.3 + color flash to white on score change
+- [x] Combo countdown urgency - combo-urgent (red pulse) at <35% chain, combo-critical (faster red flash) at <15% chain, audio chime on critical
 
-### Status: [ ] NOT STARTED
+### Web Audio API Sound System - ✅ DONE
+- 17 procedural sound functions synthesized via OscillatorNode + GainNode envelopes
+- Lazy initialization on first user interaction (browser policy)
+- Mute toggle in settings, persisted in localStorage
+- Sound effects: peg hit, bonus, slot collect (8 types), jackpot, overload, button click, drop, achievement, shield, explosion, critical, floor complete, game over, drag pickup/drop, teleport, reel tick
+
+### Button Hover/Active States - ✅ DONE
+- :hover: translateY(-1px) lift, color invert
+- :active: translateY(1px) scale(0.96) press
+- Ripple animation via ::after pseudo-element on click
+
+### New Keyframe Animations Added
+- `overlay-fade-in` - smooth overlay entry with subtle scale
+- `ambient-glow-{cyan,magenta,green,red,white,yellow,orange}` - pulsing border glow per overlay
+- `title-pulse` - menu title breathing glow
+- `menu-float` - upward particle drift
+- `score-tick` - score number bounce on change
+- `combo-urgent` - slow red pulse for low chain timer
+- `combo-critical` - fast red flash for critical chain timer
+- `low-ball-pulse` - warning when 1-2 balls left
+- `reel-glow` - slot reel inset glow during spin
+- `drag-pulse` - drop target highlight pulse
+- `btn-ripple` - button click ripple
+
+### Implementation Details
+- Audio Engine: ~250 lines (Web Audio API procedural synthesis)
+- CSS Animations: ~200 lines (keyframes + utility classes)
+- JS Integration: ~50 lines (audio hooks in event handlers)
+- Drag-drop CSS: 30 lines (replaces inline styles with class-based)
+- Menu particles: 70 lines (spawn, animate, cleanup)
+
+### Status: ✅ COMPLETE - 100%
 
 ---
 
@@ -264,7 +296,7 @@ index.html
 ---
 
 ## Current Status
-**Project Phase:** Phase 1-3 COMPLETE - Phase 4 (Sound & Motion) PENDING
+**Project Phase:** Phase 1-4 COMPLETE - All Phases Done
 **Last Updated:** 2026-06-01
 
 ## Session Log
@@ -301,3 +333,21 @@ index.html
     - Drop zone: animated trajectory, pulsing drop point, ball selection indicator
     - HUD: animated multiplier bar, jackpot counter, life indicators, progress animation
     - Added 569 lines of visual enhancements (48 removed, 617 modified)
+
+- **Session 4 (2026-06-01):**
+  - **Phase 4 COMPLETE:** Sound & Motion Integration
+    - Web Audio API procedural synthesis: 17 sound effects (peg hit, slot collect per type, jackpot, overload, etc.)
+    - Lazy audio init on first user interaction (browser policy)
+    - Mute toggle in settings, persisted in localStorage
+    - Overlay show/hide animations: fade-in with subtle scale
+    - Button press feedback: :active state with scale(0.96) + ripple effect via ::after
+    - Button hover lift: translateY(-1px) on all .btn variants
+    - Drag-drop visual feedback: .dragging + .drop-hover classes replace inline styles
+    - Ambient glow per overlay: 7 color-coded keyframes (cyan/magenta/green/red/white/yellow/orange)
+    - Menu floating particles: 8-10 colored dots with 6-10s float animation
+    - Score tick-up animation: bounce on score change
+    - Combo countdown urgency: combo-urgent (35% threshold) + combo-critical (15% threshold) + audio chime
+    - Low-ball warning pulse: when 1-2 balls remaining
+    - Slot spin animation enhanced: reel-glow keyframe during spin
+    - Menu title pulse: breathing glow on "SLOT PROTOCOL" title
+    - Added 655 lines of new code (52 removed)
