@@ -303,11 +303,37 @@
             0%, 100% { box-shadow: 0 0 10px rgba(0,255,242,0.4); }
             50% { box-shadow: 0 0 25px rgba(0,255,242,0.8); }
         }
+        /* ========== TOOLTIPS (peg + slot hover) ========== */
+        .tooltip {
+            position: fixed;
+            display: none;
+            pointer-events: none;
+            z-index: 250;
+            background: #0a0a14;
+            border: 1px solid #555566;
+            border-radius: 3px;
+            padding: 6px 9px;
+            max-width: 240px;
+            font-family: Courier New, monospace;
+            box-shadow: 0 0 12px rgba(0,255,242,0.25);
+            line-height: 1.3;
+        }
+        .tooltip-name {
+            font-size: 11px;
+            font-weight: bold;
+            text-shadow: 0 0 8px currentColor;
+            margin-bottom: 3px;
+        }
+        .tooltip-desc {
+            font-size: 10px;
+            color: #c0c0d0;
+        }
     </style>
 </head>
 <body>
     <div id="game-container">
         <canvas id="gc" width="480" height="700"></canvas>
+        <div id="tooltip" class="tooltip"></div>
         <div id="hud">
             <div>
                 <div class="hs">FLOOR <span id="fn">1</span></div>
@@ -403,11 +429,12 @@
                 <div class="stat-line"><span class="stat-label">Best Combo:</span> <span class="stat-value" id="rbc">0</span></div>
                 <div class="stat-line"><span class="stat-label">Pegs Hit:</span> <span class="stat-value" id="rph">0</span></div>
                 <div class="stat-line"><span class="stat-label">Credits Earned:</span> <span class="stat-value" id="rcd">0</span></div>
+                <div id="rda" style="display:none;margin-top:12px;padding:8px;border:1px solid #ff00ff;border-radius:4px;background:rgba(255,0,255,0.05);"></div>
                 <div id="nb" style="display:none;margin-top:10px;color:#ff00ff;font-size:16px;">NEW BEST!</div>
             </div>
             <button class="btn" id="retb">RETURN TO MENU</button>
         </div>
-        
+
         <!-- TUTORIAL OVERLAY -->
         <div id="tut" class="ov">
             <h2>HOW TO PLAY</h2>
@@ -499,6 +526,9 @@
                     <button class="btn btn2 skin-btn" data-skin="#ff6600" data-name="ORG" style="padding:5px 10px;">
                         <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#ff6600"/></svg>
                     </button>
+                    <button class="btn btn2 skin-btn" data-skin="#ffffff" data-name="WHT" style="padding:5px 10px;">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="#ffffff" stroke="#888" stroke-width="1"/></svg>
+                    </button>
                 </div>
             </div>
             <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
@@ -506,6 +536,7 @@
                 <div id="themeDisplay" style="color:#00fff2;margin:5px 0;">NEON</div>
                 <div style="display:flex;gap:5px;justify-content:center;margin-top:5px;" id="themeButtons">
                     <button class="btn btn2 theme-btn" data-theme="default" style="padding:5px 10px;">NEON</button>
+                    <button class="btn btn2 theme-btn" data-theme="neon" style="padding:5px 10px;">NEON+</button>
                     <button class="btn btn2 theme-btn" data-theme="matrix" style="padding:5px 10px;">MATRIX</button>
                 </div>
             </div>
@@ -530,7 +561,7 @@
         <!-- SLOT SELECTOR OVERLAY -->
         <div id="slot-selector" class="ov">
             <h2 style="color:#ffff00;">ARRANGE YOUR SLOTS</h2>
-            <p style="max-width:350px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:15px;">Drag slots to unlocked positions or click locked slots to unlock them. You get 1 unlock per floor!</p>
+            <p style="max-width:350px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:15px;">Drag slots to unlocked positions, or drag a slot onto a locked position to unlock it. You get 1 unlock per floor!</p>
             
             <div class="slot-arranging-section">
                 <div style="font-size:11px;color:#00fff2;margin-bottom:8px;">SLOT POSITIONS (Left to Right in Game):</div>
@@ -588,14 +619,40 @@
         STUCK_F: 180, STUCK_D: 2, CHAIN_T: 30, FRENZY_T: 180, MAXM: 7,
         TOP: 110, BOT: 480, PR: 8, PS: 50,
         SY: 560, SH: 50, SC: 7, SW: 480/7,
-        PT: {N:0, C:1, T:2, S:3, E:4, D:5, G:6, I:7, F:8, M:9, H:10, O:11},
+        PT: {N:0, C:1, T:2, S:3, E:4, D:5, I:6, F:7, M:8, H:9, O:10},
         PSTATES: {D:0, N:1, GL:2, CH:3, EX:4},
-        PC: {0:'#00fff2', 1:'#ffff00', 2:'#9944ff', 3:'#ff6600', 4:'#ff2244', 5:'#444466', 6:'#00ff88', 7:'#88ddff', 8:'#ff8844', 9:'#ffffff', 10:'#ffcc00', 11:'#ff4488'},
+        PC: {0:'#00fff2', 1:'#ffff00', 2:'#9944ff', 3:'#ff6600', 4:'#ff2244', 5:'#444466', 6:'#88ddff', 7:'#ff8844', 8:'#ffffff', 9:'#ffcc00', 10:'#ff4488'},
         // Contrast mode colors
-        PC_CONTRAST: {0:'#cccccc', 1:'#ffffff', 2:'#aaaaaa', 3:'#ffffff', 4:'#ffcccc', 5:'#888888', 6:'#ccffcc', 7:'#ddddff', 8:'#ffccaa', 9:'#ffffff', 10:'#ffffcc', 11:'#ffaaaa'},
+        PC_CONTRAST: {0:'#cccccc', 1:'#ffffff', 2:'#aaaaaa', 3:'#ffffff', 4:'#ffcccc', 5:'#888888', 6:'#ddddff', 7:'#ffccaa', 8:'#ffffff', 9:'#ffffcc', 10:'#ffaaaa'},
         ST: {E:0, CR:1, AM:2, PA:3, CM:4, SH:5, OC:6, JP:7},
         ST_NAMES: ['EMPTY', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'OVERCLOCK', 'JACKPOT'],
         ST_ICONS: ['-', '$', '+', '?', '#', '^', '*', '★'],
+        // Tooltip text for each peg type and slot effect. Shown on hover in
+        // the slot-selector and during in-game mouseover (pegs + bottom slots).
+        // Keys are the enum indices from C.PT and C.ST respectively.
+        PEG_TOOLTIPS: {
+            0:  { name: 'NODE',      desc: 'Standard peg. 50 × (combo+1) pts on hit.' },
+            1:  { name: 'CACHE',     desc: 'High-value peg. 200 + combo×50 pts, counts toward objective.' },
+            2:  { name: 'TELEPORT',  desc: 'Swaps the ball\'s position with its paired teleport peg.' },
+            3:  { name: 'SEISMIC',   desc: '+100 pts flat + shockwave + screen shake on hit.' },
+            4:  { name: 'EXPLOSIVE', desc: '×3 score on hit. Chain-destroys adjacent pegs.' },
+            5:  { name: 'DORMANT',   desc: 'Starts grey and inactive. Activates when a ball comes close.' },
+            6:  { name: 'ICE',       desc: 'First hit freezes the ball. Second hit = +150 + combo×75 pts.' },
+            7:  { name: 'FIBER',     desc: 'Multi-hit peg. Breaks for +300 + combo×100 pts on the 3rd hit.' },
+            8:  { name: 'MIRROR',    desc: 'Deflects the ball in a stored horizontal direction. +100 + combo×25.' },
+            9:  { name: 'HONEYCOMB', desc: '5-hit cycle. Final hit = +500 + combo×150 pts and attracts nearby pegs.' },
+            10: { name: 'OVERLOAD',  desc: '+75 pts but drains 10% of the jackpot. Erratic bounce.' }
+        },
+        SLOT_TOOLTIPS: {
+            0: { name: 'EMPTY',     desc: 'No effect when the ball lands here. 35% base chance.' },
+            1: { name: 'CREDITS',   desc: 'Adds score: 50 × (combo+1) × (frenzy ? 3 : 1).' },
+            2: { name: 'AMPLIFY',   desc: '+1 combo (capped at x7). Chain timer refreshes to 210.' },
+            3: { name: 'PAYLOAD',   desc: 'Adds a random payload to your queue (max 2).' },
+            4: { name: 'CRUMBLE',   desc: 'Destroys up to 3 random non-seismic/explosive pegs.' },
+            5: { name: 'SHIELD',    desc: 'Next ball is bounced back from overflow exit instead of dying.' },
+            6: { name: 'OVERCLOCK', desc: '1.5× gravity for the current ball only.' },
+            7: { name: 'JACKPOT',   desc: 'Adds the current jackpot to your score. Jackpot grows 15% if missed.' }
+        },
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
         // Multiball settings
@@ -1021,7 +1078,6 @@
         canDrop: true, mouseX: 240, ball: null,
         gravityMult: 1, // for OVERCLOCK slot
         shielded: false, // for SHIELD slot
-        lockedSlots: [], // which slots are locked this floor
         overload: false, // overload penalty active
         whiteFlash: false, // white flash effect
         jackpotWins: 0, // count of jackpots won this run
@@ -1064,9 +1120,6 @@
         // Ball color skins
         ballSkins: ['#00fff2', '#ff00ff', '#ffff00', '#00ff88', '#ff6600', '#ffffff'],
         currentBallSkin: '#00fff2',
-        unlockedBallSkins: ['#00fff2'],
-        unlockedBoardThemes: ['default'],
-        stormyModifier: false, // peg stormy modifier
         // Phase 4 Music Port: SFX and BGM are independently mutable
         audioMuted: false,
         bgmMuted: false
@@ -1172,17 +1225,27 @@
     
     function getDailyModifiers() {
         var seed = getDailySeed();
+        // Modifiers are queried at the relevant code path via modActive(id).
+        // No side-effect fns — the gravity/etc. multipliers are applied
+        // freshly each frame in Ball.update / checkCols / Peg.hit so they
+        // survive startGame()'s state reset.
         var mods = [
-            { id: 'gravity', name: 'Heavy Gravity', desc: '1.5x gravity', fn: function() { GS.gravityMult *= 1.5; } },
-            { id: 'fewer_pegs', name: 'Sparse Field', desc: '30% fewer pegs', fn: function() { /* handled in board gen */ } },
-            { id: 'small_ball', name: 'Tiny Ball', desc: 'Ball is 60% size', fn: function() { /* handled in ball creation */ } },
-            { id: 'fast_timer', name: 'Ticking Clock', desc: 'Pegs deactivate faster', fn: function() { /* handled in peg update */ } },
-            { id: 'multiplier', name: 'Lower Multiplier', desc: 'Max combo is x4', fn: function() { /* handled in combo calc */ } },
-            { id: 'double_pegs', name: 'Double Trouble', desc: 'Pegs worth half', fn: function() { /* handled in score */ } }
+            { id: 'gravity', name: 'Heavy Gravity', desc: '1.5x gravity' },
+            { id: 'fewer_pegs', name: 'Sparse Field', desc: '30% fewer pegs' },
+            { id: 'small_ball', name: 'Tiny Ball', desc: 'Ball is 60% size' },
+            { id: 'fast_timer', name: 'Ticking Clock', desc: 'Pegs deactivate faster' },
+            { id: 'multiplier', name: 'Lower Multiplier', desc: 'Max combo is x4' },
+            { id: 'double_pegs', name: 'Double Trouble', desc: 'Pegs worth half' }
         ];
         var mod1 = mods[Math.floor(seededRandom(seed) * mods.length)];
         var mod2 = mods[Math.floor(seededRandom(seed + 1) * mods.length)];
         return [mod1, mod2];
+    }
+
+    // Returns true if the named daily mod is active for the current run.
+    // Centralized so each call site stays a one-liner.
+    function modActive(id) {
+        return GS.dailyMods && GS.dailyMods.some(function(m) { return m.id === id; });
     }
     
     function startDailyChallenge() {
@@ -1543,6 +1606,13 @@
         if (!this.on) return;
         var dt60 = dt * 60;
         
+        // Slowmo payload: scale the effective time step so the ball
+        // actually moves at half speed for its lifetime. The visual octagonal
+        // overlay is gated on GS.slowmoEffect, but that flag alone does not
+        // touch physics - only scaling dt60 does. Note this is independent
+        // of `this.slow` (the ice peg's 500ms transient slow) further down.
+        if (this.slowmoMode) dt60 *= 0.5;
+        
         // Apply gravity with OVERCLOCK modifier
         this.vy += C.G * GS.gravityMult * dt60;
         
@@ -1634,9 +1704,69 @@
         this.mirrorDir = Math.random() > 0.5 ? 1 : -1; // for mirror peg
         this.attractCount = 0; // for honeypot peg
     }
-    Peg.prototype.hit = function() {
+    Peg.prototype.hit = function(b) {
         this.hc++;
         var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+        // Daily mod: double_pegs halves all per-peg scoring
+        if (modActive('double_pegs')) bonus = Math.floor(bonus / 2);
+
+        // Logicbomb payload: triple current score on the ball's first peg hit (one-shot).
+        // Applied before per-type branches so the x3 stacks on top of any per-type bonus.
+        if (b && b.lbActive) {
+            GS.sc *= 3;
+            b.lbActive = false;
+            createFloat(b.x, b.y, 'x3', '#ffff00');
+            Audio.playBonus();
+        }
+
+        // Explosive payload: on the ball's first peg hit, chain-destroy all non-Explosive
+        // pegs within 80px of the ball's position (one-shot per ball). We do the destruction
+        // inline rather than calling triggerExplosion() because the latter only spawns
+        // fragments without actually removing the pegs — too weak for a 85cr payload.
+        if (b && b.explosive) {
+            b.explosive = false;
+            for (var i = GS.bd.length - 1; i >= 0; i--) {
+                var p = GS.bd[i];
+                if (p === this) continue;  // skip the hit peg itself
+                var dx = p.x - b.x, dy = p.y - b.y;
+                if (dx*dx + dy*dy < 80*80 && p.t !== C.PT.E) {
+                    createFrag(p.x, p.y);
+                    GS.bd.splice(i, 1);
+                    GS.obj.prg++;
+                }
+            }
+            triggerScreenShake(4);
+            triggerWhiteFlash();
+            Audio.playExplosion();
+            createFloat(b.x, b.y, 'BOOM', '#ff2244');
+        }
+
+        // Scrambler payload: on the ball's first peg hit, reverse the ball's velocity
+        // so it bounces back the way it came (one-shot per ball). Applied before the
+        // per-type branches so the per-peg bounce reflection in checkCols is skipped
+        // (Peg.hit runs before the bounce in checkCols only in terms of state, not order).
+        if (b && b.scrambled === false) {
+            b.scrambled = true;
+            b.vx = -b.vx;
+            b.vy = -b.vy;
+            createFloat(b.x, b.y, 'SCRAM!', '#ff8844');
+            Audio.playTeleport();
+        }
+
+        // Trojan payload: on the ball's first peg hit, spawn 2 mini-balls with random
+        // velocities at the ball's position. Mirrors cluster's pattern (3 mini-balls)
+        // but with 2. One-shot per ball. The clones share the ball's mb array so
+        // they update independently via Ball.update (and can trigger overflow on exit).
+        if (b && b.trojanActive) {
+            b.trojanActive = false;
+            for (var i = 0; i < 2; i++) {
+                var clone = new Ball(b.x, b.y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, []);
+                clone.r = b.r * 0.6;
+                b.mb.push(clone);
+            }
+            createFloat(b.x, b.y, 'TROJAN!', '#ff2244');
+            Audio.playBonus();
+        }
 
         // Track peg types hit for achievements
         if (GS.pegTypesHit.indexOf(this.t) === -1) {
@@ -1796,7 +1926,9 @@
     // ========== BOARD GENERATION ==========
     function genBoard() {
         GS.bd = [];
-        var rows = 7 + Math.floor(GS.fl / 3);
+        // Daily mod: fewer_pegs cuts board density by 30%
+        var baseRows = 7 + Math.floor(GS.fl / 3);
+        var rows = modActive('fewer_pegs') ? Math.max(4, Math.floor(baseRows * 0.7)) : baseRows;
         var spacing = (C.BOT - C.TOP) / (rows + 1);
         var id = 0;
         for (var r = 0; r < rows; r++) {
@@ -1846,50 +1978,8 @@
                 tele[i + 1].paired = false;
             }
         }
-        // Add stormy pegs for stormy modifier
-        if (PERSIST.stormyModifier) {
-            addExtraPegs();
-        }
     }
     
-    // Add extra pegs rows for stormy modifier
-    function addExtraPegs() {
-        var extraRows = Math.min(3, Math.floor(GS.fl / 5) + 1);
-        var spacing = (C.BOT - C.TOP) / 9;
-        var startY = C.TOP + spacing * 4;
-        var id = GS.bd.length;
-        
-        for (var r = 0; r < extraRows; r++) {
-            var y = startY + r * spacing * 1.5;
-            var offset = (r % 2 === 0) ? C.PS / 4 : 0;
-            var cols = Math.floor((C.W - 80) / C.PS);
-            var startX = (C.W - cols * C.PS) / 2 + offset;
-            
-            for (var c = 0; c < cols; c++) {
-                var x = startX + c * C.PS;
-                // Check for overlap with existing pegs
-                var overlap = false;
-                for (var i = 0; i < GS.bd.length; i++) {
-                    var p = GS.bd[i];
-                    var dist = Math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y));
-                    if (dist < C.PS * 0.8) {
-                        overlap = true;
-                        break;
-                    }
-                }
-                if (!overlap) {
-                    // Stormy pegs are more unstable
-                    var rand = Math.random();
-                    var t = C.PT.N;
-                    if (rand < 0.02) t = C.PT.E;
-                    else if (rand < 0.05) t = C.PT.S;
-                    else if (rand < 0.10) t = C.PT.C;
-                    GS.bd.push(new Peg(x, y, t, id++));
-                }
-            }
-        }
-    }
-
     function setupObj() {
         var targets = [15, 20, 25, 30];
         var idx = Math.min(Math.floor(GS.fl / 3), targets.length - 1);
@@ -1909,47 +1999,55 @@
             var dist = Math.sqrt(dx * dx + dy * dy);
             var minD = b.r + p.r;
             if (dist < minD && dist > 0) {
-                var nx = dx / dist;
-                var ny = dy / dist;
-                var overlap = minD - dist;
-                b.x += nx * overlap;
-                b.y += ny * overlap;
-                var dot = b.vx * nx + b.vy * ny;
-                
-                // Apply bounce coefficient based on peg type
-                var bounceCoeff = p.bc;
-                
-                // Mirror peg: deflect ball in specific direction
-                if (p.t === C.PT.M) {
-                    // Use stored mirror direction
-                    var mirrorFactor = p.mirrorDir;
-                    // Deflect horizontally more based on direction
-                    b.vx = (Math.abs(b.vx) * mirrorFactor + b.vy * 0.5) * bounceCoeff;
-                    b.vy = (b.vy + Math.abs(b.vx) * 0.3) * bounceCoeff;
-                    
-                    // Ensure minimum horizontal velocity
-                    if (Math.abs(b.vx) < 3) {
-                        b.vx = 3 * mirrorFactor;
+                // Worm payload: skip position correction and velocity reflection
+                // (including Mirror and Ice special cases). The hit still registers
+                // below so combos and peg progression work — the ball just passes
+                // straight through without bouncing.
+                if (!b.worm) {
+                    var nx = dx / dist;
+                    var ny = dy / dist;
+                    var overlap = minD - dist;
+                    b.x += nx * overlap;
+                    b.y += ny * overlap;
+                    var dot = b.vx * nx + b.vy * ny;
+
+                    // Apply bounce coefficient based on peg type
+                    var bounceCoeff = p.bc;
+
+                    // Mirror peg: deflect ball in specific direction
+                    if (p.t === C.PT.M) {
+                        // Use stored mirror direction
+                        var mirrorFactor = p.mirrorDir;
+                        // Deflect horizontally more based on direction
+                        b.vx = (Math.abs(b.vx) * mirrorFactor + b.vy * 0.5) * bounceCoeff;
+                        b.vy = (b.vy + Math.abs(b.vx) * 0.3) * bounceCoeff;
+
+                        // Ensure minimum horizontal velocity
+                        if (Math.abs(b.vx) < 3) {
+                            b.vx = 3 * mirrorFactor;
+                        }
+                    } else if (p.t === C.PT.I && p.frozen) {
+                        // Ice peg (already hit): slow down the ball
+                        bounceCoeff = 0.3;
+                        b.vx = (b.vx - 2 * dot * nx) * bounceCoeff;
+                        b.vy = (b.vy - 2 * dot * ny) * bounceCoeff;
+                        b.slow = true;
+                        setTimeout(function() { b.slow = false; }, 500);
+                    } else {
+                        // Standard bounce
+                        b.vx = (b.vx - 2 * dot * nx) * bounceCoeff;
+                        b.vy = (b.vy - 2 * dot * ny) * bounceCoeff;
                     }
-                } else if (p.t === C.PT.I && p.frozen) {
-                    // Ice peg (already hit): slow down the ball
-                    bounceCoeff = 0.3;
-                    b.vx = (b.vx - 2 * dot * nx) * bounceCoeff;
-                    b.vy = (b.vy - 2 * dot * ny) * bounceCoeff;
-                    b.slow = true;
-                    setTimeout(function() { b.slow = false; }, 500);
-                } else {
-                    // Standard bounce
-                    b.vx = (b.vx - 2 * dot * nx) * bounceCoeff;
-                    b.vy = (b.vy - 2 * dot * ny) * bounceCoeff;
                 }
-                
+
                 b.hp[p.id] = true;
-                p.hit();
+                p.hit(b);
                 GS.obj.prg++;
                 GS.pegsHit++;
                 PERSIST.totalPegsHit++;
-                GS.cc = Math.min(GS.cc + 1, C.MAXM);
+                // Daily mod: multiplier caps the combo at 4 instead of 7
+                var maxCombo = modActive('multiplier') ? 4 : C.MAXM;
+                GS.cc = Math.min(GS.cc + 1, maxCombo);
                 GS.ct = C.CHAIN_T;
                 if (GS.cc >= 5) {
                     GS.fa = true;
@@ -2036,6 +2134,23 @@
         
         // Update active balls in GS for multiball tracking
         GS.activeBalls = activeBalls.filter(function(b) { return b && b.on; });
+        
+        // Slowmo / ghost payload global flags: dropBall sets the global
+        // (GS.slowmoEffect / GS.ghostEffect) so the per-frame render can
+        // draw the octagonal blue tint without checking every ball. But
+        // without a corresponding reset on last-flagged-ball-exit, the
+        // tint persisted until the next run. Recompute the globals from
+        // the still-active ball list so they flip off the moment the
+        // last ball carrying the flag has left the play field.
+        var anySlowmo = false, anyGhost = false;
+        for (var ai = 0; ai < GS.activeBalls.length; ai++) {
+            var ab = GS.activeBalls[ai];
+            if (!ab) continue;
+            if (ab.slowmoMode) anySlowmo = true;
+            if (ab.ghostMode) anyGhost = true;
+        }
+        GS.slowmoEffect = anySlowmo;
+        GS.ghostEffect = anyGhost;
         
         // Check if run should end (all balls gone and objective not met)
         if (GS.activeBalls.length === 0 && GS.bl <= 0 && GS.obj.prg < GS.obj.tgt) {
@@ -2269,6 +2384,53 @@
         }
     }
     
+    // Delegated tooltip handling for the slot-selector overlay. Attaching one
+    // mousemove listener on the overlay (rather than per-div mouseenter /
+    // mouseleave) lets us anchor the tooltip to the cursor in clientX/Y
+    // space, the same way the in-game canvas hover does. renderSlotSelector
+    // recreates the inner divs on every re-render, so delegation also keeps
+    // the wiring stable across re-renders.
+    (function() {
+        var _slotSel = document.getElementById('slot-selector');
+        if (!_slotSel) return;
+        function describeSlotPos(target) {
+            var pos = parseInt(target.dataset.pos);
+            var isUnlocked = GS.unlockedSlots.indexOf(pos) !== -1;
+            var slotType = GS.slotArrangement[pos];
+            var hasSlot = slotType !== undefined && slotType !== null;
+            if (isUnlocked && hasSlot) {
+                var tip = C.SLOT_TOOLTIPS[slotType];
+                if (tip) return { name: tip.name, desc: tip.desc, color: getSlotColor(slotType) };
+            } else if (isUnlocked) {
+                return { name: 'UNLOCKED SLOT', desc: 'Drop a slot here to fill this position.', color: '#ffff00' };
+            } else if (GS.canUnlockThisFloor) {
+                return { name: 'LOCKED SLOT', desc: 'Drag a slot here to UNLOCK this position (1 unlock per floor).', color: '#ff00ff' };
+            } else {
+                return { name: 'LOCKED THIS FLOOR', desc: 'You already unlocked a slot this floor. Rearrange only.', color: '#8888aa' };
+            }
+            return null;
+        }
+        function describePoolItem(target) {
+            var poolSlotType = parseInt(target.dataset.slotType);
+            var ptip = C.SLOT_TOOLTIPS[poolSlotType];
+            if (!ptip) return null;
+            return { name: ptip.name, desc: ptip.desc, color: getSlotColor(poolSlotType) };
+        }
+        _slotSel.addEventListener('mousemove', function(e) {
+            var slotPos = e.target.closest && e.target.closest('.slot-pos');
+            var poolItem = e.target.closest && e.target.closest('.slot-pool-item');
+            var info = null;
+            if (slotPos) info = describeSlotPos(slotPos);
+            else if (poolItem) info = describePoolItem(poolItem);
+            if (info) {
+                showTooltip(info.name, info.desc, info.color, e.clientX, e.clientY);
+            } else {
+                hideTooltip();
+            }
+        });
+        _slotSel.addEventListener('mouseleave', hideTooltip);
+    })();
+
     function renderSlotSelector() {
         var posContainer = document.getElementById('position-slots');
         var poolContainer = document.getElementById('slot-pool');
@@ -2335,7 +2497,6 @@
                     div.style.color = '#ffff00';
                     div.textContent = '+';
                     div.title = 'Drop a slot here!';
-
                     div.addEventListener('dragover', function(e) {
                         e.preventDefault();
                         this.classList.add('drop-hover');
@@ -2360,7 +2521,6 @@
                     div.style.color = '#ff00ff';
                     div.textContent = '?';
                     div.title = 'Drag and drop a slot to UNLOCK!';
-
                     div.addEventListener('dragover', function(e) {
                         e.preventDefault();
                         this.classList.add('drop-hover');
@@ -2691,13 +2851,15 @@
     
     // Peg evolution system
     function checkDormantActivation(ball) {
+        // Daily mod: fast_timer shrinks the activation radius from 40 to 25
+        var activationRadius = modActive('fast_timer') ? 25 : 40;
         for (var i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
             if (p.t === C.PT.D && p.st === C.PSTATES.D) {
                 var dx = ball.x - p.x;
                 var dy = ball.y - p.y;
                 var dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 40) {
+                if (dist < activationRadius) {
                     p.st = C.PSTATES.N;
                     spawnFloatText(p.x, p.y, 'REVEAL!', '#00ff88');
                 }
@@ -3266,6 +3428,23 @@
         document.getElementById('rph').textContent = GS.pegsHit;
         document.getElementById('rcd').textContent = Math.floor(GS.sc / 10);
         document.getElementById('nb').style.display = (GS.sc >= PERSIST.ls) ? 'block' : 'none';
+
+        // Phase 2a: show daily modifiers if this was a daily run, and mark complete
+        var rda = document.getElementById('rda');
+        if (GS.dailyMods && GS.dailyMods.length) {
+            var html = '<div style="color:#ff00ff;font-size:11px;font-weight:bold;margin-bottom:4px;">DAILY CHALLENGE MODIFIERS</div>';
+            for (var i = 0; i < GS.dailyMods.length; i++) {
+                html += '<div style="font-size:12px;color:#e0e0ff;">' + GS.dailyMods[i].name + ': <span style="color:#8888aa;">' + GS.dailyMods[i].desc + '</span></div>';
+            }
+            rda.innerHTML = html;
+            rda.style.display = 'block';
+            if (PERSIST.daily) {
+                PERSIST.daily.completed = true;
+                savePersist();
+            }
+        } else {
+            rda.style.display = 'none';
+        }
     }
 
     function updateShop() {
@@ -4092,7 +4271,12 @@
         var pl = GS.pl.shift() || [];
         
         var newBall = new Ball(GS.mouseX, C.DZY + 10, 0, 2, pl);
-        
+
+        // Daily mod: small_ball shrinks the ball to 60% radius
+        if (modActive('small_ball')) {
+            newBall.r = C.BR * 0.6;
+        }
+
         // Apply payload effects to ball
         if (pl.indexOf('ghost') !== -1) {
             newBall.ghostMode = true;
@@ -4101,6 +4285,48 @@
         if (pl.indexOf('slowmo') !== -1) {
             newBall.slowmoMode = true;
             GS.slowmoEffect = true;
+        }
+        if (pl.indexOf('daemon') !== -1) {
+            // Daemon: shield this ball from overflow exit (one-shot per ball).
+            // The sh field is already checked in Ball.update; the shield ring
+            // render also keys on it, so a green ring appears on drop.
+            newBall.sh = true;
+            Audio.playShield();
+        }
+        if (pl.indexOf('logicbomb') !== -1) {
+            // Logicbomb: triple the current score on the ball's first peg hit (one-shot).
+            // Peg.hit() checks b.lbActive and applies GS.sc *= 3, then clears the flag.
+            newBall.lbActive = true;
+        }
+        if (pl.indexOf('explosive') !== -1) {
+            // Explosive: on the ball's first peg hit, trigger a chain explosion
+            // at the ball's position. Peg.hit() detects b.explosive and calls
+            // triggerExplosion(b.x, b.y) plus the standard explosion FX.
+            newBall.explosive = true;
+        }
+        if (pl.indexOf('scrambler') !== -1) {
+            // Scrambler: on the ball's first peg hit, reverse the ball's velocity
+            // (b.vx *= -1, b.vy *= -1) so it bounces back the way it came.
+            // b.scrambled starts false; Peg.hit() checks and flips it to true.
+            newBall.scrambled = false;
+        }
+        if (pl.indexOf('worm') !== -1) {
+            // Worm: ball passes through pegs without bouncing. checkCols() still
+            // registers the hit (so combos and peg progression work) but skips
+            // the position correction and velocity reflection.
+            newBall.worm = true;
+        }
+        if (pl.indexOf('trojan') !== -1) {
+            // Trojan: on the ball's first peg hit, spawn 2 mini-balls (mirror of
+            // cluster's pattern but with 2 instead of 3). One-shot per ball.
+            newBall.trojanActive = true;
+        }
+        if (pl.indexOf('cluster') !== -1) {
+            // Cluster: ball sets the cl flag at drop so Ball.update splits it
+            // into 3 mini-balls (radius 60% of parent) once the trail settles
+            // (tr.length < 5). The split logic and mini-ball render are already
+            // in place - only the dropBall wiring was missing.
+            newBall.cl = true;
         }
         
         if (PERSIST.multiballEnabled && GS.ball) {
@@ -4116,11 +4342,96 @@
         setTimeout(function() { GS.canDrop = true; }, 500);
     }
 
+    // ========== TOOLTIPS (peg + slot hover) ==========
+    var _tooltipEl = null;
+    function showTooltip(header, desc, color, clientX, clientY) {
+        if (!_tooltipEl) _tooltipEl = document.getElementById('tooltip');
+        if (!_tooltipEl) return;
+        _tooltipEl.innerHTML = '<div class="tooltip-name" style="color:' + color + ';">' + header + '</div>' +
+                               '<div class="tooltip-desc">' + desc + '</div>';
+        _tooltipEl.style.display = 'block';
+        // Edge-clamp to viewport so the tooltip never overflows the window.
+        var off = 14;
+        var w = _tooltipEl.offsetWidth || 220;
+        var h = _tooltipEl.offsetHeight || 50;
+        var left = clientX + off;
+        var top = clientY + off;
+        if (left + w > window.innerWidth - 4)  left = clientX - off - w;
+        if (top + h > window.innerHeight - 4) top = clientY - off - h;
+        if (left < 4) left = 4;
+        if (top < 4) top = 4;
+        _tooltipEl.style.left = left + 'px';
+        _tooltipEl.style.top = top + 'px';
+    }
+    function hideTooltip() {
+        if (!_tooltipEl) _tooltipEl = document.getElementById('tooltip');
+        if (_tooltipEl) _tooltipEl.style.display = 'none';
+    }
+    function slotColorFor(st) {
+        switch (st) {
+            case 1: return '#00ff88'; // CR
+            case 2: return '#ff00ff'; // AM
+            case 3: return '#9944ff'; // PA
+            case 4: return '#ff6600'; // CM
+            case 5: return '#00fff2'; // SH
+            case 6: return '#ffff00'; // OC
+            case 7: return '#ffcc00'; // JP
+            default: return '#8888aa'; // E
+        }
+    }
+
     // ========== INPUT ==========
     canvas.addEventListener('mousemove', function(e) {
         var rect = canvas.getBoundingClientRect();
         GS.mouseX = (e.clientX - rect.left) * (C.W / rect.width);
+        var mouseYCanvas = (e.clientY - rect.top) * (C.H / rect.height);
+
+        // In-game hover detection: only show a tooltip while the game is
+        // actively playing. Peg hit-test is a small radius check; if no peg
+        // is under the cursor, fall through to the slot-collector zone.
+        // We only inspect the FIRST hit, top-down in array order, which
+        // is fine because pegs don't overlap in normal play.
+        if (GS.scr === C.SCR.P) {
+            var foundHeader = null, foundDesc = null, foundColor = null;
+            // Peg hit-test (small margin for forgiveness on the edges)
+            for (var i = 0; i < GS.bd.length; i++) {
+                var p = GS.bd[i];
+                var dx = GS.mouseX - p.x;
+                var dy = mouseYCanvas - p.y;
+                if (dx * dx + dy * dy < (p.r + 3) * (p.r + 3)) {
+                    var tip = C.PEG_TOOLTIPS[p.t];
+                    if (tip) {
+                        foundHeader = tip.name;
+                        foundDesc = tip.desc;
+                        foundColor = C.PC[p.t] || '#00fff2';
+                    }
+                    break;
+                }
+            }
+            // Slot-collector hit-test (only unlocked slots show a tooltip)
+            if (!foundHeader && mouseYCanvas >= C.SY && mouseYCanvas <= C.SY + C.SH) {
+                var si = Math.floor(GS.mouseX / C.SW);
+                if (si >= 0 && si < C.SC && isSlotUnlocked(si)) {
+                    var st = slots[si];
+                    var stip = C.SLOT_TOOLTIPS[st];
+                    if (stip) {
+                        foundHeader = stip.name;
+                        foundDesc = stip.desc;
+                        foundColor = slotColorFor(st);
+                    }
+                }
+            }
+            if (foundHeader) {
+                showTooltip(foundHeader, foundDesc, foundColor, e.clientX, e.clientY);
+            } else {
+                hideTooltip();
+            }
+        } else {
+            hideTooltip();
+        }
     });
+
+    canvas.addEventListener('mouseleave', hideTooltip);
 
     canvas.addEventListener('click', function() {
         if (GS.scr === C.SCR.P) dropBall();
@@ -4144,9 +4455,8 @@
         startGame();
     });
 
-    document.getElementById('dailyb').addEventListener('click', function() {
-        alert('Daily Challenge coming soon!');
-    });
+    // The full Daily Challenge modal + startDailyChallenge wiring lives further down
+    // (see "DAILY CHALLENGE BUTTON" section near the other overlay handlers)
 
     document.getElementById('tutb').addEventListener('click', function() {
         GS.scr = C.SCR.TU;
@@ -4267,7 +4577,7 @@
             hasTut: false, daily: {}, streak: 0, lastDay: '', tr: 0,
             leaderboard: [], contrastMode: false, totalPegsHit: 0, ballSaverCount: 0,
             multiballEnabled: false, currentBallSkin: '#00fff2', currentBoardTheme: 'default',
-            stormyModifier: false, audioMuted: false, bgmMuted: false };
+            audioMuted: false, bgmMuted: false };
         // Reload page to reset everything
         window.location.reload();
     });
@@ -4386,32 +4696,23 @@
     }
     
     function updatePegTypeLegend() {
+        // Phase 1: render directly from C.PT so the legend can never drift
+        // from the runtime enum again. Names are read from a name map.
         var legend = document.getElementById('pegTypeLegend');
         if (!legend) return;
-        
-        var pegTypes = [
-            { name: 'Node', color: '#00fff2', idx: 0 },
-            { name: 'Cache', color: '#ffff00', idx: 1 },
-            { name: 'Teleport', color: '#9944ff', idx: 2 },
-            { name: 'Seismic', color: '#ff6600', idx: 3 },
-            { name: 'Explosive', color: '#ff2244', idx: 4 },
-            { name: 'Dormant', color: '#444466', idx: 5 },
-            { name: 'Ice', color: '#88ddff', idx: 6 },
-            { name: 'Fiber', color: '#ff8844', idx: 7 },
-            { name: 'Mirror', color: '#eeeeee', idx: 8 },
-            { name: 'Honeypot', color: '#ffcc00', idx: 9 },
-            { name: 'Overload', color: '#ff4488', idx: 10 }
-        ];
-        
+
+        var names = {0:'Node', 1:'Cache', 2:'Teleport', 3:'Seismic', 4:'Explosive', 5:'Dormant', 6:'Ice', 7:'Fiber', 8:'Mirror', 9:'Honeycomb', 10:'Overload'};
+
         legend.innerHTML = '';
-        for (var i = 0; i < pegTypes.length; i++) {
-            var peg = pegTypes[i];
-            var iconSvg = SVG_ICONS.getPegIcon(peg.idx);
+        Object.keys(C.PT).forEach(function(key) {
+            var idx = C.PT[key];
+            var col = C.PC[idx];
+            var iconSvg = SVG_ICONS.getPegIcon(idx);
             var item = document.createElement('div');
-            item.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:9px;color:' + peg.color + ';white-space:nowrap;';
-            item.innerHTML = '<span style="width:12px;height:12px;display:inline-block;">' + iconSvg + '</span><span>' + peg.name + '</span>';
+            item.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:9px;color:' + col + ';white-space:nowrap;';
+            item.innerHTML = '<span style="width:12px;height:12px;display:inline-block;">' + iconSvg + '</span><span>' + names[idx] + '</span>';
             legend.appendChild(item);
-        }
+        });
     }
     
     function updateBallSkinDisplay() {
@@ -4491,11 +4792,9 @@
     document.querySelectorAll('.skin-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var skin = btn.getAttribute('data-skin');
-            if (PERSIST.unlockedBallSkins.indexOf(skin) !== -1 || true) { // Allow all for now
-                PERSIST.currentBallSkin = skin;
-                updateBallSkinDisplay();
-                savePersist();
-            }
+            PERSIST.currentBallSkin = skin;
+            updateBallSkinDisplay();
+            savePersist();
         });
     });
     
@@ -4503,12 +4802,10 @@
     document.querySelectorAll('.theme-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var theme = btn.getAttribute('data-theme');
-            if (PERSIST.unlockedBoardThemes.indexOf(theme) !== -1 || true) { // Allow all for now
-                PERSIST.currentBoardTheme = theme;
-                updateThemeDisplay();
-                applyBoardTheme();
-                savePersist();
-            }
+            PERSIST.currentBoardTheme = theme;
+            updateThemeDisplay();
+            applyBoardTheme();
+            savePersist();
         });
     });
     
@@ -4553,9 +4850,6 @@
         PERSIST.multiballEnabled = PERSIST.multiballEnabled || false;
         PERSIST.currentBallSkin = PERSIST.currentBallSkin || '#00fff2';
         PERSIST.currentBoardTheme = PERSIST.currentBoardTheme || 'default';
-        PERSIST.stormyModifier = PERSIST.stormyModifier || false;
-        PERSIST.unlockedBallSkins = PERSIST.unlockedBallSkins || ['#00fff2'];
-        PERSIST.unlockedBoardThemes = PERSIST.unlockedBoardThemes || ['default'];
         PERSIST.audioMuted = PERSIST.audioMuted || false;
         PERSIST.bgmMuted = PERSIST.bgmMuted || false;
         applyContrastMode();
