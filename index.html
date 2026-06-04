@@ -9,6 +9,14 @@
         body { background: #0a0a12; min-height: 100dvh; display: flex; justify-content: center; align-items: center; font-family: Courier New, monospace; color: #e0e0ff; overflow: hidden; }
         #game-container { position: relative; width: 480px; height: 700px; margin: 0 auto; flex-shrink: 0; }
         #gc { display: block; background: #12121f; }
+        /* Game board glow border - drawn via box-shadow so it doesn't shrink
+           the inner 480x700 area (a real border would, breaking the canvas
+           and overlay sizing). Toggled by showScreen() so it's hidden when
+           an overlay is up - the overlays already have their own colored
+           borders, so a double border would look like a doubled ring. */
+        #game-container.board-active { box-shadow: 0 0 0 2px #00fff2, 0 0 30px rgba(0,255,242,0.3); }
+        .theme-matrix #game-container.board-active { box-shadow: 0 0 0 2px #00ff00, 0 0 30px rgba(0,255,0,0.3); }
+        .contrast-mode #game-container.board-active { box-shadow: 0 0 0 2px #ffffff, 0 0 30px rgba(255,255,255,0.2); }
         .ov { position: absolute; top: 0; left: 0; width: 480px; height: 700px; background: rgba(10,10,18,0.98); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; border-radius: 2px; opacity: 0; }
         .ov.on { display: flex; opacity: 1; animation: overlay-fade-in 0.3s ease-out; }
         @keyframes overlay-fade-in { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
@@ -289,7 +297,7 @@
         }
         .ov.on#menu h1 { animation: title-pulse 3s ease-in-out infinite; }
         /* Slot spin animation enhancement */
-        .jr.sp { animation: spin 0.08s linear, reel-glow 0.4s linear infinite; }
+        .jr.sp { animation: spin 0.06s linear, reel-glow 0.4s linear infinite; }
         @keyframes reel-glow {
             0%, 100% { box-shadow: inset 0 0 10px rgba(0,255,242,0.3); }
             50% { box-shadow: inset 0 0 20px rgba(0,255,242,0.6), 0 0 15px rgba(0,255,242,0.4); }
@@ -656,7 +664,13 @@
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
         // Multiball settings
-        MAX_BALLS: 3, MULTIBALL_THRESHOLD: 7,
+        MAX_BALLS: 3,
+        // MULTIBALL_THRESHOLD reserved for the future meta-progression
+        // unlock system (e.g. "reach combo 7 to permanently unlock
+        // multiball"). Not enforced today - multiball is opt-in via the
+        // settings toggle. The MAX_BALLS=3 cap in dropBall is the only
+        // active constraint.
+        MULTIBALL_THRESHOLD: 7,
         // Visual enhancement constants
         RIPPLE_LIFETIME: 25,
         PORTAL_LIFETIME: 60,
@@ -1325,11 +1339,16 @@
         updateSpinButtonState();
         
         var reelSymbols = ['★', '$', '+', '?', '#', '^'];
-        var timePerReel = 60; // Much faster spinning
-        var spins = 8; // Fewer spins for faster result
-        
-        // Sound effect simulation via visual feedback
-        var soundPulse = 0;
+        // Spin timing. Original was 60/8/+4/+8/200/100 (total ~2.5s, too
+        // slow per playtest); first pass was 40/6/+2/+4/80/50 (~1.2s, too
+        // fast - felt like it skipped the anticipation). Current 50/6/+3/+5/
+        // 120/60 lands at ~1.7s, the sweet spot. The previous slowdown
+        // block that reassigned `timePerReel` inside the setInterval was a
+        // no-op (setInterval locks the interval at creation time) so the
+        // near-miss drama it tried to add never fired. Removed rather than
+        // fixed.
+        var timePerReel = 50;
+        var spins = 6;
         
         function spinReel(reelIdx, totalSpins, finalCallback) {
             var el = document.getElementById('jreel' + reelIdx);
@@ -1347,19 +1366,17 @@
                 // Add slight movement effect
                 el.style.transform = 'translateY(' + (Math.sin(count * 0.5) * 2) + 'px)';
 
-                // Audio: reel tick on each cycle
-                Audio.playReelTick();
+                // Audio: reel tick on every other cycle. At 40ms/cycle the
+                // 30ms tone would be a 75% duty cycle buzz; throttling to
+                // every other cycle gives distinct clicks at ~12.5Hz which
+                // is a much nicer slot-machine sound.
+                if (count % 2 === 0) Audio.playReelTick();
 
                 count++;
 
                 // Sound-like visual pulse every few frames
                 if (count % 3 === 0) {
                     el.style.textShadow = '0 0 ' + (15 + Math.random() * 15) + 'px #00fff2';
-                }
-                
-                // Slow down this reel's final spins (near-miss drama)
-                if (count > totalSpins - 5) {
-                    timePerReel = 80 + (count - (totalSpins - 5)) * 15;
                 }
                 
                 if (count >= totalSpins) {
@@ -1376,7 +1393,7 @@
                     setTimeout(function() {
                         el.style.animation = '';
                         if (finalCallback) finalCallback();
-                    }, 100);
+                    }, 60);
                 }
             }, timePerReel);
         }
@@ -1387,7 +1404,7 @@
             var el0 = document.getElementById('jreel0');
             el0.classList.add('hit');
             
-            spinReel(1, spins + 4, function() {
+            spinReel(1, spins + 3, function() {
                 // Second reel stops - building tension!
                 var el1 = document.getElementById('jreel1');
                 if (jackpotReels[1] === jackpotReels[0]) {
@@ -1397,7 +1414,7 @@
                 }
                 
                 setTimeout(function() {
-                    spinReel(2, spins + 8, function() {
+                    spinReel(2, spins + 5, function() {
                         // All reels stopped!
                         jackpotSpinning = false;
                         // Phase 4 Music Port: stop slot-spin BGM now that the spin is over
@@ -1470,7 +1487,7 @@
                         
                         if (callback) callback();
                     });
-                }, 200);
+                }, 120);
             });
         });
     }
@@ -1600,6 +1617,7 @@
         this.ghostMode = false; // for ghost payload chromatic aberration
         this.slowmoMode = false; // for slowmo payload
         this.slotChecked = false; // track if slot has been triggered for this ball
+        this.shieldedSlot = -1;  // slot index that the ball is currently bouncing out of after a shield (-1 = no shield context)
     }
 
     Ball.prototype.update = function(dt) {
@@ -1632,10 +1650,26 @@
         this.tr.push({x: this.x, y: this.y});
         if (this.tr.length > 10) this.tr.shift();
         
-        // Check if ball entered slot zone
+        // Check if ball entered slot zone. On first entry, remember the slot
+        // index in `shieldedSlot` so the same-slot guard below can suppress
+        // a duplicate trigger if the ball gets bounced back by a shield and
+        // lands in the same x-slot. `shieldedSlot` stays at -1 for balls
+        // that never enter an unlocked slot (locked slots are silent no-ops
+        // in checkSlot, so there's nothing to re-trigger and no need to
+        // track them for the same-slot guard).
         if (!this.slotChecked && this.y >= C.SY) {
             this.slotChecked = true;
-            checkSlot(this.x, this.y);
+            var slotIdx = getSlotForX(this.x);
+            if (this.shieldedSlot !== -1 && slotIdx === this.shieldedSlot) {
+                // Suppress re-trigger of the same slot that bounced us out
+                // via shield. No float, no effect - the slot is just a
+                // no-op for this ball. The ball continues falling and exits
+                // normally (the shield flag was already cleared on the
+                // bounce, so this is a clean death).
+            } else {
+                if (this.shieldedSlot === -1) this.shieldedSlot = slotIdx;
+                checkSlot(this.x, this.y);
+            }
         }
         
         var dx = this.x - this.lastX;
@@ -1672,12 +1706,25 @@
             this.mb[i].update(dt);
         }
         if (this.y > C.H + 50) {
-            // Shield protects ball from overload
+            // Shield protects ball from overflow. The old bounce (vy *= -0.5
+            // of the downward velocity) was too weak: a ball exiting at
+            // vy=10 only rebounded to y≈481, which is exactly the bottom
+            // of the board - the ball clipped into the peg field for a
+            // frame or two and immediately fell back. With a fixed upward
+            // kick (vy=-7) the ball reliably clears the bottom rows, and
+            // the random vx nudge means the bounce is unlikely to land in
+            // the same x-slot. slotChecked clears so a NEW slot entry
+            // actually fires; the same-slot guard in the slot-check block
+            // suppresses a duplicate trigger if the ball does fall back
+            // through the same slot. shieldedSlot stays set across the
+            // bounce (it's the reference, not the re-fire trigger).
             if (this.sh && !GS.overload) {
                 this.sh = false;
                 GS.shielded = false;
                 this.y = C.SY - 10;
-                this.vy = -Math.abs(this.vy) * 0.5;
+                this.vy = -7;
+                this.vx += (Math.random() - 0.5) * 6;
+                this.slotChecked = false;
                 createFloat(this.x, this.y, 'SHIELDED!', '#00fff2');
                 return;
             }
@@ -2085,45 +2132,70 @@
             }
         }
         
-        // Clean up inactive mini balls from main ball
-        if (GS.ball) {
-            GS.ball.mb = GS.ball.mb.filter(function(mb) { return mb.on; });
-        }
-        
-        // Count how many main balls have exited
-        var ballsExited = 0;
-        
-        // Check main ball
+        // Check main ball exit. Decrement GS.bl once, then promote a still-
+        // active mini (if any) to be the new main ball and re-parent the
+        // remaining minis under it. Without promotion, the minis become
+        // unreachable the next frame: `activeBalls` is built from
+        // `GS.ball.mb`, and with `GS.ball` null the snapshot is empty, so
+        // the minis would never get exit-checked, never get a ball-count
+        // charge, and never trigger overflow - making the cluster/trojan
+        // payload risk-free when the main ball exits before its minis. The
+        // pre-existing line `GS.ball = GS.activeBalls.length > 1 ?
+        // GS.activeBalls[1] : null;` was half-broken: it referenced the
+        // previous frame's GS.activeBalls (the new value is rebuilt below (line 2168), after this block) and never re-parented, so even when
+        // the promotion fired only one of N minis remained reachable.
         if (GS.ball && !GS.ball.on) {
             checkBallExit(GS.ball);
-            GS.ball = GS.activeBalls.length > 1 ? GS.activeBalls[1] : null;
-            ballsExited++;
-        }
-        
-        // Check mini balls (if not in multiball mode)
-        if (!PERSIST.multiballEnabled) {
-            for (var i = 0; i < activeBalls.length; i++) {
-                var mb = activeBalls[i];
-                if (mb && mb !== GS.ball && !mb.on) {
-                    ballsExited++;
-                    checkBallExit(mb);
-                }
+            // Find the first still-active mini to promote
+            var newMain = null;
+            var newMb = [];
+            for (var i = 1; i < activeBalls.length; i++) {
+                var m = activeBalls[i];
+                if (!m || !m.on) continue;
+                if (!newMain) newMain = m;
+                else newMb.push(m);
             }
+            if (newMain) {
+                // Re-parent the other still-active minis under the new main
+                newMain.mb = newMb;
+            }
+            GS.ball = newMain;  // null if no active minis
         }
-        
-        // Check mini balls in GS.ball.mb
-        if (GS.ball && GS.ball.mb) {
-            for (var i = GS.ball.mb.length - 1; i >= 0; i--) {
-                var mb = GS.ball.mb[i];
-                if (!mb.on) {
-                    // Mini ball exited - trigger overflow and remove
+
+        // Mini-ball exits: single source of truth for cluster / trojan spawns.
+        // Iterates the snapshot (activeBalls[1..]) so it catches minis that
+        // became inactive this frame even if the main ball also exited (in
+        // which case GS.ball is null and GS.ball.mb is unreachable - the
+        // indexOf lookup would NPE). In non-multiball mode each mini-ball
+        // exit charges 1 ball count, triggers the overflow visual, and
+        // resets multiplier / gravity state - matching the cost of the
+        // parent cluster/trojan ball that spawned it. In multiball mode
+        // there's no penalty, just array cleanup. Two bugs that this
+        // consolidates:
+        //   1. The pre-existing `if (GS.ball) { GS.ball.mb = GS.ball.mb.filter(...) }`
+        //      ran BEFORE this loop and removed the inactive minis, making
+        //      the third loop dead code (zero ball-count charge, zero
+        //      overflow trigger for cluster/trojan exits - the payload
+        //      felt free).
+        //   2. The separate "Check mini balls (if not in multiball mode)"
+        //      loop that called checkBallExit(mb) was a double-count
+        //      hazard once this loop is live (both would decrement GS.bl).
+        if (activeBalls.length > 1) {
+            for (var i = activeBalls.length - 1; i >= 1; i--) {
+                var mb = activeBalls[i];
+                if (mb && !mb.on) {
                     if (!PERSIST.multiballEnabled) {
                         triggerOverflow(mb.x);
-                        GS.bl--; // Consume a ball count for mini ball exit
+                        GS.bl--;
                     }
-                    // Remove from mini ball array
-                    GS.ball.mb.splice(i, 1);
-                    // Reset multiplier on mini ball exit
+                    // Remove from the live GS.ball.mb (no-op if the main
+                    // ball also exited - the array is unreachable and the
+                    // mini-balls will be filtered from GS.activeBalls below)
+                    if (GS.ball) {
+                        var liveIdx = GS.ball.mb.indexOf(mb);
+                        if (liveIdx !== -1) GS.ball.mb.splice(liveIdx, 1);
+                    }
+                    // Reset multiplier / gravity on mini-ball exit
                     GS.cc = 0;
                     GS.ct = 0;
                     GS.fa = false;
@@ -3151,6 +3223,21 @@
         if (id && id !== 'none') {
             var el = document.getElementById(id);
             if (el) el.classList.add('on');
+        }
+        // Toggle the .board-active class on the game container. The CSS uses
+        // this to show a theme-colored glow border (cyan for default, green
+        // for matrix, white for contrast mode) - but only when no overlay is
+        // up, since overlays have their own colored borders and a double
+        // ring would look wrong. showScreen('none') - called after slot
+        // arrangement, on floor-clear, etc. - is the "canvas is visible"
+        // signal, so it gets the border; anything else hides it.
+        var container = document.getElementById('game-container');
+        if (container) {
+            if (id && id !== 'none') {
+                container.classList.remove('board-active');
+            } else {
+                container.classList.add('board-active');
+            }
         }
         // Spawn ambient menu particles when menu is shown, stop them otherwise
         if (id === 'menu' || id === 'none' || id === undefined) {
