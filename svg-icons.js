@@ -1,47 +1,190 @@
-// Slot Protocol - SVG Icon Library
+// Slot Protocol - SVG Icon Library (Phase 3: Blade Runner 2049 visual overhaul)
+//
+// Visual rules for every icon in this file:
+//   - 24x24 viewBox, centered designs
+//   - 1.5-1.75px stroke, no fills (or very thin inner highlight)
+//   - Two-tone: outer outline in the type color, optional inner accent
+//   - Reads at 16px (HUD chips, button icons) and 40px (decorative)
+//   - Distinct silhouettes per type - trojan/cluster/explosive all read
+//     differently so a player can identify them at a glance
+//
+// The shape language is geometric line art with one or two accent marks;
+// no clipart-style emoji or three-color clipart. The icon is a wireframe
+// of the concept, not a pictogram.
 var SVG_ICONS = {
-    // PEG TYPE ICONS (11 types)
-    PEG_NODE: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#00fff2"/><circle cx="9" cy="9" r="2" fill="rgba(255,255,255,0.5)"/></svg>',
-    PEG_CACHE: '<svg viewBox="0 0 24 24"><path d="M12 3L22 12L12 21L2 12Z" fill="#ffff00"/><text x="12" y="15" text-anchor="middle" fill="#996600" font-size="10" font-weight="bold">$</text></svg>',
-    PEG_TELEPORT: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#9944ff"/><path d="M12 6C15 6 18 9 18 12C18 15 15 18 12 18" stroke="#cc99ff" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="2" fill="#fff"/></svg>',
-    PEG_SEISMIC: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ff6600"/><path d="M12 4L12 8M12 16L12 20M4 12L8 12M16 12L20 12" stroke="#ff8833" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" fill="#ffcc00"/></svg>',
-    PEG_EXPLOSIVE: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ff2244"/><path d="M12 5L12 8M12 16L12 19M5 12L8 12M16 12L19 12" stroke="#ff6666" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="#ff0000"/><path d="M10 9L12 12L10 13L11 15L13 12L15 13L14 11L12 10L13 8L11 9Z" fill="#ffff00"/></svg>',
-    PEG_DORMANT: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#444466" opacity="0.7" stroke="#666688" stroke-width="1" stroke-dasharray="3 2"/><text x="12" y="16" text-anchor="middle" fill="#8888aa" font-size="8">Z</text></svg>',
-    PEG_ICE: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#88ddff"/><path d="M12 5L12 19M5 12L19 12M7 7L17 17M17 7L7 17" stroke="#fff" stroke-width="1" opacity="0.7"/></svg>',
-    PEG_FIBER: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ff8844"/><path d="M6 8L18 8M6 12L18 12M6 16L18 16" stroke="#ffaa66" stroke-width="2" stroke-linecap="round"/></svg>',
-    PEG_MIRROR: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#eeeeee"/><circle cx="12" cy="12" r="8" stroke="#fff" stroke-width="2" fill="none"/></svg>',
-    PEG_HONEYPOT: '<svg viewBox="0 0 24 24"><path d="M12 3L20 8L20 16L12 21L4 16L4 8Z" fill="#ffcc00"/><text x="12" y="14" text-anchor="middle" fill="#996600" font-size="7" font-weight="bold">5</text></svg>',
-    PEG_OVERLOAD: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ff4488"/><path d="M12 5L12 8M12 16L12 19M5 12L8 12M16 12L19 12" stroke="#ff88aa" stroke-width="2" stroke-linecap="round"/></svg>',
-    // SLOT TYPE ICONS
-    SLOT_EMPTY: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2" stroke="#555566" stroke-width="2" stroke-dasharray="4 2" fill="none"/></svg>',
-    SLOT_CREDITS: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#00ff88"/><text x="12" y="16" text-anchor="middle" fill="#004422" font-size="12" font-weight="bold">$</text></svg>',
-    SLOT_AMPLIFY: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ff00ff"/><path d="M12 7V17M7 12H17" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>',
-    SLOT_PAYLOAD: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#9944ff"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">?</text></svg>',
-    SLOT_CRUMBLE: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#ff6600"/><path d="M8 8L10 12L8 16M12 8L14 12L12 16M16 8L14 12L16 16" stroke="#fff" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>',
-    SLOT_SHIELD: '<svg viewBox="0 0 24 24"><path d="M12 3L20 6V12C20 16 12 21 12 21C12 21 4 16 4 12V6L12 3Z" fill="#00fff2"/><path d="M9 12L11 14L15 10" stroke="#004422" stroke-width="2" stroke-linecap="round"/></svg>',
-    SLOT_OVERCLOCK: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ffff00"/><path d="M12 6V12L16 10" stroke="#996600" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.5" fill="#996600"/></svg>',
-    SLOT_JACKPOT: '<svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg>',
-    // PAYLOAD ICONS
-    PAYLOAD_SCRAMBLER: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2" stroke="#00fff2" stroke-width="2" fill="none"/><path d="M8 12L12 8V16ZM16 12L12 8V16" stroke="#00fff2" stroke-width="2" stroke-linecap="round"/></svg>',
-    PAYLOAD_TROJAN: '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="4" fill="#ff00ff"/><circle cx="16" cy="8" r="4" fill="#ff00ff" opacity="0.7"/><circle cx="12" cy="14" r="4" fill="#ff00ff" opacity="0.5"/></svg>',
-    PAYLOAD_WORM: '<svg viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="4" fill="#00fff2"/><circle cx="8" cy="12" r="3" fill="#006666"/><circle cx="16" cy="12" r="3" fill="#006666"/></svg>',
-    PAYLOAD_LOGIC_BOMB: '<svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="8" fill="#ff2244"/><text x="12" y="16" text-anchor="middle" fill="#ffff00" font-size="8" font-weight="bold">3x</text></svg>',
-    PAYLOAD_DAEMON: '<svg viewBox="0 0 24 24"><path d="M12 3L20 6V12C20 16 12 21 12 21C12 21 4 16 4 12V6L12 3Z" fill="#ff4488"/><circle cx="12" cy="12" r="4" fill="#ffff00"/></svg>',
-    PAYLOAD_GHOST: '<svg viewBox="0 0 24 24"><path d="M6 20V10C6 6 9 3 12 3C15 3 18 6 18 10V20L16 18V20H14L12 18L10 20H8L6 18V20Z" fill="#fff" opacity="0.6"/><circle cx="9" cy="8" r="1.5" fill="#000"/><circle cx="15" cy="8" r="1.5" fill="#000"/></svg>',
-    PAYLOAD_CLUSTER: '<svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="5" fill="#ff00ff"/><circle cx="7" cy="16" r="5" fill="#ff00ff" opacity="0.7"/><circle cx="17" cy="16" r="5" fill="#ff00ff" opacity="0.7"/></svg>',
-    PAYLOAD_EXPLOSIVE: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ff6600"/><path d="M12 4L12 8M12 16L12 20M4 12L8 12M16 12L20 12" stroke="#ff9900" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" fill="#ffff00"/></svg>',
-    PAYLOAD_SLOWMO: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#88ddff" opacity="0.7"/><path d="M8 12H16M8 9H14M8 15H14" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-    // UI ICONS
-    UI_TROPHY: '<svg viewBox="0 0 24 24"><path d="M12 17C15 17 18 14 18 10V4H6V10C6 14 9 17 12 17Z" fill="#ffcc00"/><rect x="8" y="20" width="8" height="2" rx="1" fill="#ff8800"/></svg>',
-    UI_STAR: '<svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg>',
-    UI_HEART: '<svg viewBox="0 0 24 24"><path d="M12 21C12 21 4 14 4 8.5C4 5.4 6.4 3 9.5 3C11 3 12 4 12 4C12 4 13 3 14.5 3C17.6 3 20 5.4 20 8.5C20 14 12 21 12 21Z" fill="#ff2244"/></svg>',
-    UI_LOCK: '<svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="12" rx="2" fill="#555566"/><circle cx="12" cy="16" r="2" fill="#ffff00"/></svg>',
-    UI_CHECK: '<svg viewBox="0 0 24 24"><path d="M9 12L11 14L15 10" stroke="#00ff88" stroke-width="3" stroke-linecap="round" fill="none"/></svg>',
-    UI_ARROW_RIGHT: '<svg viewBox="0 0 24 24"><path d="M5 12H19M13 6L19 12L13 18" stroke="#00fff2" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
-    // Helper to get icon by peg type
-    getPegIcon: function(type) { return this['PEG_' + ['NODE','CACHE','TELEPORT','SEISMIC','EXPLOSIVE','DORMANT','ICE','FIBER','MIRROR','HONEYPOT','OVERLOAD'][type] || 'PEG_NODE']; },
-    // Helper to get icon by slot type
-    getSlotIcon: function(type) { return this['SLOT_' + ['EMPTY','CREDITS','AMPLIFY','PAYLOAD','CRUMBLE','SHIELD','OVERCLOCK','JACKPOT'][type] || 'SLOT_EMPTY']; },
-    // Helper to get icon by payload type
-    getPayloadIcon: function(type) { return this['PAYLOAD_' + ['SCRAMBLER','TROJAN','WORM','LOGIC_BOMB','DAEMON','GHOST','CLUSTER','EXPLOSIVE','SLOWMO'][type] || 'PAYLOAD_SCRAMBLER']; }
+    // ========== PEG TYPES (11) ==========
+    // Cyan node - the default peg. Specular dot at 10 o'clock reads as
+    // "lit glass" - the most common shape in the game so it stays minimal.
+    PEG_NODE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#00fff2" stroke-width="1.75"/><circle cx="9" cy="9" r="1.5" fill="#00fff2" opacity="0.8"/></svg>',
+
+    // Yellow cache - diamond (4-sided) with a center cross. Diamond shape
+    // is visually distinct from the round nodes; cross reads as "+ value".
+    PEG_CACHE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L21 12L12 21L3 12Z" fill="none" stroke="#ffff00" stroke-width="1.75" stroke-linejoin="round"/><path d="M8 12H16M12 8V16" stroke="#ffff00" stroke-width="1.5" stroke-linecap="round"/></svg>',
+
+    // Purple teleport - concentric circles + inward chevron, reads as
+    // "swirl" without the swoopy curves that read as clipart.
+    PEG_TELEPORT: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#9944ff" stroke-width="1.75"/><circle cx="12" cy="12" r="4" fill="none" stroke="#cc99ff" stroke-width="1.25" stroke-dasharray="2 1.5"/><path d="M12 9L9 12L12 15M12 9L15 12L12 15" fill="none" stroke="#cc99ff" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+    // Orange seismic - ring with 4 short cardinal tick marks, plus an inner
+    // dot. Tick marks read as "concentric shockwave" without literal rings.
+    PEG_SEISMIC: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ff6600" stroke-width="1.75"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21" stroke="#ff8833" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="#ffcc00"/></svg>',
+
+    // Red explosive - circle with 8-point starburst (4 long axes + 4 short
+    // diagonals). Reads as "impact" / "danger" - the most aggressive peg.
+    PEG_EXPLOSIVE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="7" fill="none" stroke="#ff2244" stroke-width="1.75"/><path d="M12 2L12 7M12 17L12 22M2 12L7 12M17 12L22 12" stroke="#ff2244" stroke-width="1.75" stroke-linecap="round"/><path d="M5 5L8 8M16 16L19 19M5 19L8 16M16 8L19 5" stroke="#ff6666" stroke-width="1.25" stroke-linecap="round"/><circle cx="12" cy="12" r="2.5" fill="#ff2244"/></svg>',
+
+    // Grey dormant - dashed circle (inactive) with a small center dot.
+    // The dash pattern is the visual signal: "not yet awake".
+    PEG_DORMANT: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#666688" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="12" cy="12" r="1.5" fill="#8888aa"/></svg>',
+
+    // Light blue ice - 6-sided snowflake-like radial lines, hexagon silhouette.
+    // Distinct from the round Node so the player can read it at a glance.
+    PEG_ICE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#88ddff" stroke-width="1.75"/><path d="M12 4V20M4 12H20M6.3 6.3L17.7 17.7M17.7 6.3L6.3 17.7" stroke="#88ddff" stroke-width="1.25" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="#fff" opacity="0.8"/></svg>',
+
+    // Orange-red fiber - circle with 3 horizontal striations, "strands"
+    // of fiber-optic cable. The striation count = tier.
+    PEG_FIBER: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ff8844" stroke-width="1.75"/><path d="M5 9H19M5 12H19M5 15H19" stroke="#ffaa66" stroke-width="1.5" stroke-linecap="round"/></svg>',
+
+    // White mirror - circle with cross-hair (X + plus). Reads as
+    // "reflective surface" without literal mirror-curves.
+    PEG_MIRROR: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ffffff" stroke-width="1.75"/><path d="M4 12H20M12 4V20M6.3 6.3L17.7 17.7M17.7 6.3L6.3 17.7" stroke="#ffffff" stroke-width="1.25" stroke-linecap="round" opacity="0.7"/></svg>',
+
+    // Gold honeycomb - hexagon outline + smaller inner hexagon. Pure hex
+    // silhouette, no extras; the only round-disrupter in the game.
+    PEG_HONEYCOMB: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L20 7.5V16.5L12 21L4 16.5V7.5Z" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linejoin="round"/><path d="M12 8L16.5 10.25V14.75L12 17L7.5 14.75V10.25Z" fill="none" stroke="#ffcc00" stroke-width="1.25" stroke-linejoin="round" opacity="0.7"/></svg>',
+
+    // Pink overload - circle with lightning bolt (jagged Z shape).
+    // Lightning is a universal "electric/overload" symbol.
+    PEG_OVERLOAD: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ff4488" stroke-width="1.75"/><path d="M13 4L8 13H12L11 20L16 11H12L13 4Z" fill="#ff4488" stroke="#ff4488" stroke-width="0.5" stroke-linejoin="round"/></svg>',
+
+    // ========== SLOT TYPES (8) ==========
+    // Empty slot - dashed square. Reads as "no slot assigned".
+    SLOT_EMPTY: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="#555566" stroke-width="1.5" stroke-dasharray="3 2"/></svg>',
+
+    // Credits - circle with $ glyph stylized as two parallel lines
+    // through a vertical bar (avoids the text "$" which reads as
+    // font-dependent).
+    SLOT_CREDITS: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#00ff88" stroke-width="1.75"/><path d="M12 5V19" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/><path d="M15 8.5C15 8.5 14 7 12 7C10 7 9 8 9 9.5C9 11 10 11.5 12 12C14 12.5 15 13 15 14.5C15 16 14 17 12 17C10 17 9 15.5 9 15.5" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/></svg>',
+
+    // Amplify - two upward chevrons stacked. "Boost" without using +.
+    SLOT_AMPLIFY: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 13L12 6L19 13" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19L12 12L19 19" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/></svg>',
+
+    // Payload - square with corner brackets + central "?" drawn as a hook.
+    // "?" is a literal slot for "random", not text.
+    SLOT_PAYLOAD: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 4V8M4 4H8M20 4H16M20 4V8M4 20V16M4 20H8M20 20H16M20 20V16" stroke="#9944ff" stroke-width="1.75" stroke-linecap="round" fill="none"/><path d="M9 9C9 7.5 10.5 6.5 12 6.5C13.5 6.5 15 7.5 15 9C15 10.5 13.5 11 12 11V13" fill="none" stroke="#9944ff" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="#9944ff"/></svg>',
+
+    // Crumble - 3 fragments separated by gaps. Reads as "break" without
+    // a literal hammer.
+    SLOT_CRUMBLE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 4L8 4L8 8L4 8Z" fill="none" stroke="#ff6600" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 4L20 4L20 8L16 8Z" fill="none" stroke="#ff6600" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 12L14 12L14 16L10 16Z" fill="none" stroke="#ff6600" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 16L8 16L8 20L4 20Z" fill="none" stroke="#ff6600" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 16L20 16L20 20L16 20Z" fill="none" stroke="#ff6600" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+
+    // Shield - shield silhouette + inner checkmark.
+    SLOT_SHIELD: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L20 6V12C20 16 12 21 12 21C12 21 4 16 4 12V6L12 3Z" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linejoin="round"/><path d="M8.5 12L11 14.5L15.5 10" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+    // Overclock - clock face with hands. Distinct from amplify's chevrons.
+    SLOT_OVERCLOCK: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ffff00" stroke-width="1.75"/><path d="M12 7V12L15 10" fill="none" stroke="#ffff00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3V5M12 19V21M3 12H5M19 12H21" stroke="#ffff00" stroke-width="1.25" stroke-linecap="round"/></svg>',
+
+    // Jackpot - 5-point star (the classic reward star) with an inner
+    // glow ring. Reads as "prize" universally.
+    SLOT_JACKPOT: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 8.5L21.5 9L16 14L17.5 21L12 17L6.5 21L8 14L2.5 9L9.5 8.5Z" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="#ffcc00"/></svg>',
+
+    // ========== PAYLOAD TYPES (9) ==========
+    // Scrambler - U-turn arrow (180° reversal of direction).
+    PAYLOAD_SCRAMBLER: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H17C19 12 19 9 17 7L14 4" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 4L18 4L18 8" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+    // Trojan - shield with a "breach" (broken top edge). Distinct from
+    // SLOT_SHIELD's intact shield.
+    PAYLOAD_TROJAN: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L20 6V12C20 16 12 21 12 21C12 21 4 16 4 12V6L7 5" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 4L20 6" stroke="#ff00ff" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="13" r="2.5" fill="none" stroke="#ff00ff" stroke-width="1.5"/></svg>',
+
+    // Worm - chain link / connecting segments. Reads as "passes through".
+    PAYLOAD_WORM: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 12H17" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round"/><rect x="3" y="8" width="8" height="8" rx="4" fill="none" stroke="#00fff2" stroke-width="1.75"/><rect x="13" y="8" width="8" height="8" rx="4" fill="none" stroke="#00fff2" stroke-width="1.75"/><circle cx="7" cy="12" r="1" fill="#00fff2"/><circle cx="17" cy="12" r="1" fill="#00fff2"/></svg>',
+
+    // Logic Bomb - bomb silhouette with a fuse + "x3" stamp drawn as a
+    // tiny "×3" symbol. Bomb reads even at 16px.
+    PAYLOAD_LOGIC_BOMB: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="14" r="7" fill="none" stroke="#ff2244" stroke-width="1.75"/><path d="M16 9L18 7" stroke="#ffcc00" stroke-width="1.75" stroke-linecap="round"/><path d="M18 7C19 5 21 5 21 3" fill="none" stroke="#ffcc00" stroke-width="1.5" stroke-linecap="round"/><path d="M8.5 11.5L13.5 16.5M13.5 11.5L8.5 16.5" stroke="#ff2244" stroke-width="1.25" stroke-linecap="round"/><path d="M14 14H17" stroke="#ff2244" stroke-width="1.25" stroke-linecap="round"/></svg>',
+
+    // Daemon - horned silhouette. Two short upturned curves + a center eye.
+    PAYLOAD_DAEMON: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 9C5 6 8 4 12 4C16 4 19 6 19 9" fill="none" stroke="#ff4488" stroke-width="1.75" stroke-linecap="round"/><path d="M4 9L2 6M20 9L22 6" stroke="#ff4488" stroke-width="1.75" stroke-linecap="round"/><path d="M7 11C7 16 9 19 12 19C15 19 17 16 17 11" fill="none" stroke="#ff4488" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="13" r="1.5" fill="#ffcc00"/></svg>',
+
+    // Ghost - rounded ghost silhouette. Two eyes (small circles) + wavy
+    // bottom edge. Classic, instantly readable.
+    PAYLOAD_GHOST: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 20V10C5 6 8 3 12 3C16 3 19 6 19 10V20L17 18L15 20L13 18L11 20L9 18L7 20L5 18Z" fill="none" stroke="#ffffff" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round"/><circle cx="9.5" cy="10" r="1.25" fill="#ffffff"/><circle cx="14.5" cy="10" r="1.25" fill="#ffffff"/></svg>',
+
+    // Cluster - 3 connected nodes (triangle layout, lines connecting them).
+    // Distinct from trojan's shield and explosive's starburst.
+    PAYLOAD_CLUSTER: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4L12 18M5 19L17 9M5 9L17 19" stroke="#ff00ff" stroke-width="1.25" stroke-linecap="round" opacity="0.6"/><circle cx="12" cy="5" r="3" fill="none" stroke="#ff00ff" stroke-width="1.75"/><circle cx="5" cy="19" r="3" fill="none" stroke="#ff00ff" stroke-width="1.75"/><circle cx="19" cy="19" r="3" fill="none" stroke="#ff00ff" stroke-width="1.75"/></svg>',
+
+    // Explosive (payload) - central burst with rays of varying length.
+    // Smaller / more compact than the explosive peg.
+    PAYLOAD_EXPLOSIVE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" fill="#ff6600"/><path d="M12 2L12 5M12 19L12 22M2 12L5 12M19 12L22 12M5 5L7 7M17 7L19 5M5 19L7 17M17 17L19 19" stroke="#ff6600" stroke-width="1.75" stroke-linecap="round"/></svg>',
+
+    // Slowmo - clock with a "rewind" arrow loop. Reads as "time".
+    PAYLOAD_SLOWMO: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#88ddff" stroke-width="1.75"/><path d="M16 8C15 6.5 13.5 5.5 12 5.5C10.5 5.5 9 6.5 8 8" fill="none" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round"/><path d="M16 8L13 8L13 5" fill="none" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9V13L14.5 11" fill="none" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+    // ========== UI ICONS ==========
+    // Trophy - cup on a base. Used in leaderboard.
+    UI_TROPHY: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 4H17V10C17 13 15 15 12 15C9 15 7 13 7 10V4Z" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linejoin="round"/><path d="M7 6H4V8C4 10 5 11 7 11" fill="none" stroke="#ffcc00" stroke-width="1.5" stroke-linecap="round"/><path d="M17 6H20V8C20 10 19 11 17 11" fill="none" stroke="#ffcc00" stroke-width="1.5" stroke-linecap="round"/><path d="M9 19H15M12 15V19M10 21H14" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linecap="round"/></svg>',
+
+    // Star - 5-point star.
+    UI_STAR: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 8.5L21.5 9L16 14L17.5 21L12 17L6.5 21L8 14L2.5 9L9.5 8.5Z" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+
+    // Heart - filled heart with cutout.
+    UI_HEART: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21C12 21 4 14.5 4 9C4 6 6.5 4 9 4C10.5 4 12 5 12 5C12 5 13.5 4 15 4C17.5 4 20 6 20 9C20 14.5 12 21 12 21Z" fill="none" stroke="#ff2244" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+
+    // Lock - body + arch. Used for locked slots.
+    UI_LOCK: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="10" rx="1.5" fill="none" stroke="#8888aa" stroke-width="1.75"/><path d="M8 11V7C8 5 10 3 12 3C14 3 16 5 16 7V11" fill="none" stroke="#8888aa" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="16" r="1.5" fill="#8888aa"/></svg>',
+
+    // Check - single checkmark. Used for unlocked achievements.
+    UI_CHECK: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 12L10 17L19 7" fill="none" stroke="#00ff88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+    // Arrow right - used in menu footer.
+    UI_ARROW_RIGHT: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12H20M14 6L20 12L14 18" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+    // Bolt - lightning, for "reset / danger" / contrast mode.
+    UI_BOLT: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L5 13H11L10 22L19 11H13L13 2Z" fill="none" stroke="#ffff00" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+
+    // Plus - "drop a slot here" affordance on unlocked-empty positions.
+    UI_PLUS: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ffff00" stroke-width="1.75" stroke-dasharray="3 2"/><path d="M12 8V16M8 12H16" stroke="#ffff00" stroke-width="1.75" stroke-linecap="round"/></svg>',
+
+    // Unlock - magenta variant, used on locked-but-unlockable slot positions.
+    UI_UNLOCK: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="10" rx="1.5" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-dasharray="3 2"/><path d="M8 11V7C8 5 10 3 12 3C13.5 3 15 4 15.5 5.5" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="16" r="1.5" fill="#ff00ff"/></svg>',
+
+    // Gear - settings. Slightly stylized with 6 teeth.
+    UI_GEAR: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" fill="none" stroke="#ffffff" stroke-width="1.75"/><path d="M12 2V4M12 20V22M2 12H4M20 12H22M5 5L6.5 6.5M17.5 17.5L19 19M5 19L6.5 17.5M17.5 6.5L19 5" stroke="#ffffff" stroke-width="1.75" stroke-linecap="round"/></svg>',
+
+    // Calendar - daily challenge button.
+    UI_CALENDAR: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="1.5" fill="none" stroke="#00fff2" stroke-width="1.75"/><path d="M3 10H21" stroke="#00fff2" stroke-width="1.75"/><path d="M8 3V7M16 3V7" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round"/><rect x="7" y="13" width="3" height="3" fill="#00fff2"/></svg>',
+
+    // Question / Info - tutorial button.
+    UI_QUESTION: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" fill="none" stroke="#00fff2" stroke-width="1.75"/><path d="M9.5 9C9.5 7.5 10.5 6.5 12 6.5C13.5 6.5 14.5 7.5 14.5 9C14.5 10.5 12 10.5 12 13" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="#00fff2"/></svg>',
+
+    // Medal - achievements button. Ribbon + disk.
+    UI_MEDAL: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="9" r="5" fill="none" stroke="#ffcc00" stroke-width="1.75"/><circle cx="12" cy="9" r="2" fill="none" stroke="#ffcc00" stroke-width="1.25"/><path d="M8 13L6 22L12 18L18 22L16 13" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+
+    // Dollar - menu stat.
+    UI_DOLLAR: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" fill="none" stroke="#00ff88" stroke-width="1.75"/><path d="M12 6V18M15 8.5C15 8.5 14 7 12 7C10 7 9 8 9 9.5C9 11 10 11.5 12 12C14 12.5 15 13 15 14.5C15 16 14 17 12 17C10 17 9 15.5 9 15.5" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/></svg>',
+
+    // Flag - menu stat (best floor).
+    UI_FLAG: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 3V21" stroke="#00fff2" stroke-width="1.75" stroke-linecap="round"/><path d="M5 4H17L14 8L17 12H5" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+
+    // Ball - menu stat (total runs).
+    UI_BALL: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ffff00" stroke-width="1.75"/><circle cx="9" cy="9" r="1.5" fill="#ffff00" opacity="0.8"/></svg>',
+
+    // Coin - for total runs stat.
+    UI_RUNS: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ff00ff" stroke-width="1.75"/><path d="M12 6L18 12L12 18L6 12Z" fill="none" stroke="#ff00ff" stroke-width="1.5"/></svg>',
+
+    // ========== HELPER FUNCTIONS ==========
+    // Lookup by enum index. Returns an SVG string suitable for innerHTML.
+    getPegIcon: function(type) {
+        var names = ['NODE','CACHE','TELEPORT','SEISMIC','EXPLOSIVE','DORMANT','ICE','FIBER','MIRROR','HONEYCOMB','OVERLOAD'];
+        return this['PEG_' + (names[type] || 'NODE')];
+    },
+    getSlotIcon: function(type) {
+        var names = ['EMPTY','CREDITS','AMPLIFY','PAYLOAD','CRUMBLE','SHIELD','OVERCLOCK','JACKPOT'];
+        return this['SLOT_' + (names[type] || 'EMPTY')];
+    },
+    getPayloadIcon: function(type) {
+        // type is the payload name string (e.g. 'scrambler', 'logicbomb')
+        var key = ('payload_' + type).toUpperCase().replace(/-/g, '_');
+        return this[key] || this.PAYLOAD_SCRAMBLER;
+    }
 };

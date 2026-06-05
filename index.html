@@ -5,8 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Slot Protocol</title>
     <style>
+        /* ========== PHASE 3: VISUAL OVERHAUL (Blade Runner 2049) ==========
+           Typography: Orbitron for HUD/titles, Share Tech Mono for body.
+           Color scheme unchanged - only iconography, depth, and ambient. */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a12; min-height: 100dvh; display: flex; justify-content: center; align-items: center; font-family: Courier New, monospace; color: #e0e0ff; overflow: hidden; }
+        body { background: #0a0a12; min-height: 100dvh; display: flex; justify-content: center; align-items: center; font-family: 'Share Tech Mono', 'Courier New', monospace; color: #e0e0ff; overflow: hidden; }
+        /* Tabular numerals for HUD digits so the score/jackpot/balls do not
+           jitter as they tick up */
+        .hs, .hss, .hsj, .hsb, #mv, .jp-amount { font-variant-numeric: tabular-nums; }
         #game-container { position: relative; width: 480px; height: 700px; margin: 0 auto; flex-shrink: 0; }
         #gc { display: block; background: #12121f; }
         /* Game board glow border - drawn via box-shadow so it doesn't shrink
@@ -27,21 +34,35 @@
         #shop, #resetconfirm { border: 2px solid #ff00ff; box-shadow: 0 0 30px rgba(255,0,255,0.3); }
         #ach { border: 2px solid #ffff00; box-shadow: 0 0 30px rgba(255,255,0,0.3); }
         #settings { border: 2px solid #ffffff; box-shadow: 0 0 30px rgba(255,255,255,0.2); }
+        /* Settings has a lot of content (4 toggles + skin row + theme row +
+           11-entry legend + reset + close). Center-flex would crop the
+           bottom, so anchor to the top and let it scroll. The remaining
+           overlays keep the centered flex layout. */
+        #settings { justify-content: flex-start; padding-top: 30px; padding-bottom: 30px; overflow-y: auto; }
+        #settings > * { flex-shrink: 0; }
         #slot-selector { border: 2px solid #ff6600; box-shadow: 0 0 30px rgba(255,102,0,0.3); }
-        .ov h1 { font-size: 32px; margin-bottom: 20px; text-shadow: 0 0 20px #00fff2; letter-spacing: 4px; }
-        .ov h2 { font-size: 24px; margin-bottom: 15px; }
+        .ov h1 { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 30px; margin-bottom: 20px; text-shadow: 0 0 20px #00fff2, 0 0 40px rgba(0,255,242,0.3); letter-spacing: 6px; text-transform: uppercase; }
+        .ov h2 { font-family: 'Orbitron', monospace; font-weight: 700; font-size: 20px; margin-bottom: 15px; letter-spacing: 3px; text-transform: uppercase; }
         .ov .stat-line { font-size: 14px; margin: 5px 0; }
         .ov .stat-label { color: #8888aa; }
         .ov .stat-value { color: #ffff00; }
-        .btn { margin: 10px; padding: 12px 30px; background: transparent; border: 2px solid #00fff2; color: #00fff2; font-family: Courier New, monospace; font-size: 16px; cursor: pointer; text-shadow: 0 0 10px #00fff2; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
-        .btn:hover { background: #00fff2; color: #0a0a12; box-shadow: 0 0 20px rgba(0,255,242,0.5); transform: translateY(-1px); }
-        .btn:active { transform: translateY(1px) scale(0.96); box-shadow: 0 0 10px rgba(0,255,242,0.3); transition: transform 0.05s ease-out; }
+        .btn { margin: 8px; padding: 10px 18px; background: transparent; border: 2px solid #00fff2; color: #00fff2; font-family: 'Orbitron', 'Courier New', monospace; font-weight: 700; font-size: 12px; letter-spacing: 1.5px; cursor: pointer; text-shadow: 0 0 10px #00fff2; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,255,242,0.15) inset, 0 0 12px rgba(0,255,242,0.18); }
+        /* Keep the icon + label on one line. Without this, narrow buttons
+           (the paired ACHIEVEMENTS / LEADERBOARD row in particular) wrap
+           the icon above the text. */
+        .btn { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+        /* Buttons must never overflow the 480px container. The flex parent
+           (e.g. the ACHIEVEMENTS / LEADERBOARD row) wraps if the pair
+           can't fit on one line. */
+        .btn { max-width: 100%; box-sizing: border-box; }
+        .btn:hover { background: rgba(0,255,242,0.12); color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.4) inset, 0 0 24px rgba(0,255,242,0.5); transform: translateY(-1px); }
+        .btn:active { transform: translateY(1px) scale(0.98); box-shadow: 0 0 0 1px rgba(0,255,242,0.6) inset, 0 0 14px rgba(0,255,242,0.4); transition: transform 0.05s ease-out; }
         .btn2 { border-color: #555566; color: #8888aa; text-shadow: none; }
-        .btn2:hover { background: #555566; color: #e0e0ff; transform: translateY(-1px); }
-        .btn2:active { transform: translateY(1px) scale(0.96); transition: transform 0.05s ease-out; }
+        .btn2:hover { background: rgba(85,85,102,0.25); color: #e0e0ff; box-shadow: 0 0 0 1px rgba(136,138,170,0.4) inset, 0 0 18px rgba(136,138,170,0.3); transform: translateY(-1px); }
+        .btn2:active { transform: translateY(1px) scale(0.98); transition: transform 0.05s ease-out; }
         .btn3 { border-color: #ff2244; color: #ff2244; }
-        .btn3:hover { background: #ff2244; color: #fff; transform: translateY(-1px); }
-        .btn3:active { transform: translateY(1px) scale(0.96); transition: transform 0.05s ease-out; }
+        .btn3:hover { background: rgba(255,34,68,0.15); color: #ff4466; box-shadow: 0 0 0 1px rgba(255,34,68,0.5) inset, 0 0 24px rgba(255,34,68,0.5); transform: translateY(-1px); }
+        .btn3:active { transform: translateY(1px) scale(0.98); transition: transform 0.05s ease-out; }
         /* Button click ripple effect */
         .btn::after { content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; background: rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%) scale(0); opacity: 0; pointer-events: none; }
         .btn.clicked::after { animation: btn-ripple 0.5s ease-out; }
@@ -52,13 +73,19 @@
         #shop h2 { color: #ff00ff; text-shadow: 0 0 15px #ff00ff; }
         #hud { position: absolute; top: 0; left: 0; right: 0; padding: 10px 15px; display: none; justify-content: space-between; pointer-events: none; z-index: 10; }
         #hud.on { display: flex; }
-        .hs { font-size: 14px; text-shadow: 0 0 10px #00fff2; }
-        .hss { font-size: 18px; color: #ffff00; text-shadow: 0 0 15px #ffff00; }
+        .hs { font-family: 'Orbitron', monospace; font-weight: 500; font-size: 11px; text-shadow: 0 0 10px #00fff2; letter-spacing: 2px; text-transform: uppercase; }
+        .hss { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 22px; color: #ffff00; text-shadow: 0 0 15px #ffff00; letter-spacing: 1px; }
         .hsj { color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
         .hsb { color: #00ff88; }
         #mul { position: absolute; top: 80px; right: 15px; text-align: right; display: none; }
         #mul.on { display: block; }
-        #mv { font-size: 28px; color: #00fff2; text-shadow: 0 0 20px #00fff2; transition: transform 0.1s ease, color 0.3s ease, text-shadow 0.3s ease; display: inline-block; }
+        #mv { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 32px; color: #00fff2; text-shadow: 0 0 20px #00fff2; transition: transform 0.1s ease, color 0.3s ease, text-shadow 0.3s ease; display: inline-block; letter-spacing: 1px; position: relative; padding: 2px 10px 6px; }
+        /* Corner-bracket frame around the multiplier, drawn with two
+           pseudo-elements so the bracket L's are sharp. Top brackets at
+           the top-left/right corners of the value. */
+        #mv::before, #mv::after { content: ''; position: absolute; width: 8px; height: 8px; border-color: #00fff2; opacity: 0.7; }
+        #mv::before { top: 0; left: 0; border-top: 1.5px solid; border-left: 1.5px solid; }
+        #mv::after { bottom: 0; right: 0; border-bottom: 1.5px solid; border-right: 1.5px solid; }
         #cb { width: 60px; height: 4px; background: #1a1a2e; margin-top: 5px; border: 1px solid #555566; }
         #cf { height: 100%; background: linear-gradient(90deg, #00fff2, #ff00ff); transition: background 0.3s ease; }
         #ol { position: absolute; bottom: 65px; left: 15px; right: 15px; font-size: 10px; color: #8888aa; text-align: center; display: none; }
@@ -66,7 +93,7 @@
         #ob { position: absolute; bottom: 60px; left: 15px; right: 15px; height: 20px; background: #1a1a2e; border: 1px solid #555566; border-radius: 3px; overflow: hidden; display: none; }
         #ob.on { display: block; }
         #of { height: 100%; width: 0%; background: linear-gradient(90deg, #00ff88, #00fff2); box-shadow: 0 0 10px #00ff88; }
-        #sb { position: absolute; bottom: 15px; right: 15px; padding: 8px 16px; background: transparent; border: 1px solid #ff00ff; color: #ff00ff; font-family: Courier New, monospace; font-size: 12px; cursor: pointer; pointer-events: auto; display: none; z-index: 15; }
+        #sb { position: absolute; bottom: 15px; right: 15px; padding: 8px 16px; background: transparent; border: 1px solid #ff00ff; color: #ff00ff; font-family: 'Orbitron', 'Courier New', monospace; font-weight: 700; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; pointer-events: auto; display: none; z-index: 15; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 0 1px rgba(255,0,255,0.2) inset, 0 0 12px rgba(255,0,255,0.2); }
         #sb.on { display: block; }
         #sb:hover { background: #ff00ff; color: #0a0a12; }
         #toast { position: absolute; bottom: 80px; right: 15px; background: #1a1a2e; border: 2px solid #ffff00; box-shadow: 0 0 15px rgba(255,255,0,0.3); padding: 10px 15px; opacity: 0; transform: translateX(100px); transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); pointer-events: none; z-index: 50; border-radius: 4px; display: flex; align-items: center; gap: 12px; }
@@ -79,15 +106,19 @@
         @keyframes toast-glow { 0%, 100% { filter: drop-shadow(0 0 5px #ffcc00); } 50% { filter: drop-shadow(0 0 15px #ffcc00); } }
         @keyframes toast-bounce { 0% { transform: translateX(100px) scale(0.8); } 60% { transform: translateX(-5px) scale(1.05); } 100% { transform: translateX(0) scale(1); } }
         .sg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px; max-width: 450px; }
-        .si { background: #1a1a2e; border: 1px solid #555566; padding: 10px; text-align: center; cursor: pointer; }
+        .si { background: #1a1a2e; border: 1px solid #555566; padding: 10px; text-align: center; cursor: pointer; position: relative; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .si::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: #00fff2; box-shadow: 0 0 6px #00fff2; opacity: 0.6; }
+        .si::after { content: ''; position: absolute; top: 4px; left: 4px; width: 6px; height: 6px; border-top: 1px solid #00fff2; border-left: 1px solid #00fff2; opacity: 0.7; }
+        .si:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.3) inset, 0 0 14px rgba(0,255,242,0.25); transform: translateY(-1px); }
         .si.disabled { opacity: 0.5; cursor: not-allowed; }
         .si.disabled:hover { border-color: #555566; box-shadow: none; }
-        .in { font-size: 12px; color: #00fff2; margin-bottom: 5px; }
+        .in { font-family: 'Orbitron', monospace; font-weight: 700; font-size: 12px; color: #00fff2; margin-bottom: 5px; letter-spacing: 1px; text-transform: uppercase; }
         .ic { font-size: 14px; color: #ff00ff; }
         .ii { font-size: 10px; color: #8888aa; margin-top: 3px; }
         /* Payload slot styles */
-        .ps { width: 32px; height: 32px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; border-radius: 4px; transition: border-color 0.3s ease, box-shadow 0.3s ease; }
-        .ps.on { background: rgba(153,68,255,0.2); border-color: #9944ff; }
+        .ps { width: 32px; height: 32px; border: 1px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #555566; background: #1a1a2e; border-radius: 3px; transition: border-color 0.3s ease, box-shadow 0.3s ease; position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset; }
+        .ps::after { content: ''; position: absolute; top: 1px; right: 1px; width: 4px; height: 4px; border-top: 1px solid currentColor; border-right: 1px solid currentColor; opacity: 0.5; }
+        .ps.on { background: rgba(153,68,255,0.2); border-color: #9944ff; box-shadow: 0 0 0 1px rgba(153,68,255,0.4) inset, 0 0 10px rgba(153,68,255,0.4); }
         .ps-icon { width: 24px; height: 24px; }
         .ps-icon svg { width: 100%; height: 100%; }
         #pi { position: absolute; bottom: 15px; left: 15px; display: none; gap: 5px; }
@@ -125,15 +156,16 @@
         .lb-list { max-height: 250px; overflow-y: auto; margin: 15px 0; width: 350px; }
         .lb-item { display: flex; justify-content: space-between; padding: 8px 15px; border-bottom: 1px solid #333; font-size: 14px; }
         .lb-item:nth-child(odd) { background: rgba(0,255,242,0.05); }
-        .lb-item.top3 { color: #ffff00; font-weight: bold; }
+        .lb-item.top3 { color: #ffff00; font-weight: bold; text-shadow: 0 0 8px rgba(255,255,0,0.3); }
         .lb-rank { color: #8888aa; width: 30px; }
         .lb-name { flex: 1; margin-left: 10px; }
         .lb-score { color: #ffff00; }
+        .lb-rank, .lb-name, .lb-score { font-family: 'Share Tech Mono', monospace; }
         .lb-date { color: #555566; font-size: 11px; margin-left: 10px; }
         .name-input { background: #1a1a2e; border: 2px solid #00fff2; color: #00fff2; padding: 10px 15px; font-family: Courier New, monospace; font-size: 16px; width: 200px; text-align: center; margin: 10px 0; }
         .name-input:focus { outline: none; box-shadow: 0 0 15px rgba(0,255,242,0.3); }
         /* Settings styles */
-        .toggle-row { display: flex; align-items: center; justify-content: center; margin: 15px 0; gap: 10px; font-size: 12px; min-width: 200px; }
+        .toggle-row { display: flex; align-items: center; justify-content: center; margin: 8px 0; gap: 10px; font-size: 12px; min-width: 200px; }
         .toggle { width: 40px; height: 20px; background: #333; border-radius: 10px; cursor: pointer; position: relative; transition: background 0.3s; }
         .toggle.on { background: #00fff2; }
         .toggle::after { content: ''; width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
@@ -152,8 +184,8 @@
         @keyframes jackpot-win { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.1) rotate(2deg); } }
         @keyframes reel-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         @keyframes coin-burst { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100px) scale(0); opacity: 0; } }
-        .jp-display { background: linear-gradient(180deg, #1a1a2e, #12121f); border: 2px solid #ff00ff; border-radius: 8px; padding: 8px 15px; margin-bottom: 10px; text-align: center; }
-        .jp-amount { font-size: 20px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
+        .jp-display { background: linear-gradient(180deg, #1a1a2e, #12121f); border: 2px solid #ff00ff; border-radius: 3px; padding: 8px 15px; margin-bottom: 10px; text-align: center; width: 200px; box-sizing: border-box; }
+        .jp-amount { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 24px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; letter-spacing: 1px; }
         .jp-label { font-size: 10px; color: #8888aa; margin-bottom: 3px; }
         .spins-left { font-size: 12px; color: #ffff00; margin-top: 10px; }
         .spin-btn { background: linear-gradient(180deg, #ff00ff, #aa0088) !important; border-color: #ff00ff !important; color: #fff !important; animation: spin-ready 1s ease-in-out infinite; }
@@ -165,10 +197,14 @@
         @keyframes reel-stop { 0% { transform: scale(1.1); } 100% { transform: scale(1); } }
         /* Achievement styles */
         .ach-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; max-width: 400px; }
-        .ach-item { background: #1a1a2e; border: 1px solid #555566; padding: 10px; text-align: center; }
+        .ach-item { background: #1a1a2e; border: 1px solid #555566; padding: 10px 10px 10px 14px; text-align: left; position: relative; transition: all 0.2s ease; }
+        .ach-item::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; background: #555566; box-shadow: 0 0 4px currentColor; }
+        .ach-item.unlocked::before { background: #ffff00; box-shadow: 0 0 8px #ffff00; }
+        .ach-item::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-top: 1px solid #555566; border-right: 1px solid #555566; }
+        .ach-item.unlocked::after { border-top-color: #ffff00; border-right-color: #ffff00; box-shadow: 1px -1px 4px rgba(255,255,0,0.4); }
         .ach-item.locked { opacity: 0.4; }
-        .ach-item.unlocked { border-color: #ffff00; }
-        .ach-name { color: #ffff00; font-size: 12px; }
+        .ach-item.unlocked { border-color: rgba(255,255,0,0.5); box-shadow: 0 0 12px rgba(255,255,0,0.15); }
+        .ach-name { font-family: 'Orbitron', monospace; font-weight: 700; font-size: 11px; color: #ffff00; letter-spacing: 1px; text-transform: uppercase; }
         .ach-desc { color: #8888aa; font-size: 10px; margin-top: 5px; }
         /* Matrix theme */
         .theme-matrix #game-container #gc { background: #000800; }
@@ -182,18 +218,29 @@
         .skin-preview { width: 40px; height: 40px; margin: 10px auto; display: flex; justify-content: center; align-items: center; }
         .skin-preview svg { width: 100%; height: 100%; filter: drop-shadow(0 0 5px currentColor); }
         /* Daily challenge modifier styles */
-        .daily-mod { color: #ff00ff; font-size: 14px; margin: 10px 0; padding: 10px; border: 1px solid #ff00ff; background: rgba(255,0,255,0.1); border-radius: 4px; display: flex; align-items: center; gap: 10px; }
+        .daily-mod { color: #ff00ff; font-size: 14px; margin: 10px 0; padding: 10px 10px 10px 14px; border: 1px solid #ff00ff; background: rgba(255,0,255,0.1); border-radius: 3px; display: flex; align-items: center; gap: 10px; position: relative; box-shadow: 0 0 0 1px rgba(255,0,255,0.2) inset, 0 0 12px rgba(255,0,255,0.15); }
+        .daily-mod::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; background: #ff00ff; box-shadow: 0 0 4px #ff00ff; }
+        .daily-mod::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-top: 1px solid #ff00ff; border-right: 1px solid #ff00ff; }
         .daily-mod-icon { width: 24px; height: 24px; flex-shrink: 0; }
         .daily-mod-icon svg { width: 100%; height: 100%; }
         .daily-mod-text { flex: 1; }
         .daily-mods-container { margin: 15px 0; display: flex; flex-direction: column; gap: 10px; }
         /* Slot selector styles */
-        .slot-pos { width: 50px; height: 50px; background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
-        .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 10px rgba(0,255,242,0.3); }
+        /* Effect tiles: positions and pool items share the same physical
+           size (56x56) and corner-bracket treatment so the eye reads
+           them as one visual system. 56px gives icons room to breathe
+           AND leaves healthy 24px margin on each side of the 7-position
+           row (7*56 + 6*6 = 428, fits in 476 inner with 24px to spare). */
+        .slot-pos, .slot-pool-item { width: 56px; height: 56px; box-sizing: border-box; }
+        .slot-pos { background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+        .slot-pos::before { content: ''; position: absolute; top: 2px; left: 2px; width: 5px; height: 5px; border-top: 1px solid currentColor; border-left: 1px solid currentColor; opacity: 0.5; }
+        .slot-pos::after { content: ''; position: absolute; bottom: 2px; right: 2px; width: 5px; height: 5px; border-bottom: 1px solid currentColor; border-right: 1px solid currentColor; opacity: 0.5; }
+        .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.3) inset, 0 0 10px rgba(0,255,242,0.3); }
         .slot-pos.occupied { border-style: solid; cursor: grab; }
         .slot-pos.highlight { border-color: #ffff00; background: rgba(255,255,0,0.1); transform: scale(1.1); }
         .slot-pool-item { width: 50px; height: 50px; background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: grab; transition: all 0.2s; margin: 4px; }
-        .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 10px rgba(0,255,242,0.5); transform: scale(1.1); }
+        .slot-pool-item { background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: grab; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset; }
+        .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.4) inset, 0 0 14px rgba(0,255,242,0.4); transform: scale(1.1); }
         .slot-pool-item.dragging { opacity: 0.5; }
         .slot-arranging-section { margin: 15px 0; text-align: center; }
         /* Menu decorative styles */
@@ -209,8 +256,8 @@
         .menu-footer-decor { margin-top: 15px; opacity: 0.5; }
         .footer-icon { display: inline-block; animation: pulse-right 2s ease-in-out infinite; }
         @keyframes pulse-right { 0%, 100% { transform: translateX(0); opacity: 0.3; } 50% { transform: translateX(5px); opacity: 0.7; } }
-        .btn-icon { display: inline-flex; margin-right: 6px; vertical-align: middle; }
-        .btn-icon svg { vertical-align: middle; }
+        .btn-icon { display: inline-flex; align-items: center; justify-content: center; margin-right: 6px; vertical-align: middle; width: 16px; height: 16px; }
+        .btn-icon svg { width: 16px; height: 16px; vertical-align: middle; display: block; }
         .slot-arrows { color: #8888aa; margin: 0 10px; align-self: center; }
         /* ========== SVG ICON DEFINITIONS ========== */
         .svg-icon { display: inline-block; width: 24px; height: 24px; vertical-align: middle; }
@@ -336,6 +383,35 @@
             font-size: 10px;
             color: #c0c0d0;
         }
+        /* ========== AMBIENT SCANLINES + CRT VIGNETTE (Phase 3) ==========
+           Single fixed pseudo-element covering the viewport. Pointer-events
+           disabled so it never blocks clicks. Sits above overlays (z 999)
+           but below tooltips (we bump tooltip z to 1000). Disabled under
+           prefers-reduced-motion. */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 3px);
+            box-shadow: inset 0 0 200px rgba(0,0,0,0.7);
+            pointer-events: none;
+            z-index: 999;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            body::after { display: none; }
+        }
+        /* Achievement shimmer - gated to motion preference */
+        @keyframes ach-shimmer {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
+        .ach-item.unlocked { background: linear-gradient(90deg, #1a1a2e 0%, #1a1a2e 40%, rgba(255,255,0,0.06) 50%, #1a1a2e 60%, #1a1a2e 100%); background-size: 200% 100%; }
+        .ach-item.unlocked.unlocked-shimmer { animation: ach-shimmer 4s linear infinite; }
+        @media (prefers-reduced-motion: reduce) {
+            .ach-item.unlocked.unlocked-shimmer { animation: none; }
+        }
+        /* Bump tooltip above the scanline overlay */
+        .tooltip { z-index: 1000 !important; }
     </style>
 </head>
 <body>
@@ -361,48 +437,41 @@
         <!-- MENU OVERLAY -->
         <div id="menu" class="ov on">
             <div id="menu-particles"></div>
-            <div class="menu-decorative">
-                <span class="menu-icon svg-icon svg-icon-32" style="width:40px;height:40px;"><svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg></span>
-                <span class="menu-divider"></span>
-                <span class="menu-icon svg-icon svg-icon-32" style="width:40px;height:40px;"><svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg></span>
-                <span class="menu-divider"></span>
-                <span class="menu-icon svg-icon svg-icon-32" style="width:40px;height:40px;"><svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg></span>
-            </div>
             <h1>SLOT PROTOCOL</h1>
             <h2>Rogue Pachinko</h2>
-            <p>Drop balls through peg boards, hit targets, survive the floors.</p>
+            <p style="padding:0 28px;text-align:center;">Drop balls through peg boards, hit targets, survive the floors.</p>
             <div class="menu-stats">
-                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffcc00"/></svg></span><span class="stat-label">Best Score:</span> <span class="stat-value" id="msc">0</span></div>
-                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#00fff2"/><circle cx="9" cy="9" r="2" fill="rgba(255,255,255,0.5)"/></svg></span><span class="stat-label">Best Floor:</span> <span class="stat-value" id="mfl">0</span></div>
-                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#00ff88"/><text x="12" y="16" text-anchor="middle" fill="#004422" font-size="12" font-weight="bold">$</text></svg></span><span class="stat-label">Credits:</span> <span class="stat-value" id="mcr">0</span></div>
-                <div class="menu-stat"><span class="menu-stat-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3L22 12L12 21L2 12Z" fill="#ffff00"/><text x="12" y="15" text-anchor="middle" fill="#996600" font-size="10" font-weight="bold">$</text></svg></span><span class="stat-label">Total Runs:</span> <span class="stat-value" id="mtr">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon" id="msc-icon"></span><span class="stat-label">Best Score:</span> <span class="stat-value" id="msc">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon" id="mfl-icon"></span><span class="stat-label">Best Floor:</span> <span class="stat-value" id="mfl">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon" id="mcr-icon"></span><span class="stat-label">Credits:</span> <span class="stat-value" id="mcr">0</span></div>
+                <div class="menu-stat"><span class="menu-stat-icon" id="mtr-icon"></span><span class="stat-label">Total Runs:</span> <span class="stat-value" id="mtr">0</span></div>
             </div>
             <button class="btn" id="startb">INITIATE BREACH</button>
             <div id="daily-info" style="margin:5px 0;text-align:center;display:none;"></div>
             <button class="btn btn2" id="dailyb">
-                <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10H21" stroke="currentColor" stroke-width="2"/><path d="M8 2V6M16 2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span class="btn-icon" id="dailyb-icon"></span>
                 DAILY
             </button>
             <button class="btn btn2" id="tutb">
-                <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 16V12M12 8H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span class="btn-icon" id="tutb-icon"></span>
                 TUTORIAL
             </button>
-            <div style="display:flex;gap:10px;margin-top:10px;">
+            <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center;">
                 <button class="btn btn2" id="achb">
-                    <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 21H16M12 17V21M12 17C9 17 6 14 6 11.5C6 8.5 9 5 12 3C15 5 18 8.5 18 11.5C18 14 15 17 12 17Z" fill="#ffcc00" stroke="#ff8800" stroke-width="1"/></svg></span>
+                    <span class="btn-icon" id="achb-icon"></span>
                     ACHIEVEMENTS
                 </button>
                 <button class="btn btn2" id="lbb">
-                    <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 17C15 17 18 14 18 10V4H6V10C6 14 9 17 12 17Z" fill="#ffcc00"/><rect x="8" y="20" width="8" height="2" rx="1" fill="#ff8800"/></svg></span>
+                    <span class="btn-icon" id="lbb-icon"></span>
                     LEADERBOARD
                 </button>
             </div>
             <button class="btn btn2" id="settingsb" style="margin-top:10px;">
-                <span class="btn-icon"><svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+                <span class="btn-icon" id="settingsb-icon"></span>
                 SETTINGS
             </button>
             <div class="menu-footer-decor">
-                <span class="footer-icon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12H19M13 6L19 12L13 18" stroke="#00fff2" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+                <span class="footer-icon" id="menu-footer-icon"></span>
             </div>
         </div>
         
@@ -498,6 +567,7 @@
         <!-- SETTINGS OVERLAY -->
         <div id="settings" class="ov">
             <h2>SETTINGS</h2>
+            <div style="font-size:11px;color:#8888aa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Preferences</div>
             <div class="toggle-row">
                 <span>CONTRAST MODE</span>
                 <div class="toggle" id="contrasttoggle"></div>
@@ -514,7 +584,7 @@
                 <span>MUSIC</span>
                 <div class="toggle" id="musictoggle"></div>
             </div>
-            <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
+            <div style="margin-top:8px;font-size:12px;color:#8888aa;text-align:center;">
                 <div>BALL SKIN:</div>
                 <div id="ballSkinDisplay" style="color:#00fff2;margin:5px 0;">CYAN</div>
                 <div class="skin-preview" id="ballSkinPreview"></div>
@@ -539,7 +609,7 @@
                     </button>
                 </div>
             </div>
-            <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
+            <div style="margin-top:8px;font-size:12px;color:#8888aa;text-align:center;">
                 <div>BOARD THEME:</div>
                 <div id="themeDisplay" style="color:#00fff2;margin:5px 0;">NEON</div>
                 <div style="display:flex;gap:5px;justify-content:center;margin-top:5px;" id="themeButtons">
@@ -548,11 +618,11 @@
                     <button class="btn btn2 theme-btn" data-theme="matrix" style="padding:5px 10px;">MATRIX</button>
                 </div>
             </div>
-            <div style="margin-top:15px;font-size:12px;color:#8888aa;text-align:center;">
+            <div style="margin-top:8px;font-size:12px;color:#8888aa;text-align:center;">
                 <div>PEG TYPES:</div>
                 <div id="pegTypeLegend" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px;max-width:300px;margin-left:auto;margin-right:auto;"></div>
             </div>
-            <div style="margin-top:20px;">
+            <div style="margin-top:12px;">
                 <button class="btn btn3" id="resetb">RESET ALL DATA</button>
             </div>
             <button class="btn btn2" id="settclb">CLOSE</button>
@@ -569,17 +639,19 @@
         <!-- SLOT SELECTOR OVERLAY -->
         <div id="slot-selector" class="ov">
             <h2 style="color:#ffff00;">ARRANGE YOUR SLOTS</h2>
-            <p style="max-width:350px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:15px;">Drag slots to unlocked positions, or drag a slot onto a locked position to unlock it. You get 1 unlock per floor!</p>
+            <p style="max-width:360px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:15px;letter-spacing:0.5px;">Drag a slot onto an unlocked position to assign it. Drag onto a locked position to unlock it. 1 unlock per floor.</p>
             
             <div class="slot-arranging-section">
-                <div style="font-size:11px;color:#00fff2;margin-bottom:8px;">SLOT POSITIONS (Left to Right in Game):</div>
+                <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Target Positions</div>
                 <div id="position-slots" style="display:flex;gap:6px;justify-content:center;margin-bottom:15px;"></div>
             </div>
             
-            <div style="text-align:center;color:#8888aa;font-size:12px;margin:10px 0;">↓ Drag from here ↓</div>
+            <div style="text-align:center;color:#8888aa;font-size:11px;letter-spacing:1px;margin:4px 0 6px;">↑ Drag a slot up to a position ↑</div>
             
             <div class="slot-arranging-section">
-                <div id="slot-pool" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;max-width:420px;"></div>
+                <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Available Effects</div>
+                <div id="slot-info" style="color:#00fff2;font-size:10px;margin:0 0 6px;letter-spacing:1px;text-align:center;text-transform:uppercase;"></div>
+                <div id="slot-pool" style="display:flex;gap:6px;justify-content:center;flex-wrap:nowrap;width:180px;"></div>
             </div>
             
             <div style="display:flex;gap:10px;justify-content:center;margin-top:15px;">
@@ -634,7 +706,6 @@
         PC_CONTRAST: {0:'#cccccc', 1:'#ffffff', 2:'#aaaaaa', 3:'#ffffff', 4:'#ffcccc', 5:'#888888', 6:'#ddddff', 7:'#ffccaa', 8:'#ffffff', 9:'#ffffcc', 10:'#ffaaaa'},
         ST: {E:0, CR:1, AM:2, PA:3, CM:4, SH:5, OC:6, JP:7},
         ST_NAMES: ['EMPTY', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'OVERCLOCK', 'JACKPOT'],
-        ST_ICONS: ['-', '$', '+', '?', '#', '^', '*', '★'],
         // Tooltip text for each peg type and slot effect. Shown on hover in
         // the slot-selector and during in-game mouseover (pegs + bottom slots).
         // Keys are the enum indices from C.PT and C.ST respectively.
@@ -2418,9 +2489,13 @@
         // This preserves slots from previous floors
         GS.slotArrangement = slots.slice();
 
-        // Generate 7 NEW random slot effects as the pool for this floor
+        // Generate a small pool of random slot effects for this floor.
+        // POOL_SIZE controls the choice density - smaller pools make each
+        // pick more meaningful. 3 (vs the previous 7) keeps the row
+        // visually distinct from the 7 target positions above.
+        var POOL_SIZE = 3;
         var poolSlots = [];
-        for (var i = 0; i < C.SC; i++) {
+        for (var i = 0; i < POOL_SIZE; i++) {
             var r = Math.random();
             if (r < 0.03) poolSlots.push(C.ST.JP);
             else if (r < 0.10) poolSlots.push(C.ST.OC);
@@ -2433,7 +2508,7 @@
         }
 
         // Initialize state
-        GS.slotPool = poolSlots; // 7 new random slots to choose from this floor
+        GS.slotPool = poolSlots; // POOL_SIZE new random slots to choose from this floor
         GS.slotsArranged = false; // Player must arrange slots before playing
         GS.scr = C.SCR.P; // Set game state
 
@@ -2567,7 +2642,7 @@
                     div.style.borderColor = '#ffff00';
                     div.style.borderStyle = 'dashed';
                     div.style.color = '#ffff00';
-                    div.textContent = '+';
+                    div.innerHTML = '<span class="svg-icon" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_PLUS + '</span>';
                     div.title = 'Drop a slot here!';
                     div.addEventListener('dragover', function(e) {
                         e.preventDefault();
@@ -2591,7 +2666,7 @@
                     div.style.borderColor = '#ff00ff';
                     div.style.borderStyle = 'dashed';
                     div.style.color = '#ff00ff';
-                    div.textContent = '?';
+                    div.innerHTML = '<span class="svg-icon" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_UNLOCK + '</span>';
                     div.title = 'Drag and drop a slot to UNLOCK!';
                     div.addEventListener('dragover', function(e) {
                         e.preventDefault();
@@ -2608,11 +2683,14 @@
                     });
                 } else {
                     // All slots unlocked or can't unlock this floor
+                    // - still a valid drop target for rearrangement, so
+                    // show the same plus affordance as the yellow empty
+                    // state above (just dimmer to signal "neutral").
                     div.style.background = 'rgba(85,85,102,0.3)';
                     div.style.borderColor = '#555566';
                     div.style.color = '#555566';
-                    div.textContent = '?';
-                    div.title = 'Already unlocked';
+                    div.innerHTML = '<span class="svg-icon" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;opacity:0.6;">' + SVG_ICONS.UI_PLUS + '</span>';
+                    div.title = 'Drop a slot here to rearrange';
                 }
             }
 
@@ -2622,26 +2700,30 @@
         // Build pool of available slots to choose from
         poolContainer.innerHTML = '';
 
-        // Show info about unlocking
+        // Show info about unlocking. Lives in its own #slot-info div (a
+        // sibling of #slot-pool) so the pool's flex layout doesn't fight
+        // the text's intrinsic width.
+        var infoContainer = document.getElementById('slot-info');
+        if (infoContainer) infoContainer.innerHTML = '';
         var infoDiv = document.createElement('div');
-        infoDiv.style.cssText = 'color:#00fff2;font-size:11px;margin-bottom:8px;width:100%;text-align:center;';
-        if (GS.canUnlockThisFloor) {
-            var nextLocked = -1;
-            for (var k = 0; k < C.SC; k++) {
-                if (GS.unlockedSlots.indexOf(k) === -1) {
-                    nextLocked = k;
-                    break;
-                }
-            }
-            if (nextLocked !== -1) {
-                infoDiv.textContent = 'Drag and drop to unlock a slot!';
-            }
-        } else if (GS.unlockedSlots.length < 7) {
-            infoDiv.textContent = 'All positions unlocked! Rearrange as needed.';
+        // Only show the "drag to unlock" hint on the first floor (where
+        // there are still locked positions to fill). Once a position is
+        // unlocked, the up-arrow + section labels already explain the
+        // rearrange mechanic - the extra "Rearrange as needed" copy was
+        // redundant (and could be wrong on floor 1 before any auto-arrange).
+        if (GS.canUnlockThisFloor && GS.unlockedSlots.length < C.SC) {
+            infoDiv.textContent = 'Drag onto a locked position to unlock it';
         } else {
-            infoDiv.textContent = 'All slots unlocked! Rearrange as needed.';
+            // No hint needed - the empty positions show the UI_PLUS
+            // affordance, the arrows point up, and the up-arrow copy
+            // covers the action.
+            if (infoContainer) infoContainer.style.display = 'none';
         }
-        poolContainer.appendChild(infoDiv);
+        if (infoContainer && infoContainer.style.display !== 'none') {
+            infoContainer.appendChild(infoDiv);
+        } else if (!infoContainer) {
+            poolContainer.appendChild(infoDiv);
+        }
 
         for (var j = 0; j < GS.slotPool.length; j++) {
             var poolSlotType = GS.slotPool[j];
@@ -3763,6 +3845,121 @@
             ctx.fillText(shortLabel, x + C.SW / 2, C.SY + C.SH - 8);
         }
         
+        // ========== AT-REST PEG SHAPE (Phase 3: visual overhaul) ==========
+        // Draws the base shape that gives every peg type an identity on the
+        // board, even before it has been hit. The per-hit effects (ripple,
+        // crystal burst, gradient highlight) still fire on top of this in
+        // the per-type branches below. Each shape is a small set of cheap
+        // canvas calls (no shadow blurs, no path-count blowup) so 60fps is
+        // preserved with 40+ pegs on screen.
+        function drawPegShape(type, x, y, r, color, st) {
+            ctx.lineWidth = 1;
+            if (type === C.PT.N) {
+                // Node: circle + specular dot at 10 o'clock.
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = 0.75;
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.beginPath();
+                ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (type === C.PT.C) {
+                // Cache: circle + center cross (+ value).
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(80,60,0,0.9)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x - r * 0.6, y); ctx.lineTo(x + r * 0.6, y);
+                ctx.moveTo(x, y - r * 0.6); ctx.lineTo(x, y + r * 0.6);
+                ctx.stroke();
+            } else if (type === C.PT.T) {
+                // Teleport: circle + inner ring + inward chevron.
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(x, y, r * 0.65, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x - r * 0.35, y - r * 0.15);
+                ctx.lineTo(x, y + r * 0.35);
+                ctx.lineTo(x + r * 0.35, y - r * 0.15);
+                ctx.stroke();
+            } else if (type === C.PT.S) {
+                // Seismic: circle + 4 cardinal tick marks.
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, y - r - 2); ctx.lineTo(x, y - r + 1);
+                ctx.moveTo(x, y + r - 1); ctx.lineTo(x, y + r + 2);
+                ctx.moveTo(x - r - 2, y); ctx.lineTo(x - r + 1, y);
+                ctx.moveTo(x + r - 1, y); ctx.lineTo(x + r + 2, y);
+                ctx.stroke();
+            } else if (type === C.PT.E) {
+                // Explosive: circle + 4 long cardinal spikes + 4 short diagonals.
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#ff6666';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, y - r - 2); ctx.lineTo(x, y - r + 1);
+                ctx.moveTo(x, y + r - 1); ctx.lineTo(x, y + r + 2);
+                ctx.moveTo(x - r - 2, y); ctx.lineTo(x - r + 1, y);
+                ctx.moveTo(x + r - 1, y); ctx.lineTo(x + r + 2, y);
+                ctx.stroke();
+                ctx.strokeStyle = '#ffaaaa';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                var diag = r * 0.75;
+                ctx.moveTo(x - diag, y - diag); ctx.lineTo(x - diag + 1.5, y - diag + 1.5);
+                ctx.moveTo(x + diag, y - diag); ctx.lineTo(x + diag - 1.5, y - diag + 1.5);
+                ctx.moveTo(x - diag, y + diag); ctx.lineTo(x - diag + 1.5, y + diag - 1.5);
+                ctx.moveTo(x + diag, y + diag); ctx.lineTo(x + diag - 1.5, y + diag - 1.5);
+                ctx.stroke();
+            } else if (type === C.PT.D) {
+                // Dormant: dashed circle (the visual signal: not yet awake).
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.setLineDash([2, 2]);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(136,136,170,0.6)';
+                ctx.beginPath();
+                ctx.arc(x, y, r * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Fallback: plain filled circle (should not normally hit -
+                // the per-type branches in render() handle I/F/M/H/O already).
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+        }
+
         // Pegs
         for (var i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
@@ -3880,14 +4077,12 @@
                 ctx.lineTo(p.x + 2, p.y + 4);
                 ctx.stroke();
             } else {
-                // Standard peg rendering
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.r + glow, 0, Math.PI * 2);
-                ctx.fillStyle = col;
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                // Standard peg rendering - delegate to drawPegShape so every
+                // basic type (N/C/T/S/E/D) has a visual identity on the
+                // board, not just on hit. The +glow outer ring is applied
+                // by the per-state condition above; drawPegShape draws the
+                // base shape at the given radius.
+                drawPegShape(p.t, p.x, p.y, p.r + glow, col, p.st);
             }
         }
         
@@ -4677,12 +4872,19 @@
     document.getElementById('dailyb').addEventListener('click', function() {
         var mods = getDailyModifiers();
         var modIcons = {
-            'gravity': '<svg viewBox="0 0 24 24"><path d="M12 3V21M12 3L6 9M12 3L18 9M6 15H18" stroke="#ff6600" stroke-width="2" stroke-linecap="round"/></svg>',
-            'fewer_pegs': '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" fill="#8888aa"/><circle cx="16" cy="12" r="3" fill="#8888aa"/><circle cx="10" cy="18" r="3" fill="#8888aa"/></svg>',
-            'small_ball': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#00fff2"/><circle cx="10" cy="10" r="1.5" fill="rgba(255,255,255,0.5)"/></svg>',
-            'fast_timer': '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="9" fill="none" stroke="#ff2244" stroke-width="2"/><path d="M12 7V13L15 15" stroke="#ff2244" stroke-width="2" stroke-linecap="round"/></svg>',
-            'multiplier': '<svg viewBox="0 0 24 24"><path d="M12 2L14 8L20 9L15 14L17 21L12 17L7 21L9 14L4 9L10 8Z" fill="#ffff00"/><text x="12" y="16" text-anchor="middle" fill="#996600" font-size="8" font-weight="bold">X4</text></svg>',
-            'double_pegs': '<svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4" fill="#00fff2"/><circle cx="16" cy="12" r="4" fill="#00fff2" opacity="0.5" stroke="#00fff2" stroke-dasharray="2 2"/></svg>'
+            // Heavy Gravity - downward arrow (gravityMult 1.5x).
+            'gravity': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3V20M6 14L12 20L18 14" fill="none" stroke="#ff6600" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 5H8M16 5H20" stroke="#ff6600" stroke-width="1.75" stroke-linecap="round" opacity="0.6"/></svg>',
+            // Sparse Field - 3 widely-spaced dots, no fill, evoking the
+            // fewer_pegs board layout (-30% density).
+            'fewer_pegs': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="1.5" fill="none" stroke="#8888aa" stroke-width="1.5"/><circle cx="18" cy="12" r="1.5" fill="none" stroke="#8888aa" stroke-width="1.5"/><circle cx="7" cy="18" r="1.5" fill="none" stroke="#8888aa" stroke-width="1.5"/><path d="M3 3L6 6M16 9L18 12" stroke="#8888aa" stroke-width="1" stroke-dasharray="2 1.5" opacity="0.4"/></svg>',
+            // Tiny Ball - small ball next to a "scale" reference (large ghost ring).
+            'small_ball': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#00fff2" stroke-width="1.25" stroke-dasharray="2 2" opacity="0.5"/><circle cx="12" cy="12" r="3" fill="#00fff2"/><circle cx="11" cy="11" r="0.7" fill="#fff" opacity="0.8"/></svg>',
+            // Ticking Clock - clock face with hands at 12 and 2 (faster).
+            'fast_timer': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ff2244" stroke-width="1.75"/><path d="M12 6V8" stroke="#ff2244" stroke-width="1.75" stroke-linecap="round"/><path d="M12 12L15 9" fill="none" stroke="#ff2244" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5L17 7" stroke="#ff2244" stroke-width="1.5" stroke-linecap="round"/></svg>',
+            // Lower Multiplier - "x4" with a down-arrow indicating cap drop.
+            'multiplier': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 6L9 18M19 6L15 18M3 9H21M3 15H21" stroke="#ffff00" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/><path d="M6 4L8 6M16 4L14 6" fill="none" stroke="#ffff00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+            // Double Trouble - two overlapping halved circles (peg value halved).
+            'double_pegs': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20" stroke="#00fff2" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M2 12C2 7 6 4 12 4V20C6 20 2 17 2 12Z" fill="none" stroke="#00fff2" stroke-width="1.75"/><path d="M22 12C22 7 18 4 12 4V20C18 20 22 17 22 12Z" fill="none" stroke="#00fff2" stroke-width="1.75" opacity="0.4" stroke-dasharray="3 2"/></svg>'
         };
         var modNames = {
             'gravity': 'Heavy Gravity',
@@ -4717,7 +4919,8 @@
         
         // Show in a styled div instead of alert
         var dailyDiv = document.createElement('div');
-        dailyDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a2e;border:2px solid #ff00ff;box-shadow:0 0 30px rgba(255,0,255,0.3);padding:20px;border-radius:8px;z-index:200;max-width:350px;text-align:center;';
+        dailyDiv.className = 'daily-modal';
+        dailyDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,10,18,0.98);border:2px solid #ff00ff;box-shadow:0 0 30px rgba(255,0,255,0.4),0 0 0 1px rgba(255,0,255,0.3) inset;padding:20px;border-radius:3px;z-index:200;max-width:380px;text-align:center;';
         dailyDiv.innerHTML = '<h2 style="color:#ff00ff;margin-bottom:15px;">DAILY CHALLENGE</h2>' + modList + '<p style="color:#8888aa;font-size:12px;margin:15px 0;">These modifiers are active for today only!</p><div style="display:flex;gap:10px;justify-content:center;"><button id="daily-start" class="btn">START</button><button id="daily-cancel" class="btn btn2">CANCEL</button></div>';
         document.body.appendChild(dailyDiv);
         
@@ -4955,6 +5158,30 @@
 
         // ========== INIT ==========
     loadPersist();
+
+    // Inject the new icon library into the static menu HTML - the button
+    // labels (DAILY / TUTORIAL / ACHIEVEMENTS / LEADERBOARD / SETTINGS) and
+    // the footer arrow get replaced with the matching svg-icons.js entries
+    // at load time so the menu reads as one visual system. (Phase 3.)
+    (function injectMenuIcons() {
+        var setIcon = function(id, svg) {
+            var el = document.getElementById(id);
+            if (el) el.innerHTML = svg;
+        };
+        setIcon('dailyb-icon', SVG_ICONS.UI_CALENDAR);
+        setIcon('tutb-icon', SVG_ICONS.UI_QUESTION);
+        setIcon('achb-icon', SVG_ICONS.UI_MEDAL);
+        setIcon('lbb-icon', SVG_ICONS.UI_TROPHY);
+        setIcon('settingsb-icon', SVG_ICONS.UI_GEAR);
+        setIcon('menu-footer-icon', SVG_ICONS.UI_ARROW_RIGHT);
+        // Menu stat row icons - one per metric on the main menu.
+        setIcon('msc-icon', SVG_ICONS.UI_STAR);
+        setIcon('mfl-icon', SVG_ICONS.UI_FLAG);
+        setIcon('mcr-icon', SVG_ICONS.UI_DOLLAR);
+        setIcon('mtr-icon', SVG_ICONS.UI_RUNS);
+        // The settings overlay has its own ball-skin buttons (six colored
+        // circles) which are intentionally literal previews - leave those.
+    })();
 
     // Audio initialization on first user interaction (browsers require this)
     function audioInitOnce() {
