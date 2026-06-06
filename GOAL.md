@@ -304,6 +304,279 @@ index.html (single file, ~4637 lines)
 
 ---
 
+## Phase 4.5 - Economy Balancing Pass
+
+Audit + balance pass on the run economy (score, credits, peg-target curve, payload costs, slot effects). Conducted after Phase 3. Findings + shipped fixes in this section.
+
+### Audit findings (as of Phase 3)
+
+- **Peg-target curve** (`setupObj`, line ~2095): tier table `[15,20,25,30] + fl` gave fl 1/5/10 targets of 16/25/40. Past fl 6 the curve outpaces peg-hit efficiency (5 balls * ~6 hits/ball = 30 max). Late-game feels like a grind.
+- **Per-peg scoring** is flat across floors (Node at fl 12 = same 50 base as fl 1). No floor-scaling reward.
+- **Credit income** has a double-dipping bug: `loop()` floor-clear pays `Math.floor(GS.sc/10)` of the cumulative score at every floor clear, AND `retb()` pays the same `Math.floor(GS.sc/10)` of the final cumulative score on run end. Example: 4-floor run with floor scores 1k/2k/3k/4k pays 100+300+600+1000+1000 = **3000 credits** for 10k total score. The `credit_rich` achievement is intended to fire at 1000 credits/run; the bug means it fires at ~3300 score instead.
+- **Payload cost/power inversion**: the most powerful payloads (Worm, Slowmo) are the cheapest (60, 55). The cheapest should be the situational ones (Scrambler, Ghost).
+- **Crumble slot is a progress exploit**: `triggerSlotCollected` CM branch increments `GS.obj.prg` once per destroyed peg, so a single Crumble gives 3 free progress. Combined with removing those pegs from the board, it both counts toward the objective AND thins future hit opportunities.
+- **Slot pool of 3 with 35% EMPTY weight** = 1.05 expected EMPTY per floor, 4.3% chance of all-EMPTY pool.
+- **Explosive peg's `GS.sc *= 3`** triples lifetime score on one hit, which dominates in long combos and reads as broken (every other special peg is a flat +bonus).
+- **Daily mod stacking**: `multiplier` (cap combo x4) + `double_pegs` (halve all scoring) on the same day is run-ending. Should disallow the worst mod pairs.
+- **Chain timer (C.CHAIN_T = 30 frames ~ 0.5s)** is tight for slower players.
+- **Shield slot** has a working bounce (vy=-7) but the tooltip undersells what the ball can do post-bounce.
+
+### Top 5 fixes shipped (PR1)
+
+1. **A. Credit double-dipping fix** - changed `loop()` floor-clear payout to pay the *delta* from the last floor's score (new `GS.lastFloorScore` tracking), initialized to 0 in `startGame()` and reset in `contb()`. Removed the run-end `PERSIST.br += Math.floor(GS.sc/10)` in `retb()`. Net effect: a 10k-score run now yields exactly 1000 credits (matching the `credit_rich` achievement target). The `updateRunEnd` display still computes `Math.floor(GS.sc/10)` for the 'Credits Earned' line, which now matches the actual amount paid out.
+2. **B. Peg-target rescale** - replaced the tier table in `setupObj` with a single linear curve `t = 12 + Math.floor(fl * 1.5)`. New targets: fl 1=13, fl 5=19, fl 10=27, fl 12=30. Softens the late-game grind without trivialising it.
+3. **C. Payload cost rebalance** - rewrote the cost table in `updateShop` to align cost with power:
+   - Scrambler 50 (keep, situational)
+   - Ghost 50 -> 60 (slight buff, weakest combat payload)
+   - Slowmo 55 -> 85 (was the most underpriced, now premium)
+   - Daemon 80 (keep)
+   - Trojan 75 -> 80 (slight buff)
+   - Worm 60 -> 95 (big jump, free combo through everything)
+   - Explosive 85 -> 100 (tied with Cluster for chain-destroy premium)
+   - Cluster 90 -> 100 (kept premium, mini-ball chase is great)
+   - Logic Bomb 100 -> 120 (most expensive premium, x3 lifetime score)
+   Spread is now 50-120 (was 50-100), with the cheapest mapping to the situational payloads and the priciest to the run-warping ones.
+4. **D. Crumble objective-count fix** - in `triggerSlotCollected` CM branch, moved the `GS.obj.prg++` out of the destruction loop so it fires once per Crumble (regardless of how many pegs are actually destroyed), not once per destroyed peg. Crumble still thins the board and gives +1 toward objective (so it remains a 'feels good' slot), but no longer grants +3 free progress.
+5. **E. Shield tooltip clarification** - updated `C.SLOT_TOOLTIPS[5].desc` from 'Next ball is bounced back from overflow exit instead of dying.' to 'Bounces the next ball back from overflow exit so it can hit more pegs.' Makes it clear the bounced ball re-enters the peg field, not just gets a free pass.
+
+### Deferred (initial PR1 plan, status as of follow-up pass)
+
+The original PR1 plan listed 5 deferred items. Status:
+
+- **F. Slot pool size 3 -> 4** - SUPERSEDED by Phase 4.5-F (unique pool + EMPTY exclusion). The size-bump was a poor solution to the underlying anti-agency problem; the unique-pool fix is the better one.
+- **G. Explosive peg scoring rewrite** - SHIPPED in Phase 4.5-G. See below.
+- **H. Daily mod stacking rule** - SHIPPED in Phase 4.5-H. See below.
+- **I. Chain timer bump** - SHIPPED in Phase 4.5-I. See below.
+- **J. Per-peg floor scaling** - SHIPPED in Phase 4.5-J. See below.
+
+All deferred items are now resolved. The Phase 4.5 series (A-J) is closed.
+
+
+### Phase 4.5-F: Unique pool + no EMPTY as a choice (added post-PR1)
+
+Added after PR1 (initial 5 fixes) at user request. Found a deeper issue with the pool:
+- 35% EMPTY weight meant ~73% of pools had at least one EMPTY pick (and 4.3% of pools were all-EMPTY)
+- Duplicates were possible (e.g. two CR in a row)
+
+**Changes in `initSlotArrangement` (index.html ~line 2500):**
+- Excluded `C.ST.E` (EMPTY) from the pool roll. EMPTY is a strictly negative slot (no effect on ball entry, still costs a life) and offering it as a "choice" was anti-agency. The 35% weight was redistributed proportionally across the 7 useful types so the rare ones (JP, OC, SH) get a small bump.
+- New pool weights: JP 4% / OC 10% / SH 12% / CM 15% / AM 15% / PA 18% / CR 26% (sums to 100%, was 65% useful).
+- Added a re-roll loop: each pick rolls up to 30 times for an unused type, with a fallback that picks any remaining unused useful type if the weighted roll never escapes (extremely unlikely with 7 eligible types and 3 picks).
+- Verified via 100k Monte Carlo: 100% of pools are 3 unique useful types, 0% contain EMPTY.
+
+**EMPTY slot type is NOT removed:**
+- Still in `C.ST` enum (defensive coverage for data load / future reset paths)
+- `triggerSlotCollected` still has the no-op branch (cheap, safe)
+- `checkSlot` still treats it as "no effect"
+- `getSlotColor` / `slotIconCache` still handle it
+- But it is **unreachable through normal play** — pool never offers it, AUTO-ARRANGE never places it (the pool always fills all unlocked positions with useful types)
+
+**Followup consideration:** if at some point we want to offer EMPTY as a *deliberate* player choice (e.g. a "skip" position that doesn't trigger any slot effect but is visually distinct), it could be re-added to the pool at a low weight (5-10%) so the player can opt in. For now, it's effectively removed from the gameplay loop.
+### Phase 4.5-G: Explosive peg scoring rewrite
+
+The Explosive peg (PT.E) was the only special peg with lifetime-scaling on its score: `GS.sc *= 3` in the PT.E branch of `Peg.hit` AND `GS.sc += bonus * 3` in `triggerPegExplosion`. A single Explosive hit on a 10k-score game turned into 30k+ in one frame. Every other special peg is a flat +bonus — Explosive was the outlier and dominated long runs.
+
+**Changes in `index.html:1952-1958` and `index.html:3080-3120`:**
+- Removed `GS.sc *= 3;` and the redundant `'x3'` float from the PT.E branch in `Peg.hit`. The `triggerPegExplosion` call below now does the work.
+- `triggerPegExplosion` rewritten: self bonus is now flat `500 * (cc+1) * (frenzy?3:1)`, adjacent bonus is flat `100 * (cc+1) * (frenzy?3:1)`. No lifetime multipliers anywhere.
+- Float text changed from `'x3!'` to `'BOOM +<amount>'` so the player sees the actual score gain.
+- The new self/adjacent values match the *feel* of Cache's `200 + cc*50` pattern (base value scales with combo and frenzy). At low combo: Cache 200, Explosive 500 (2.5x premium for chain-destroy). At max combo + frenzy: Cache 550, Explosive 12000 (still strong, but bounded).
+- Explosive PAYLOAD (b.explosive, paid at 100cr) is unchanged — it only chain-destroys pegs, no score scaling. That was already correct.
+- Logic Bomb PAYLOAD (b.lbActive, paid at 120cr) still does `GS.sc *= 3` — that's a paid payload, not a peg, and the player chose it.
+
+### Phase 4.5-H: Daily mod hard-tier dedup
+
+Previously, a daily seed could pick both `multiplier` (cap combo x4) and `double_pegs` (halve all scoring) on the same day. Stacking these was run-ending.
+
+**Changes in `getDailyModifiers` (`index.html:1350-1359`):**
+- Added a `hardTier = ['multiplier', 'double_pegs', 'fast_timer']` and `easyTier = ['gravity', 'fewer_pegs', 'small_ball']` classification.
+- If both `mod1` and `mod2` are in the hard tier, swap `mod2` for a deterministic pick from the easy tier (using `seededRandom(seed + 2)` so the result is reproducible for a given date).
+- Tier rationale: hard = all three cap or reduce player power. Easy = non-capping, with workarounds (gravity = drop higher, fewer_pegs = aimed shots, small_ball = pegs are bigger relative to ball).
+
+### Phase 4.5-I: Chain timer 30 → 36 frames
+
+`C.CHAIN_T` was 30 frames (0.5s at 60fps) — tight for slower players, who would lose combos because the timer expired between bounces.
+
+**Change in `index.html:701-707`:**
+- `CHAIN_T: 30` → `CHAIN_T: 36` (0.5s → 0.6s).
+- Invisible to fast players, meaningful QoL buff for slow ones.
+- The combo-urgent and combo-critical CSS animations at <35% and <15% of the timer still fire (0.21s and 0.09s remaining respectively), so the visual urgency cue is preserved.
+
+### Phase 4.5-J: Per-peg floor scaling
+
+Per-peg scoring was flat across floors — a Node hit at floor 12 gave the same 50 base as floor 1. Late-game runs felt the same per-peg as early runs, which made deep runs feel grindy on a per-action basis (even with the softer target curve from Phase 4.5-B).
+
+**Changes in `index.html:757-771, 1861-1863, 2419-2421`:**
+- Added a `pegBasePoints()` helper that returns `50 * (1 + (GS.fl - 1) * 0.1)`. Floor curve: fl 1=50, fl 5=70, fl 10=95, fl 12=105.
+- Replaced the flat `50` in two sites:
+  - `Peg.hit` top of function (line 1862) — affects Node, Teleport, Dormant activation, Ice first hit, and the default-peg branch
+  - `triggerSlotCollected` CREDITS branch (line 2420) — credits slot now scales with floor
+- The explosive peg's own 500 bonus in `triggerPegExplosion` is intentionally NOT scaled — it's a premium effect, not a base scoring branch, and the user spec was specific to the 50-point base. The 50 in `triggerSlotCollected` AMPLIFY was already not a base formula (it adds to GS.cc / GS.ct, not GS.sc).
+- CREDITS slot now scales from 50 (fl 1, no combo) to 105 (fl 12, no combo), so late-game CREDITS slots are ~2.1x more valuable. Combines naturally with the combo+frenzy multipliers for big late-game payouts.
+
+### Validation results (G/H/I/J)
+
+- **G** simulation: 10k-score run, one explosive hit mid-combo. Old: 30k+ (3x lifetime + bonus*3). New: 10k + 500*4*3 = 16k at mid combo. Bounded and predictable.
+- **H** simulation: 100 random daily seeds. Without dedup, 17% had a `multiplier + double_pegs` pair. With dedup: 0%.
+- **I** sim: 30→36 frames means a 20% longer window. The CSS urgent/critical thresholds (at 35% / 15% of the timer) still trigger at 0.21s / 0.09s remaining, preserving the visual cue.
+- **J** sim: floor 12 max-combo+frenzy Node hit = 105*8*3 = 2520 (was 1200). Per-floor total scoring at floor 12 with 30 hits = ~3000-5000 (was ~1500-2500). Late-game scoring now feels rewarding without trivialising the curve.
+
+### Phase 4.5-K: Credit rate + payload cost rebalance v2 (luxury tier)
+
+After Phase 4.5-A the credit economy was correct (10% of floor score delta, no double-counting) and after 4.5-C the payload costs were aligned with power (50-120 spread). But the combination was still too generous: a 4-floor 10k-score run gave 1000 credits, and the player could buy 6-8 payloads from that. Powers weren't a *luxury* — they were routine purchases. Multi-ball payloads (Trojan, Cluster) and the rare-but-strong ones (Logic Bomb, Slowmo) became run-warping defaults rather than meaningful choices.
+
+**K-1: credit rate cut 10% → 5%** (`index.html:4574-4575`)
+- `Math.floor(floorDelta / 10)` → `Math.floor(floorDelta / 20)`
+- A 10k-score run now yields 500 credits (was 1000). The `credit_rich` achievement (1000/run) now fires at 20k score, a real milestone instead of a per-floor triviality.
+
+**K-2: payload cost rebalance v2** (`index.html:3725-3738`)
+- New spread 80-220 (was 50-120, 2.4x ratio). New ratio 2.75x.
+- Scrambler 50 → 80 (cheap situational)
+- Ghost 60 → 100 (weak combat, slight bump)
+- Slowmo 85 → 150 (was the most underpriced after C; now premium)
+- Daemon 80 → 130 (1-ball save, mid tier)
+- Trojan 80 → 140 (2 minis, mid-premium)
+- Worm 95 → 180 (free combo, premium)
+- Explosive 100 → 180 (chain-destroy, premium)
+- Cluster 100 → 180 (3-mini split, premium — matches Explosive)
+- Logic Bomb 120 → 220 (lifetime x3 score, the priciest)
+
+**Combined effect** (verified by simulation):
+- 4-floor 10k-score run: 500 credits. Can buy 1 premium (e.g. Cluster 180) + 1 cheap (Scrambler 80) = 260, with 240 left for a mid-tier (Slowmo 150) or 2 cheap (Ghost 100 + Daemon 130 = 230).
+- Old economy: same run bought 6-8 payloads. New economy: 1-3 with deliberate choices.
+- Powers are now a real luxury — picking a Cluster over a Scrambler means skipping something else later.
+
+### Phase 4.5-L: Jackpot 2/3 partial match
+
+The 3-reel slot machine was 1/36 hit chance per spin (5.5% per floor with 2 spins). Players went entire runs without hitting, which made the jackpot feel like a pipe dream rather than a motivating force. The user flagged this as an engagement issue: jackpot should be rare, but the slot machine has to keep the player engaged.
+
+**Change in `spinJackpot` (`index.html:1545-1626`):**
+- Replaced the 2-way (jackpot / miss) branch with a 3-way branch:
+  - **3/3 match** (jackpot): unchanged. Full payout + fanfare + screen shake + `jackpotWonThisFloor = true`.
+  - **2/3 match** (partial, NEW): +10% of current jackpot as score, `Audio.playBonus()` chime, '2 OF 3!' float in yellow, '+<amount>' float in orange. The two matching reels get the 'win' class; the odd one gets 'lose'. The jackpot does NOT grow (this is a small win) and does NOT count as `jackpotWonThisFloor` (the player can still spin the second time).
+  - **0/3 match** (miss): unchanged. Jackpot grows 15%, 'TRY AGAIN...' float, all reels flash 'lose'.
+
+**Probability** (with 6 symbols, 3 reels):
+- 3/3: 6 × (1/6)³ = 1/36 = 2.78% per spin → ~5.5% per floor
+- exactly 2/3: 3 × (1/6)² × (5/6) = 15/216 = 6.94% per spin → ~13.5% per floor
+- 0/3: ~90.3% per spin → ~80.5% per floor
+
+**Engagement per floor**: 19% chance of *some* win (was 5.5%). The 3/3 remains the big rare event; the 2/3 is the frequent "you almost got it" that keeps the slot machine feeling alive. Per-spin expected value: 2-match contributes 0.694% of jackpot, 3-match contributes 2.78% — so 3/3 is still 4x more valuable per spin than 2/3, but 2/3 is 2.5x more common.
+
+**No interaction with the credit economy**: the 2/3 payout is *score* (consistent with the 3/3 and the board-level JACKPOT slot, both of which add to GS.sc), not credits. Credits come from floor clears (K-1). This keeps the two economies separated and the slot machine's role clear: it's a score burst, not a credit faucet.
+
+### Phase 4.5-M: Slot machine reel state persistence fix
+
+After a 3/3 jackpot or 2/3 partial match, the `.win` CSS class (flashing yellow border with `jackpot-win 0.3s ease-in-out infinite` animation) was being added to the matching reels but never removed. The `.lose` class was properly removed via a 500ms `setTimeout` in the 0/3 and 2/3-odd-reel branches, but the `.win` class had no equivalent cleanup.
+
+Two failure modes:
+1. **Same floor, no more spins**: if the player hit a 3/3 jackpot (spin button disabled) or ran out of spins, the cleanup at the start of the *next* spin's result handler never ran. The flashing yellow persisted.
+2. **Across floor boundaries**: if the player hit CONTINUE before the next spin, the reel elements (which are static divs, not re-rendered) carried the `.win` class into the next floor's floor-complete screen.
+
+**Fix in 3 places (`index.html`):**
+- **M-1**: at the top of `spinJackpot()`, strip `hit` / `win` / `lose` from all 3 reels before the new spin starts. Belt-and-suspenders: even if the timeout doesn't fire, the next spin starts clean.
+- **M-2**: at the end of the 3/3 jackpot branch, schedule a `setTimeout(1500ms)` to remove `win` / `lose` from all reels. 1500ms is enough for the player to read the `★ JACKPOT! ★` float and the screen effects.
+- **M-3**: same 1500ms timeout at the end of the 2/3 partial branch. The original 2/3 code only had the 500ms `lose` timeout for the odd reel; the two matching reels kept `.win` indefinitely.
+- **M-4 (safety)**: right before `showScreen('fc')` in the floor-complete handler, strip `hit` / `win` / `lose` from all reels. Catches the case where the user races through a floor in <1500ms (faster than the win-flash timeout) and enters the next floor's fc with stale reel state.
+
+After the fix, the win flash plays for 1.5s (so the player sees the celebration), then the reels return to a neutral state with the final symbols still visible. The state is also reset at the start of every new spin and at the start of every new floor's fc, so there are no persistent-flash cases.
+
+### Phase 4.5-N: Slot machine result banner
+
+The slot machine's win feedback was three small float texts (`★ JACKPOT! ★`, `2 OF 3!`, `+<amount>`) that rose and faded within ~1 second, plus a yellow border flash on the matching reels. Easy to miss — the player would often look at the reels and not register the +X amount, especially on a 2/3 partial (the `+X` is small and moves quickly).
+
+**Change:** added a persistent result banner between the reels and the `SPINS LEFT` text. Three states with distinct visual treatment:
+
+- **`jackpot`** (3/3 match): gold border + glow, title `★ JACKPOT! ★` in gold with text-shadow, subtitle `+<amount> POINTS` in yellow.
+- **`partial`** (2/3 match): yellow border + soft glow, title `NICE! 2 OF 3` in yellow, subtitle `+<amount> POINTS` in orange.
+- **`miss`** (0/3 match): grey border (no glow), title `MISS` in grey, subtitle `NEXT JACKPOT: <amount>` in dim grey so the player sees the new value they're chasing.
+
+**Lifecycle:**
+- Hidden when entering the floor-complete screen (no result yet).
+- Shows with a 0.3s scale-in animation when the spin result lands.
+- Persists until the next spin starts (the next `spinJackpot()` call hides it via `hideJackpotResult()`).
+- Replaced on each spin with the new result.
+- Hidden on `showScreen('fc')` safety reset (along with the reel state reset from M).
+
+**Why "POINTS" not "CREDITS":** the slot machine pays out *score* (added to `GS.sc`), not credits. The 5% credit conversion happens at floor clear. The banner says `+X POINTS` to match the actual reward type. If the player is confused, the float text + reels + prize pool still show the numbers, so they can verify.
+
+**Why `NEXT JACKPOT: <amount>` on miss:** keeps the slot machine visible as a *target*. The player sees both "you missed" and "this is what you're chasing now" in one banner. Pairs with the existing reel `lose` flash (500ms) and the `'TRY AGAIN...'` float (which are unchanged).
+
+**Files:** HTML banner `<div id="jackpot-result">` between the reels and `SPINS LEFT`; CSS for the 3 states (~60 lines); JS helpers `showJackpotResult(kind, amount, nextJackpot)` and `hideJackpotResult()`; wired into the 3 result branches + `spinJackpot()` entry + `showScreen('fc')` safety reset (8 edits total).
+
+### Phase 4.5-O: Floor-cleared overlay alignment fix
+
+The floor-cleared screen had a visible horizontal alignment issue: the JACKPOT section content (PRIZE POOL box, reels, MISS banner, NO SPINS LEFT button) was shifted ~50px right of the canvas center, and the CONTINUE / END RUN buttons were shifted ~130px right. The FLOOR CLEARED h2 and SPINS LEFT: 0 text were correctly centered, but everything else was offset.
+
+**Root cause:** the two `<div>` wrappers inside `#fc` (the Score/Balls stats div and the Jackpot section div) had no `width` set, so they sized to their content. With `text-align: center` on the parent, their inline content was centered within the narrower divs — which were themselves centered in the 480px `#fc` by the `.ov` class's `align-items: center`. But the centering axes didn't line up: the inner divs sat at the center of their (narrower) content box, offset from the direct children (CONTINUE / END RUN buttons) that WERE centered in the full 480px. The buttons themselves also appeared to ignore `align-items: center` for unclear reasons — possibly a specificity issue with the existing `.btn` rule's `display: inline-flex` or a margin interaction.
+
+**Fixes (`index.html`):**
+- **O-1**: Score/Balls inner div — `style="margin:15px 0;text-align:center;width:100%;box-sizing:border-box;"` (was `margin:15px;text-align:center`). The `width:100%` forces the div to fill the 480px parent so its centered content sits at the canvas center. The `margin:15px 0` drops the left/right margin (no longer needed since the div fills the width) to avoid overflow.
+- **O-2**: Jackpot section inner div — same treatment (`margin:15px 0;text-align:center;width:100%;box-sizing:border-box;`).
+- **O-3**: `.jp-display` CSS — added `margin-left: auto; margin-right: auto;` so the 200px-wide PRIZE POOL block centers within the now-full-width parent. Without this, the block left-aligned within the parent and sat ~50px right of center.
+- **O-4 (safety net)**: `.ov` class — added `text-align: center;`. Belt-and-suspenders for any inline content that might not be centered by `align-items: center` (e.g. if a future child has `display: inline` instead of being a flex item).
+- **O-5 (safety net)**: `.btn` class — added `align-self: center;`. Explicit per-item override of the parent's `align-items`. Ensures buttons center regardless of any specificity gotcha (e.g. if the `.btn` class's own `align-items: center` was being interpreted as "center the button's own content" rather than "center the button in its parent").
+
+**Why not just flatten the structure?** The inner divs serve a visual grouping purpose (Score/Balls together, Jackpot section together). Removing them and putting all elements as direct children of `#fc` would work but loses the grouping signal. The `width: 100%` fix preserves the structure while ensuring consistent centering.
+
+**After the fix** (verified by reading the rendered CSS): all elements in the floor-cleared overlay should sit at the canvas center (240px in the 480px-wide canvas). The PRIZE POOL box, the 3 reels, the MISS banner, the NO SPINS LEFT button, and the CONTINUE / END RUN buttons all share the same vertical center axis.
+
+### Phase 4.5-P: Continuous BGM + "CONNECTION LOST" end screen
+
+The BGM was restarting between every floor because the floor-complete screen mapped to `null` (stop BGM) and the next slot-selector mapped to `'gameplay'` (start it again). Combined with the `stopBgm` call after each slot-machine spin, the player heard: gameplay → silence → gameplay → silence → gameplay... The run-end screen used the one-shot `connection-lost` sting which got cut off by the next title track when the player returned to menu.
+
+**New BGM flow:**
+- **Menu**: `title` track (looping, starts on first mousemove on title screen)
+- **Start of run** (in `startGame()`): explicit `Audio.playBgm('gameplay')` — the ONE place the BGM transitions
+- **Slot selector → gameplay → floor-complete → next floor**: all return `'continue'` from `trackForScreen()`, so the BGM keeps playing uninterrupted
+- **Slot machine spin**: `playBgm('slot-spin')` during the spin, then `playBgm(previousBgm)` to restore gameplay (no more `stopBgm`)
+- **Run end** (manual end or game over): `trackForScreen('re')` returns `'ending'` — the looping `ending-screen.mp3` track plays on the end screen
+- **Return to menu**: `trackForScreen('menu')` returns `'title'` — switches back to title
+
+**Changes (`index.html`):**
+
+- **P-1** `trackForScreen` mapping updated:
+  - `'slot-selector'` → `'continue'` (was `'gameplay'` — no more restart when re-entering from contb)
+  - `'fc'` → `'continue'` (was `null` — gameplay BGM now plays through floor-complete)
+  - `'re'` → `'ending'` (was `'continue'` — distinct end-screen music now plays)
+- **P-2** `spinJackpot` save/restore: before the spin, save `Audio.currentBgmId` (the gameplay track); after the spin, `playBgm(previousBgm)` to restore. Replaces the `stopBgm(true)` that was cutting the BGM and causing the next screen change to restart it.
+- **P-3** `startGame()` adds `Audio.playBgm('gameplay')` at the top. This is the ONLY place the BGM transitions during a run. After this, the BGM stays on gameplay through all floors.
+- **P-4a/4b** Removed `Audio.playBgm('connection-lost')` from both the game-over check and the `endb` handler. The connection-lost sting was being cut off by the ending track anyway, and the ending loop is itself a "game over" cue.
+- **P-5** Changed the `#re` overlay h2 from `"RUN COMPLETE"` to `"CONNECTION LOST"`. Matches the thematic framing (slot protocol as a system that gets disconnected) and the ending BGM track. The stats below (Score, Floors, Best Combo, Pegs Hit, Credits Earned, NEW BEST indicator) are unchanged.
+
+**Why the ending track instead of connection-lost?**
+- `connection-lost.mp3` is a one-shot sting (no loop) — it plays once and then there's silence
+- `ending-screen.mp3` is a looping track designed to play while the player views the end screen
+- The user wanted "end screen music" (ongoing), not a one-shot sting
+
+**The result:**
+The player now hears continuous BGM from the moment they click INITIATE BREACH through the entire run, through all floor transitions, through all slot-machine spins. The music only changes at three points: title → gameplay (at run start), gameplay → slot-spin (during a spin, then back to gameplay), gameplay → ending (at run end), ending → title (back to menu).
+
+### Phase 4.5-Q: Slot machine BGM swap removed (SFX over continuous BGM)
+
+After Phase 4.5-P made the BGM continuous through floor transitions, the slot-machine spin still swapped the BGM to a dedicated `'slot-spin'` track (`audio/slot-machine.mp3`) for the duration of the spin, then swapped back to gameplay after. The user pointed out that the slot-machine audio cue is already provided by the `playReelTick()` SFX calls in the `spinReel` setInterval (called every other cycle, ~25ms ticks at 1000Hz square wave) - we don't need a separate BGM track on top of that.
+
+**Change:** removed the BGM swap around the slot-machine spin. The gameplay BGM now plays continuously through the entire spin, with the existing `playReelTick()` SFX layered on top.
+
+**Why this is cleaner:**
+- No track-switching mid-spin, so no risk of a load hiccup cutting the BGM
+- Simpler audio state machine - the BGM is purely screen-driven (`trackForScreen` returns `'continue'` for `'fc'`, `'continue'` for `'slot-selector'`, `'ending'` for `'re'`, etc.) and never gets touched by the spin
+- The `playReelTick()` SFX (a 30ms 1000Hz square wave) is short and percussive - it layers well over the continuous gameplay BGM as a ticking cue without competing with it
+- The `slot-machine.mp3` audio file in the audio/ folder is now unused (left in place in case we want to re-enable it later)
+
+**Files:** 2 edits in `index.html` (removed `var previousBgm = ...` and `Audio.playBgm('slot-spin')` before the spin; removed the restore block at the end of the spin). 2 `Phase 4.5-Q` tags in source. 17 phase tags A–Q total.
+
+### Validation plan (post-PR1)
+
+- [ ] 5-floor mid-run sim: 1k+2k+3k+4k+5k = 15k score. Credits earned = 1500. Was 3000 pre-fix.
+- [ ] Floor 5 solvability: 5 balls * 6 hits/ball = 30 peg hits, target 19. Should clear ~85% of runs.
+- [ ] Floor 10 solvability: 30 peg hits, target 27. Should clear ~50% of runs.
+- [ ] Payload affordability: 600-credit run should afford 4-6 payloads at new costs.
+- [ ] Daily mod simulation (100 seeds): zero 'multiplier + double_pegs' pairs after the dedup rule.
+- [ ] Hand-test fl 1/5/10, with and without Slowmo/Worm, time the clears and score deltas.
+
+---
+
 ## 5. Acceptance Criteria
 
 ### Core Gameplay

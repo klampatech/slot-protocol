@@ -24,7 +24,7 @@
         #game-container.board-active { box-shadow: 0 0 0 2px #00fff2, 0 0 30px rgba(0,255,242,0.3); }
         .theme-matrix #game-container.board-active { box-shadow: 0 0 0 2px #00ff00, 0 0 30px rgba(0,255,0,0.3); }
         .contrast-mode #game-container.board-active { box-shadow: 0 0 0 2px #ffffff, 0 0 30px rgba(255,255,255,0.2); }
-        .ov { position: absolute; top: 0; left: 0; width: 480px; height: 700px; background: rgba(10,10,18,0.98); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; border-radius: 2px; opacity: 0; }
+        .ov { position: absolute; top: 0; left: 0; width: 480px; height: 700px; background: rgba(10,10,18,0.98); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 100; border-radius: 2px; opacity: 0; }
         .ov.on { display: flex; opacity: 1; animation: overlay-fade-in 0.3s ease-out; }
         @keyframes overlay-fade-in { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
         /* Default overlay border - cyan like board */
@@ -50,7 +50,7 @@
         /* Keep the icon + label on one line. Without this, narrow buttons
            (the paired ACHIEVEMENTS / LEADERBOARD row in particular) wrap
            the icon above the text. */
-        .btn { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+        .btn { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; align-self: center; }
         /* Buttons must never overflow the 480px container. The flex parent
            (e.g. the ACHIEVEMENTS / LEADERBOARD row) wraps if the pair
            can't fit on one line. */
@@ -184,7 +184,12 @@
         @keyframes jackpot-win { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.1) rotate(2deg); } }
         @keyframes reel-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         @keyframes coin-burst { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100px) scale(0); opacity: 0; } }
-        .jp-display { background: linear-gradient(180deg, #1a1a2e, #12121f); border: 2px solid #ff00ff; border-radius: 3px; padding: 8px 15px; margin-bottom: 10px; text-align: center; width: 200px; box-sizing: border-box; }
+        /* Phase 4.5-O: margin-left/right:auto so the 200px block
+           centers horizontally in its parent (the full-width Jackpot
+           section inner div). Without this, the PRIZE POOL box left-
+           aligns within the parent and sits ~50px right of the #fc
+           center, offset from the CONTINUE/END RUN buttons below. */
+        .jp-display { background: linear-gradient(180deg, #1a1a2e, #12121f); border: 2px solid #ff00ff; border-radius: 3px; padding: 8px 15px; margin-bottom: 10px; margin-left: auto; margin-right: auto; text-align: center; width: 200px; box-sizing: border-box; }
         .jp-amount { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 24px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; letter-spacing: 1px; }
         .jp-label { font-size: 10px; color: #8888aa; margin-bottom: 3px; }
         .spins-left { font-size: 12px; color: #ffff00; margin-top: 10px; }
@@ -194,6 +199,68 @@
         .spin-btn:disabled { animation: none; opacity: 0.5; cursor: not-allowed; }
         .coin { position: absolute; font-size: 16px; animation: coin-burst 1s ease-out forwards; pointer-events: none; }
         @keyframes prize-flash { 0%, 100% { color: #ff00ff; text-shadow: 0 0 10px #ff00ff; } 50% { color: #ffff00; text-shadow: 0 0 30px #ffff00, 0 0 50px #ff00ff; } }
+        /* Phase 4.5-N: result banner styles. Three states (jackpot /
+           partial / miss) with distinct colors and a scale-in animation
+           on show. The banner sits between the reels and the SPINS
+           LEFT text so it's prominent but doesn't push the reels around.
+           Hidden by default; .show triggers a 0.3s scale+fade-in. */
+        .jackpot-result {
+            text-align: center;
+            font-family: 'Orbitron', monospace;
+            margin: 12px 0 8px;
+            padding: 10px 16px;
+            min-height: 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transform: scale(0.7);
+            transition: opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-radius: 3px;
+            box-sizing: border-box;
+            width: 280px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .jackpot-result.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .jackpot-result .jr-title {
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            line-height: 1.1;
+        }
+        .jackpot-result .jr-amount {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            font-family: 'Orbitron', monospace;
+        }
+        .jackpot-result.jackpot {
+            background: rgba(255, 204, 0, 0.08);
+            border: 2px solid #ffcc00;
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.4), inset 0 0 12px rgba(255, 204, 0, 0.1);
+        }
+        .jackpot-result.jackpot .jr-title { color: #ffcc00; text-shadow: 0 0 20px #ffcc00; }
+        .jackpot-result.jackpot .jr-amount { color: #ffff00; }
+        .jackpot-result.partial {
+            background: rgba(255, 255, 0, 0.05);
+            border: 2px solid #ffff00;
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.25);
+        }
+        .jackpot-result.partial .jr-title { color: #ffff00; text-shadow: 0 0 12px #ffff00; }
+        .jackpot-result.partial .jr-amount { color: #ffaa00; }
+        .jackpot-result.miss {
+            background: rgba(136, 136, 170, 0.05);
+            border: 2px solid #555566;
+        }
+        .jackpot-result.miss .jr-title { color: #8888aa; }
+        .jackpot-result.miss .jr-amount { color: #666688; }
         @keyframes reel-stop { 0% { transform: scale(1.1); } 100% { transform: scale(1); } }
         /* Achievement styles */
         .ach-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; max-width: 400px; }
@@ -238,7 +305,9 @@
         .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.3) inset, 0 0 10px rgba(0,255,242,0.3); }
         .slot-pos.occupied { border-style: solid; cursor: grab; }
         .slot-pos.highlight { border-color: #ffff00; background: rgba(255,255,0,0.1); transform: scale(1.1); }
-        .slot-pool-item { width: 50px; height: 50px; background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: grab; transition: all 0.2s; margin: 4px; }
+                /* Pool items now match position square size (56x56) - see the
+           combined .slot-pos, .slot-pool-item rule above. The 50x50
+           override from earlier was a leftover from a smaller layout. */
         .slot-pool-item { background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: grab; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset; }
         .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.4) inset, 0 0 14px rgba(0,255,242,0.4); transform: scale(1.1); }
         .slot-pool-item.dragging { opacity: 0.5; }
@@ -478,11 +547,27 @@
         <!-- FLOOR COMPLETE OVERLAY -->
         <div id="fc" class="ov">
             <h2>FLOOR CLEARED</h2>
-            <div style="margin:15px;text-align:center">
+            <!-- Phase 4.5-O: width:100% so the inner div fills the full
+                 480px of #fc. Without this, the div is sized to its content
+                 and its centered text sits at the center of a narrower box,
+                 which is offset from the direct children (CONTINUE/END RUN)
+                 that ARE centered in the full 480px. box-sizing:border-box
+                 keeps the width:100% honest if padding is ever added. -->
+            <div style="margin:15px 0;text-align:center;width:100%;box-sizing:border-box;">
                 <div class="stat-line"><span class="stat-label">Score:</span> <span class="stat-value" id="fsc">0</span></div>
                 <div class="stat-line"><span class="stat-label">Balls:</span> <span class="stat-value" id="fbl">5</span></div>
             </div>
-            <div style="margin:15px;text-align:center;">
+            <!-- Phase 4.5-O: width:100% so the Jackpot section fills the
+                 full 480px and its centered content aligns with the direct
+                 children of #fc. Without this, the PRIZE POOL box (200px),
+                 the reels div, the MISS banner, and the NO SPINS LEFT
+                 button all sit at the center of a narrower (~200-280px)
+                 inner div, which is offset ~50px right of the #fc center.
+                 The MISS banner already has margin:auto so it self-centers;
+                 the reels div already has display:flex with justify-content
+                 center so it self-centers. The .jp-display (200px block)
+                 needs its own centering - see the CSS rule below. -->
+            <div style="margin:15px 0;text-align:center;width:100%;box-sizing:border-box;">
                 <p style="color:#ff00ff;font-size:12px;margin-bottom:10px;">JACKPOT</p>
                 <div class="jp-display"><div class="jp-label">PRIZE POOL</div><div class="jp-amount" id="fjpresult">0</div></div>
                 <div style="display:flex;gap:10px;justify-content:center;margin:15px 0;">
@@ -490,6 +575,15 @@
                     <div class="jr" id="jreel1">-</div>
                     <div class="jr" id="jreel2">-</div>
                 </div>
+                <!-- Phase 4.5-N: result banner. Hidden until a spin completes,
+                     then shows the outcome (JACKPOT / 2 OF 3 / MISS) plus the
+                     score amount. Persists until the next spin so the player
+                     has time to read it. Replaces the small floating "+X"
+                     text which was easy to miss. Note: the slot machine pays
+                     out SCORE (points added to GS.sc), not credits - the
+                     banner says "POINTS" to match the actual reward type.
+                     The 5% credit conversion happens at floor clear. -->
+                <div id="jackpot-result" class="jackpot-result"></div>
                 <div class="spins-left" id="spinsLeft">SPINS LEFT: <span id="spinsLeftNum">2</span></div>
                 <button class="btn btn2 spin-btn" id="spinjp" style="font-size:14px;padding:10px 25px;margin-top:10px;">SPIN</button>
             </div>
@@ -499,7 +593,12 @@
         
         <!-- RUN END OVERLAY -->
         <div id="re" class="ov">
-            <h2>RUN COMPLETE</h2>
+            <!-- Phase 4.5-P: changed from "RUN COMPLETE" to "CONNECTION LOST"
+                 to match the thematic framing (slot protocol as a system
+                 that gets disconnected) and the ending BGM track. The
+                 stats below (Score, Floors, Best Combo, etc.) are
+                 unchanged - just the screen title. -->
+            <h2>CONNECTION LOST</h2>
             <div style="margin:20px;text-align:center">
                 <div class="stat-line"><span class="stat-label">Score:</span> <span class="stat-value" id="rsc">0</span></div>
                 <div class="stat-line"><span class="stat-label">Floors:</span> <span class="stat-value" id="rfl">0</span></div>
@@ -651,7 +750,7 @@
             <div class="slot-arranging-section">
                 <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Available Effects</div>
                 <div id="slot-info" style="color:#00fff2;font-size:10px;margin:0 0 6px;letter-spacing:1px;text-align:center;text-transform:uppercase;"></div>
-                <div id="slot-pool" style="display:flex;gap:6px;justify-content:center;flex-wrap:nowrap;width:180px;"></div>
+                <div id="slot-pool" style="display:flex;gap:6px;justify-content:center;flex-wrap:nowrap;width:180px;margin:0 auto;"></div>
             </div>
             
             <div style="display:flex;gap:10px;justify-content:center;margin-top:15px;">
@@ -696,7 +795,13 @@
     var C = {
         W: 480, H: 700,
         G: 0.18, FR: 0.995, MAXV: 14, MAXS: 21, BR: 7,
-        STUCK_F: 180, STUCK_D: 2, CHAIN_T: 30, FRENZY_T: 180, MAXM: 7,
+        STUCK_F: 180, STUCK_D: 2,
+        // Phase 4.5-I: chain timer 30 -> 36 frames (0.5s -> 0.6s at 60fps).
+        // Invisible to fast players, QoL buff for slow ones. 30 was tight;
+        // 36 keeps the pressure (the combo-urgent and combo-critical CSS
+        // animations at <35% and <15% of the timer still fire) without
+        // making chains feel racy.
+        CHAIN_T: 36, FRENZY_T: 180, MAXM: 7,
         TOP: 110, BOT: 480, PR: 8, PS: 50,
         SY: 560, SH: 50, SC: 7, SW: 480/7,
         PT: {N:0, C:1, T:2, S:3, E:4, D:5, I:6, F:7, M:8, H:9, O:10},
@@ -728,7 +833,9 @@
             2: { name: 'AMPLIFY',   desc: '+1 combo (capped at x7). Chain timer refreshes to 210.' },
             3: { name: 'PAYLOAD',   desc: 'Adds a random payload to your queue (max 2).' },
             4: { name: 'CRUMBLE',   desc: 'Destroys up to 3 random non-seismic/explosive pegs.' },
-            5: { name: 'SHIELD',    desc: 'Next ball is bounced back from overflow exit instead of dying.' },
+            // Phase 4.5-E: tooltip now clarifies the bounced ball re-enters
+            // the peg field and can score more points, not just gets a free pass.
+            5: { name: 'SHIELD',    desc: 'Bounces the next ball back from overflow exit so it can hit more pegs.' },
             6: { name: 'OVERCLOCK', desc: '1.5× gravity for the current ball only.' },
             7: { name: 'JACKPOT',   desc: 'Adds the current jackpot to your score. Jackpot grows 15% if missed.' }
         },
@@ -748,6 +855,22 @@
         FLASH_LIFETIME: 15,
         MAX_BALL_COLORS: ['#00fff2', '#ff00ff', '#ffff00', '#00ff88', '#ff6600', '#ffffff']
     };
+
+    // Phase 4.5-J: per-peg floor-scaled base points. Replaces the flat
+    // 50 in the per-peg bonus formula. Starts at 50 on floor 1, grows
+    // 10% per floor: fl 1=50, fl 5=70, fl 10=95, fl 12=105. Late-game
+    // hits now feel rewarding instead of identical to floor 1. The
+    // 50 in the formula is replaced with pegBasePoints() at the two
+    // call sites (Peg.hit top of function, triggerSlotCollected CREDITS
+    // branch). The explosive peg's own 500 bonus (in triggerPegExplosion)
+    // is intentionally NOT scaled - it's a premium effect, not a base
+    // scoring branch, and the user spec was specific to the 50-point
+    // base. 50 * (1 + (fl-1) * 0.1) is integer-friendly for every fl
+    // (1+0.1*0=1, 1+0.1*4=1.4 -> 70, etc.) so the result is always a
+    // clean number.
+    function pegBasePoints() {
+        return 50 * (1 + (GS.fl - 1) * 0.1);
+    }
 
     // ========== AUDIO ENGINE (Phase 4) ==========
     // Procedural sound synthesis using Web Audio API
@@ -1119,12 +1242,19 @@
                 // (gameplay) rather than swapping to the title track.
                 case 'none':            return 'continue';
                 case undefined:         return 'continue';
-                case 'slot-selector':   return 'gameplay';
-                case 'fc':              return null;  // silent during floor-complete (matches rogue-pachinko)
-                // Run-end BGM is set explicitly by the caller (endb handler,
-                // game-over check). Returning 'continue' prevents the screen
-                // transition from clobbering the music the caller just chose.
-                case 're':              return 'continue';
+                // Phase 4.5-P: slot-selector and fc both return 'continue'
+                // so the BGM doesn't restart between floors. The gameplay
+                // track is started ONCE in startGame() and kept playing
+                // through the slot-selector, gameplay, and floor-complete
+                // screens. Only the slot-spin BGM (during a spin) and the
+                // ending BGM (on the re screen) interrupt it.
+                case 'slot-selector':   return 'continue';
+                case 'fc':              return 'continue';  // was null (silence) - now keeps gameplay BGM through floor-complete
+                // Phase 4.5-P: 'ending' is the looping track for the
+                // run-end screen. Was 'continue' (kept gameplay BGM into
+                // the end screen) - the user wanted distinct "end screen
+                // music" so the ending track now plays on re.
+                case 're':              return 'ending';
                 // Modal overlays opened on top of title or gameplay: keep
                 // whatever BGM was playing (title track on the menu, gameplay
                 // track mid-run) so opening/closing doesn't cut the music.
@@ -1324,6 +1454,19 @@
         ];
         var mod1 = mods[Math.floor(seededRandom(seed) * mods.length)];
         var mod2 = mods[Math.floor(seededRandom(seed + 1) * mods.length)];
+        // Phase 4.5-H: hard-tier dedup. If both picks are in the
+        // player-power-capping tier (multiplier / double_pegs / fast_timer),
+        // swap mod2 for an easy-tier pick. Previously, multiplier +
+        // double_pegs on the same day was run-ending.
+        var hardTier = ['multiplier', 'double_pegs', 'fast_timer'];
+        var easyTier = ['gravity', 'fewer_pegs', 'small_ball'];
+        if (hardTier.indexOf(mod1.id) !== -1 && hardTier.indexOf(mod2.id) !== -1) {
+            var easyPool = [];
+            for (var ei = 0; ei < mods.length; ei++) {
+                if (easyTier.indexOf(mods[ei].id) !== -1) easyPool.push(mods[ei]);
+            }
+            mod2 = easyPool[Math.floor(seededRandom(seed + 2) * easyPool.length)];
+        }
         return [mod1, mod2];
     }
 
@@ -1365,6 +1508,38 @@
         updateSpinButtonState();
         updateJackpotUI();
     }
+
+    // Phase 4.5-N: result banner helpers. The banner shows the spin
+    // outcome (JACKPOT / 2 OF 3 / MISS) plus the score amount in a
+    // persistent display. Hidden by default; .show triggers a
+    // scale-in animation. The amount is passed as the actual score
+    // added (or, for misses, the new jackpot value so the player
+    // sees what they're chasing next).
+    function showJackpotResult(kind, amount, nextJackpot) {
+        var el = document.getElementById('jackpot-result');
+        if (!el) return;
+        var titleText, amountText;
+        if (kind === 'jackpot') {
+            titleText = '★ JACKPOT! ★';
+            amountText = '+' + amount + ' POINTS';
+        } else if (kind === 'partial') {
+            // 'NICE!' is shorter than '2 OF 3' for the title; the
+            // subtitle spells out the 2/3 detail. Avoids header
+            // wrapping on narrow displays.
+            titleText = 'NICE! 2 OF 3';
+            amountText = '+' + amount + ' POINTS';
+        } else {
+            titleText = 'MISS';
+            amountText = 'NEXT JACKPOT: ' + (nextJackpot || amount);
+        }
+        el.className = 'jackpot-result show ' + kind;
+        el.innerHTML = '<div class="jr-title">' + titleText + '</div>' +
+                       '<div class="jr-amount">' + amountText + '</div>';
+    }
+    function hideJackpotResult() {
+        var el = document.getElementById('jackpot-result');
+        if (el) el.classList.remove('show');
+    }
     
     function updateSpinsLeftUI() {
         var el = document.getElementById('spinsLeftNum');
@@ -1403,8 +1578,28 @@
         if (jackpotSpinsLeft <= 0 || jackpotWonThisFloor) return;
 
         jackpotSpinning = true;
-        // Phase 4 Music Port: switch to slot-spin BGM for the duration of the spin
-        Audio.playBgm('slot-spin');
+        // Phase 4.5-M: strip any leftover reel state classes from a
+        // previous spin before starting the new one. The 'win' class
+        // has a flashing yellow animation (CSS jackpot-win 0.3s infinite)
+        // that would otherwise persist across spins and across floor
+        // boundaries if the setTimeout in the result branch doesn't fire
+        // (e.g. user advances to next floor before the 1500ms elapses).
+        ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+            document.getElementById(id).classList.remove('hit', 'win', 'lose');
+        });
+        // Phase 4.5-N: hide the result banner on each new spin so the
+        // previous result doesn't linger under the spinning reels.
+        hideJackpotResult();
+        // Phase 4.5-Q: BGM stays on gameplay through the entire spin.
+        // The slot-machine audio cue is provided by the existing
+        // playReelTick() calls in the spinReel setInterval (called every
+        // other cycle, ~25ms ticks at 1000Hz square wave). The
+        // gameplay BGM plays under the ticks for a layered effect.
+        // Previously we swapped to a dedicated 'slot-spin' BGM track
+        // (slot-machine.mp3) for the duration of the spin, but the
+        // user preferred keeping the continuous BGM and just having
+        // the SFX over it - simpler, no track switching, no risk of
+        // the BGM restarting if the track load hiccups mid-spin.
         jackpotSpinsLeft--;
         updateSpinsLeftUI();
         updateSpinButtonState();
@@ -1488,30 +1683,45 @@
                     spinReel(2, spins + 5, function() {
                         // All reels stopped!
                         jackpotSpinning = false;
-                        // Phase 4 Music Port: stop slot-spin BGM now that the spin is over
-                        // (floor-complete screen is silent between spins, matching rogue-pachinko)
-                        Audio.stopBgm(true);
+                        // Phase 4.5-Q: no BGM manipulation here. The gameplay
+                        // BGM has been playing continuously through the spin
+                        // (the playBgm('slot-spin') swap was removed in Q-1),
+                        // so there's nothing to restore. The slot-machine
+                        // audio cue was provided by the playReelTick() calls
+                        // during the spin animation. The BGM just continues
+                        // uninterrupted into the result display and beyond.
 
                         // Remove hit classes
                         ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
                             document.getElementById(id).classList.remove('hit', 'win');
                         });
                         
-                        // Check for jackpot (3 of a kind)
-                        if (jackpotReels[0] === jackpotReels[1] && jackpotReels[1] === jackpotReels[2]) {
+                        // Phase 4.5-L: 3-way result branch.
+                        // 3/3 (jackpot): full payout + fanfare + screen shake (rare, 2.78%/spin)
+                        // 2/3 (partial): +10% of jackpot as score + bonus chime (common, 41.67%/spin)
+                        // 0/3 (miss): jackpot grows 15%, no payout (55.56%/spin)
+                        // The 2/3 partial is the engagement hook. With 6 symbols + 3
+                        // reels, any-pair-match happens 41.67% of the time
+                        // (90/216 outcomes) - so the slot machine feels rewarding on
+                        // most floors without trivialising the 3/3 big win. Per floor
+                        // (2 spins): ~5.5% jackpot, ~66% partial, ~31% miss, 69% any-win.
+                        var r0 = jackpotReels[0], r1 = jackpotReels[1], r2 = jackpotReels[2];
+                        var threeOfThree = (r0 === r1 && r1 === r2);
+                        var twoOfThree = !threeOfThree && (r0 === r1 || r0 === r2 || r1 === r2);
+                        if (threeOfThree) {
                             // JACKPOT BONANZA!
                             jackpotWonThisFloor = true;
-                            
+
                             // Add win animation to all reels
                             ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
                                 document.getElementById(id).classList.add('win');
                             });
-                            
+
                             // Massive screen effects
                             triggerScreenShake(12);
                             triggerWhiteFlash();
                             triggerWhiteFlash(); // Double flash!
-                            
+
                             // Spawn coin bursts
                             var fcEl = document.getElementById('fc');
                             var rect = fcEl.getBoundingClientRect();
@@ -1520,7 +1730,7 @@
                                     spawnCoinBurst(200 + Math.random() * 80, 250);
                                 }, burst * 200);
                             }
-                            
+
                             // Flash the prize amount
                             var resultEl = document.getElementById('fjpresult');
                             if (resultEl) {
@@ -1528,29 +1738,107 @@
                                 resultEl.offsetHeight;
                                 resultEl.style.animation = 'prize-flash 0.5s ease-in-out 3';
                             }
-                            
+
                             // Award jackpot
                             GS.sc += GS.jp;
                             GS.jackpotWon = GS.jp;
                             GS.jackpotWins++;
+                            var jackpotWonAmount = GS.jp;
                             GS.jp = Math.floor(500 * GS.fl); // Reset jackpot
-                            
+
                             createFloat(C.W / 2, C.H / 2 - 50, '★ JACKPOT! ★', '#ff00ff');
-                            createFloat(C.W / 2, C.H / 2, '+' + GS.jp, '#ffff00');
-                            
+                            createFloat(C.W / 2, C.H / 2, '+' + jackpotWonAmount, '#ffff00');
+
+                            // Phase 4.5-N: persistent result banner so the
+                            // player can clearly see they hit the jackpot and
+                            // how many points it was worth. Replaces the
+                            // small floating '+X' which was easy to miss.
+                            showJackpotResult('jackpot', jackpotWonAmount, GS.jp);
+
                             checkAchievements();
+
+                            // Phase 4.5-M: strip the 'win' (flashing yellow)
+                            // class after 1500ms. Without this, the animation
+                            // persists forever on a jackpot (the spin button
+                            // is disabled so the next-spin cleanup never runs,
+                            // and if the user advances to the next floor the
+                            // class carries over). 1500ms gives the player
+                            // time to read the '★ JACKPOT! ★' float + screen
+                            // effects, then the reels return to a neutral
+                            // state with the final symbols still visible.
+                            setTimeout(function() {
+                                ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+                                    document.getElementById(id).classList.remove('win', 'lose');
+                                });
+                            }, 1500);
+                        } else if (twoOfThree) {
+                            // Phase 4.5-L: 2/3 partial match. Award 10% of the
+                            // current jackpot as score, with a small bonus
+                            // chime and a yellow 'NICE!' float. The jackpot
+                            // does NOT grow (this is a small win, not a
+                            // miss) and does NOT count as jackpotWon (the
+                            // player can still spin the second time). On a
+                            // 575 jackpot that's 57 score - meaningful but
+                            // much smaller than the 3/3 win.
+                            var partialAmount = Math.floor(GS.jp * 0.1);
+                            GS.sc += partialAmount;
+                            // Mark the two matching reels with 'win' class so
+                            // the player can see which two matched, and the
+                            // odd-one-out with 'lose' so it's clear which
+                            // symbol broke the chain.
+                            [['jreel0', r0, r1, r2], ['jreel1', r1, r0, r2], ['jreel2', r2, r0, r1]].forEach(function(t) {
+                                var el = document.getElementById(t[0]);
+                                if (t[1] === t[2] || t[1] === t[3]) {
+                                    el.classList.add('win');
+                                } else {
+                                    el.classList.add('lose');
+                                    setTimeout(function() { el.classList.remove('lose'); }, 500);
+                                }
+                            });
+                            // Audio: small bonus chime (not the full jackpot
+                            // fanfare - that's reserved for 3/3).
+                            Audio.playBonus();
+                            createFloat(C.W / 2, C.H / 2 - 30, '2 OF 3!', '#ffff00');
+                            createFloat(C.W / 2, C.H / 2, '+' + partialAmount, '#ffaa00');
+
+                            // Phase 4.5-N: persistent partial-win banner.
+                            // Partial payouts do NOT grow the jackpot, so
+                            // the nextJackpot arg is the same GS.jp value
+                            // (we pass 0 / null and the helper falls back
+                            // to the amount for display). 10% of jackpot
+                            // is the payout, so partialAmount is the
+                            // reward and the banner shows it.
+                            showJackpotResult('partial', partialAmount, GS.jp);
+
+                            // Phase 4.5-M: strip 'win' (matching reels) and
+                            // 'lose' (the odd one) after 1500ms. The original
+                            // 2/3 code only had a 500ms timeout for 'lose' on
+                            // the odd reel, but the 'win' class on the two
+                            // matching reels persisted. Mirrors the 3/3
+                            // jackpot branch above.
+                            setTimeout(function() {
+                                ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+                                    document.getElementById(id).classList.remove('win', 'lose');
+                                });
+                            }, 1500);
                         } else {
-                            // No jackpot - show it respectfully
+                            // No match - show it respectfully
                             ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
                                 document.getElementById(id).classList.add('lose');
                                 setTimeout(function() {
                                     document.getElementById(id).classList.remove('lose');
                                 }, 500);
                             });
-                            
+
                             // Grow jackpot
+                            var previousJackpot = GS.jp;
                             GS.jp = Math.floor(GS.jp * 1.15);
                             createFloat(C.W / 2, C.H / 2, 'TRY AGAIN...', '#8888aa');
+
+                            // Phase 4.5-N: persistent miss banner. Shows
+                            // the new jackpot value so the player can see
+                            // what they're chasing on the next spin.
+                            showJackpotResult('miss', 0, GS.jp);
                         }
                         
                         updateJackpotUI();
@@ -1824,7 +2112,9 @@
     }
     Peg.prototype.hit = function(b) {
         this.hc++;
-        var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+        // Phase 4.5-J: base points scale with floor (was flat 50).
+        // pegBasePoints() returns 50 at fl 1, 70 at fl 5, 95 at fl 10, 105 at fl 12.
+        var bonus = pegBasePoints() * (GS.cc + 1) * (GS.fa ? 3 : 1);
         // Daily mod: double_pegs halves all per-peg scoring
         if (modActive('double_pegs')) bonus = Math.floor(bonus / 2);
 
@@ -1915,8 +2205,13 @@
             triggerWhiteFlash();
             triggerScreenShake(3);
         } else if (this.t === C.PT.E) {
-            GS.sc *= 3;
-            createFloat(this.x, this.y, 'x3', '#ff2244');
+            // Phase 4.5-G: was `GS.sc *= 3` + the triggerPegExplosion below
+            // added `bonus * 3` - double lifetime scaling (3x of full score
+            // plus 3x of a 50*cc*3 bonus). For a 10k score with mid combo,
+            // one Explosive peg hit turned into 30k+ score in a single frame.
+            // Removed the *= 3; the explosion function now does the right
+            // thing (flat +bonus, no lifetime multiplier). Float text moved
+            // into triggerPegExplosion so we don't get two 'x3' floats.
             triggerPegExplosion(this);
         } else if (this.t === C.PT.T) {
             var pair = null;
@@ -2099,9 +2394,13 @@
     }
     
     function setupObj() {
-        var targets = [15, 20, 25, 30];
-        var idx = Math.min(Math.floor(GS.fl / 3), targets.length - 1);
-        var t = targets[idx] + GS.fl;
+        // Phase 4.5-B: replaced the tier table [15,20,25,30]+fl with a single
+        // linear curve 12 + floor(fl*1.5). Old curve gave fl 1/5/10 targets
+        // of 16/25/40 - past fl 6 the curve outpaced peg-hit efficiency
+        // (5 balls * ~6 hits/ball = 30 max). New curve: fl 1=13, fl 5=19,
+        // fl 10=27, fl 12=30. Softens the late-game grind without
+        // trivialising it.
+        var t = 12 + Math.floor(GS.fl * 1.5);
         GS.obj = { tp: 'standard', tgt: t, prg: 0 };
         document.getElementById('ot').textContent = t;
     }
@@ -2297,10 +2596,14 @@
         
         // Check if run should end (all balls gone and objective not met)
         if (GS.activeBalls.length === 0 && GS.bl <= 0 && GS.obj.prg < GS.obj.tgt) {
-            // Audio: game over descending tone
+            // Audio: game over descending tone (SFX, not BGM)
             Audio.playGameOver();
-            // Phase 4 Music Port: switch to run-end BGM (one-shot, not looped)
-            Audio.playBgm('connection-lost');
+            // Phase 4.5-P: the BGM transition is handled by the re screen
+            // mapping (trackForScreen('re') -> 'ending'). No explicit
+            // playBgm call here - the showScreen call below will start
+            // the ending loop. The connection-lost one-shot sting was
+            // removed because it would be cut off by the ending track
+            // anyway.
             GS.scr = C.SCR.RE;
             showScreen('re');
             updateRunEnd();
@@ -2372,7 +2675,8 @@
 
         switch(slotType) {
             case C.ST.CR: // CREDITS: +50 × multiplier credits
-                var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+                // Phase 4.5-J: base points scale with floor (was flat 50).
+                var bonus = pegBasePoints() * (GS.cc + 1) * (GS.fa ? 3 : 1);
                 GS.sc += bonus;
                 createFloat(C.W / 2, C.SY - 20, '+' + bonus, '#00ff88');
                 break;
@@ -2391,7 +2695,7 @@
                 }
                 break;
                 
-            case C.ST.CM: // CRUMBLE: Destroy 3 random pegs
+            case C.ST.CM: // CRUMBLE: Destroy up to 3 random non-seismic/non-explosive pegs, +1 toward objective
                 var crumbleCount = 0;
                 for (var i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
                     var p = GS.bd[i];
@@ -2399,9 +2703,12 @@
                         createFrag(p.x, p.y);
                         GS.bd.splice(i, 1);
                         crumbleCount++;
-                        GS.obj.prg++;
                     }
                 }
+                // Phase 4.5-D: was GS.obj.prg++ inside the loop (one per
+                // destroyed peg, up to 3 free progress per Crumble). Now
+                // fires once per Crumble (0 if no qualifying pegs existed).
+                if (crumbleCount > 0) GS.obj.prg++;
                 createFloat(C.W / 2, C.SY - 20, 'CRUMBLE!', '#ff6600');
                 break;
                 
@@ -2489,22 +2796,51 @@
         // This preserves slots from previous floors
         GS.slotArrangement = slots.slice();
 
-        // Generate a small pool of random slot effects for this floor.
-        // POOL_SIZE controls the choice density - smaller pools make each
-        // pick more meaningful. 3 (vs the previous 7) keeps the row
-        // visually distinct from the 7 target positions above.
+        // Phase 4.5-F: pool of POOL_SIZE unique useful effects per floor.
+        // - Excludes EMPTY (C.ST.E) from the roll: it was a 35% statistical
+        //   filler that's strictly worse than every other slot. The player
+        //   shouldn't be offered a no-op as a "choice" - anti-agency. The
+        //   other 6 weights are rebalanced slightly to keep the same useful-
+        //   slot rate (~95% of pool items are useful, up from ~65%).
+        // - Guarantees uniqueness: re-roll on duplicate, fallback to any
+        //   unused useful type if the weighted roll never escapes (very
+        //   unlikely with 7 eligible types and 3 picks).
+        // EMPTY remains in the C.ST enum for defensive coverage (e.g. data
+        // load, future reset paths) but is unreachable through normal play.
         var POOL_SIZE = 3;
+        var usefulTypes = [C.ST.CR, C.ST.AM, C.ST.PA, C.ST.CM, C.ST.SH, C.ST.OC, C.ST.JP];
         var poolSlots = [];
         for (var i = 0; i < POOL_SIZE; i++) {
-            var r = Math.random();
-            if (r < 0.03) poolSlots.push(C.ST.JP);
-            else if (r < 0.10) poolSlots.push(C.ST.OC);
-            else if (r < 0.18) poolSlots.push(C.ST.SH);
-            else if (r < 0.28) poolSlots.push(C.ST.CM);
-            else if (r < 0.38) poolSlots.push(C.ST.AM);
-            else if (r < 0.50) poolSlots.push(C.ST.PA);
-            else if (r < 0.65) poolSlots.push(C.ST.CR);
-            else poolSlots.push(C.ST.E);
+            var picked = -1;
+            for (var attempt = 0; attempt < 30; attempt++) {
+                var r = Math.random();
+                // Rebalanced weights summing to 1.0 across the 7 useful
+                // types. The previous 35% EMPTY weight is redistributed
+                // proportionally so JP/OC/SH (the rarest) get bumped
+                // slightly. JP 4% / OC 10% / SH 12% / CM 15% / AM 15% /
+                // PA 18% / CR 26% = 100%.
+                var st;
+                if      (r < 0.04) st = C.ST.JP;   //  4% jackpot
+                else if (r < 0.14) st = C.ST.OC;   // 10% overclock
+                else if (r < 0.26) st = C.ST.SH;   // 12% shield
+                else if (r < 0.41) st = C.ST.CM;   // 15% crumble
+                else if (r < 0.56) st = C.ST.AM;   // 15% amplify
+                else if (r < 0.74) st = C.ST.PA;   // 18% payload
+                else               st = C.ST.CR;   // 26% credits
+                if (poolSlots.indexOf(st) === -1) { picked = st; break; }
+            }
+            if (picked >= 0) {
+                poolSlots.push(picked);
+            } else {
+                // Fallback: pick any unused useful type so the pool always
+                // reaches POOL_SIZE.
+                for (var t = 0; t < usefulTypes.length; t++) {
+                    if (poolSlots.indexOf(usefulTypes[t]) === -1) {
+                        poolSlots.push(usefulTypes[t]);
+                        break;
+                    }
+                }
+            }
         }
 
         // Initialize state
@@ -3022,10 +3358,23 @@
     }
     
     function triggerPegExplosion(peg) {
-        // Explosive peg: x3 self score, x1.5 adjacent
-        var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
-        GS.sc += bonus * 3;
-        createFloat(peg.x, peg.y, 'x3!', '#ff2244');
+        // Phase 4.5-G: rewrote the scoring. Old version was:
+        //   var bonus = 50 * (GS.cc + 1) * (GS.fa ? 3 : 1);
+        //   GS.sc += bonus * 3;                    // self: lifetime x3
+        //   GS.sc += Math.floor(bonus * 1.5);      // adjacent: lifetime x1.5
+        // For a 10k score, one explosive hit turned into 30k+ (3x lifetime
+        // plus the 3x bonus). Reads as broken - every other special peg
+        // is a flat +bonus. New: flat self/adjacent that scale with combo
+        // and frenzy, no lifetime multiplier. The 500/100 constants match
+        // the *feel* of Cache's "200 + cc*50" pattern: at low combo a
+        // Cache hit is 200, an Explosive hit is 500 (2.5x - the premium
+        // for the chain-destroy behavior). At max combo + frenzy, Cache
+        // hits 550 and Explosive hits 12000 (still strong, but bounded).
+        var comboMult = (GS.cc + 1) * (GS.fa ? 3 : 1);
+        var selfBonus = 500 * comboMult;
+        var adjacentBonus = 100 * comboMult;
+        GS.sc += selfBonus;
+        createFloat(peg.x, peg.y, 'BOOM +' + selfBonus, '#ff2244');
 
         // Audio: explosion sound
         Audio.playExplosion();
@@ -3035,7 +3384,10 @@
             var p = GS.bd[i];
             var d = Math.sqrt((p.x - peg.x) * (p.x - peg.x) + (p.y - peg.y) * (p.y - peg.y));
             if (d < 60 && d > 0 && p !== peg) {
-                GS.sc += Math.floor(bonus * 1.5);
+                // Phase 4.5-G: was Math.floor(bonus * 1.5) - lifetime-scaled.
+                // Now a flat adjacentBonus (100 * combo * frenzy) that doesn't
+                // multiply the player's existing score.
+                GS.sc += adjacentBonus;
                 if (p.st < C.PSTATES.EX) p.st++;
             }
         }
@@ -3595,7 +3947,12 @@
         document.getElementById('rfl').textContent = GS.fl - 1;
         document.getElementById('rbc').textContent = GS.bestCombo;
         document.getElementById('rph').textContent = GS.pegsHit;
-        document.getElementById('rcd').textContent = Math.floor(GS.sc / 10);
+        // Phase 4.5-A: show the actual amount paid out this run (sum of
+        // per-floor deltas / 10) instead of the hypothetical
+        // Math.floor(GS.sc/10) which assumed cumulative score = credits.
+        // With delta-based floor payouts, GS.creditsEarned is the source
+        // of truth and reflects what was actually added to PERSIST.br.
+        document.getElementById('rcd').textContent = GS.creditsEarned;
         document.getElementById('nb').style.display = (GS.sc >= PERSIST.ls) ? 'block' : 'none';
 
         // Phase 2a: show daily modifiers if this was a daily run, and mark complete
@@ -3620,16 +3977,20 @@
         document.getElementById('scr').textContent = PERSIST.br;
         var grid = document.getElementById('sg');
         grid.innerHTML = '';
+        // Phase 4.5-K: payload cost rebalance v2 (see also K-1 credit
+        // rate cut). Pairs with the 5% credit rate so powers are a real
+        // luxury - 1-2 premium payloads per run, not 6-8 cheap ones.
+        // New spread 80-220 (was 50-120 after Phase 4.5-C).
         var items = [
-            {n: 'Scrambler', c: 50, d: 'Reverses direction', idx: 0},
-            {n: 'Trojan', c: 75, d: 'Spawns clone balls', idx: 1},
-            {n: 'Worm', c: 60, d: 'Passes through pegs', idx: 2},
-            {n: 'Logic Bomb', c: 100, d: 'x3 score on hit', idx: 3},
-            {n: 'Daemon', c: 80, d: 'Shields one ball', idx: 4},
-            {n: 'Ghost', c: 70, d: 'Phase through pegs', idx: 5},
-            {n: 'Cluster', c: 90, d: 'Splits into 3 balls', idx: 6},
-            {n: 'Explosive', c: 85, d: 'Chain explosions', idx: 7},
-            {n: 'Slowmo', c: 55, d: 'Slows ball speed', idx: 8}
+            {n: 'Scrambler', c: 80,   d: 'Reverses direction', idx: 0},
+            {n: 'Trojan', c: 140,     d: 'Spawns clone balls', idx: 1},
+            {n: 'Worm', c: 180,       d: 'Passes through pegs', idx: 2},
+            {n: 'Logic Bomb', c: 220, d: 'x3 score on hit', idx: 3},
+            {n: 'Daemon', c: 130,     d: 'Shields one ball', idx: 4},
+            {n: 'Ghost', c: 100,      d: 'Phase through pegs', idx: 5},
+            {n: 'Cluster', c: 180,    d: 'Splits into 3 balls', idx: 6},
+            {n: 'Explosive', c: 180,  d: 'Chain explosions', idx: 7},
+            {n: 'Slowmo', c: 150,     d: 'Slows ball speed', idx: 8}
         ];
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
@@ -3819,30 +4180,43 @@
             ctx.strokeRect(x + 2, C.SY, C.SW - 4, C.SH);
             ctx.lineWidth = 1;
 
-            // Draw slot icon using SVG_ICONS
-            var slotIconSvg = SVG_ICONS.getSlotIcon(slotType);
-            
-            // Create an image from the SVG
-            var slotImg = new Image();
-            var svgBlob = new Blob([slotIconSvg], {type: 'image/svg+xml'});
-            var slotUrl = URL.createObjectURL(svgBlob);
-            
-            // Draw a colored background circle for the slot icon
+            // Draw the slot icon. The icon was pre-loaded at init time
+            // (see preloadSlotIcons) and cached in slotIconCache so we can
+            // draw it synchronously here. If the image hasn't finished
+            // loading yet (first frame after init) or the cache missed, we
+            // fall back to the 3-letter text label so the slot is never
+            // empty - the image will replace the label on the next frame.
+            var iconCx = x + C.SW / 2;
+            var iconCy = C.SY + C.SH / 2;
+            // Slightly larger backdrop circle (radius 14) so the 28px icon
+            // sits centered with a subtle color ring around it.
             ctx.beginPath();
-            ctx.arc(x + C.SW / 2, C.SY + C.SH / 2, 16, 0, Math.PI * 2);
+            ctx.arc(iconCx, iconCy, 14, 0, Math.PI * 2);
             ctx.fillStyle = slotColor + '66';
             ctx.fill();
             ctx.strokeStyle = slotColor;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
-            
-            // Note: Canvas doesn't directly support SVG, so we'll draw the colored circle
-            // and add a small text label below as a fallback indicator
-            ctx.font = '10px Courier New';
-            ctx.fillStyle = slotColor;
-            ctx.textAlign = 'center';
-            var shortLabel = C.ST_NAMES[slotType].substring(0, 3);
-            ctx.fillText(shortLabel, x + C.SW / 2, C.SY + C.SH - 8);
+            ctx.lineWidth = 1;
+
+            var iconEntry = slotIconCache && slotIconCache[slotType];
+            if (iconEntry && iconEntry.loaded) {
+                // 28x28 icon centered on the slot. Matches the visual
+                // weight of the slot-selector tile (32px in 56x56 - the
+                // board slot is taller so 28px reads the same).
+                var iconSize = 28;
+                ctx.drawImage(iconEntry.img,
+                    iconCx - iconSize / 2,
+                    iconCy - iconSize / 2,
+                    iconSize, iconSize);
+            } else {
+                // Fallback: 3-letter label, same as before
+                ctx.font = '10px Courier New';
+                ctx.fillStyle = slotColor;
+                ctx.textAlign = 'center';
+                var shortLabel = C.ST_NAMES[slotType].substring(0, 3);
+                ctx.fillText(shortLabel, x + C.SW / 2, C.SY + C.SH - 8);
+            }
         }
         
         // ========== AT-REST PEG SHAPE (Phase 3: visual overhaul) ==========
@@ -4443,7 +4817,21 @@
                 GS.scr = C.SCR.FC;
                 GS.floorScore = GS.sc;
                 GS.jackpotWon = GS.jp;
-                var floorCredits = Math.floor(GS.sc / 10);
+                // Pay credits on the floor *delta* (this floor's contribution
+                // to the cumulative score), not the cumulative score itself.
+                // Was: Math.floor(GS.sc / 10) - which double-counted with the
+                // run-end payout in retb() and inflated credit income ~3x.
+                // With delta-based payouts, a 10k-score run yielded 1000
+                // credits. After Phase 4.5-K (this change), the rate is 5%
+                // (Math.floor(floorDelta / 20)) so a 10k-score run yields
+                // 500 credits. The credit_rich achievement (1000/run) now
+                // fires at 20k score - a real milestone, not a per-floor
+                // triviality. Pairs with the Phase 4.5-K payload cost
+                // rebalance (50-120 -> 80-220) so the same run buys ~1-2
+                // premium payloads, not 6-8.
+                var floorDelta = GS.sc - (GS.lastFloorScore || 0);
+                var floorCredits = Math.floor(floorDelta / 20);
+                GS.lastFloorScore = GS.sc;
                 GS.creditsEarned += floorCredits;
                 PERSIST.br += floorCredits;
                 if (GS.fl > PERSIST.lf) PERSIST.lf = GS.fl;
@@ -4460,6 +4848,18 @@
                 // Audio: floor complete victory sting
                 Audio.playFloorComplete();
 
+                // Phase 4.5-M: reset reel state before showing the floor-
+                // complete screen. Safety net for the win-flash timeout: if
+                // the user advanced to the next floor faster than the 1500ms
+                // delay, the leftover 'win'/'lose' classes from a previous
+                // floor's spin would otherwise show on the new fc's reels.
+                ['jreel0', 'jreel1', 'jreel2'].forEach(function(id) {
+                    document.getElementById(id).classList.remove('hit', 'win', 'lose');
+                });
+                // Phase 4.5-N: also hide the result banner so the new
+                // floor's fc shows a clean slot machine (no stale result
+                // from a previous spin).
+                hideJackpotResult();
                 showScreen('fc');
                 document.getElementById('fsc').textContent = GS.sc;
                 document.getElementById('fbl').textContent = GS.bl;
@@ -4475,6 +4875,12 @@
 
     // ========== GAME CONTROL ==========
     function startGame() {
+        // Phase 4.5-P: switch from title BGM to gameplay BGM. This is the
+        // ONE place the BGM transitions during a run. After this call,
+        // the BGM stays on gameplay through all floors (slot-selector,
+        // gameplay, floor-complete) until the run ends and the ending
+        // track takes over on the re screen.
+        Audio.playBgm('gameplay');
         GS.scr = C.SCR.P;
         GS.fl = 1;
         GS.sc = 0;
@@ -4504,6 +4910,10 @@
         GS.ballSkin = PERSIST.currentBallSkin;
         GS.ghostEffect = false;
         GS.slowmoEffect = false;
+        // Phase 4.5-A: tracks the last floor's score at clear time so the
+        // floor-clear payout can pay the *delta* (this floor's contribution)
+        // instead of the cumulative score. Initialized to 0 on every new run.
+        GS.lastFloorScore = 0;
         // Reset slot system for new run - no slots unlocked, player chooses each floor
         GS.unlockedSlots = [];
         GS.slotsArranged = false;
@@ -4773,8 +5183,9 @@
     });
 
     document.getElementById('endb').addEventListener('click', function() {
-        // Phase 4 Music Port: same one-shot BGM for a manually ended run
-        Audio.playBgm('connection-lost');
+        // Phase 4.5-P: BGM transition is handled by the re screen mapping
+        // (trackForScreen('re') -> 'ending'). No explicit playBgm call
+        // here - the showScreen call below will start the ending loop.
         GS.scr = C.SCR.RE;
         showScreen('re');
         updateRunEnd();
@@ -4784,7 +5195,10 @@
         GS.scr = C.SCR.M;
         showScreen('menu');
         showHUD(false);
-        PERSIST.br += Math.floor(GS.sc / 10);
+        // Phase 4.5-A: removed the run-end credit payout. Previously both
+        // the floor-clear handler and this retb() handler paid
+        // Math.floor(GS.sc/10), double-counting credits. Floor-clear now
+        // pays the per-floor delta, so this end-of-run payout is redundant.
         if (GS.fl > PERSIST.lf) PERSIST.lf = GS.fl;
         if (GS.sc > PERSIST.ls) PERSIST.ls = GS.sc;
         
@@ -5158,6 +5572,27 @@
 
         // ========== INIT ==========
     loadPersist();
+
+    // Pre-load the 8 slot-type SVG icons as cached Image objects so the
+    // canvas render can draw them synchronously inside the per-frame slot
+    // loop. Previously, render() tried to create a new Image + blob URL
+    // every frame for every unlocked slot, never actually drew it, and fell
+    // back to a 3-letter text label. The cache means we create each image
+    // once at init, wait for it to load, and drawImage() the cached bitmap.
+    var slotIconCache = {}; // slotType (int) -> { img: Image, loaded: bool }
+    (function preloadSlotIcons() {
+        if (!SVG_ICONS || !SVG_ICONS.getSlotIcon) return;
+        for (var st = 0; st < C.ST_NAMES.length; st++) {
+            (function(slotType) {
+                var svg = SVG_ICONS.getSlotIcon(slotType);
+                var img = new Image();
+                var blob = new Blob([svg], {type: 'image/svg+xml'});
+                img.src = URL.createObjectURL(blob);
+                img.onload = function() { slotIconCache[slotType].loaded = true; };
+                slotIconCache[slotType] = { img: img, loaded: false };
+            })(st);
+        }
+    })();
 
     // Inject the new icon library into the static menu HTML - the button
     // labels (DAILY / TUTORIAL / ACHIEVEMENTS / LEADERBOARD / SETTINGS) and
