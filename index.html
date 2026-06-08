@@ -10,7 +10,7 @@
            Color scheme unchanged - only iconography, depth, and ambient. */
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a12; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Share Tech Mono', 'Courier New', monospace; color: #e0e0ff; overflow: hidden; }
+        body { background: #0a0a12; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Share Tech Mono', 'Courier New', monospace; color: #e0e0ff; overflow: hidden; padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); box-sizing: border-box; }
         /* ========== PHASE 5: MOBILE COMPATIBILITY ==========
            The board is designed at a fixed 480x700. On phones we wrap the
            #game-container in a #scaler block whose intrinsic size is the
@@ -312,18 +312,24 @@
            size (56x56) and corner-bracket treatment so the eye reads
            them as one visual system. 56px gives icons room to breathe
            AND leaves healthy 24px margin on each side of the 7-position
-        .slot-pos, .slot-pool-item { width: 56px; height: 56px; flex-shrink: 0; box-sizing: border-box; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-        .slot-pos { background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
-        .slot-pos::before { content: ''; position: absolute; top: 2px; left: 2px; width: 5px; height: 5px; border-top: 1px solid currentColor; border-left: 1px solid currentColor; opacity: 0.5; }
-        .slot-pos::after { content: ''; position: absolute; bottom: 2px; right: 2px; width: 5px; height: 5px; border-bottom: 1px solid currentColor; border-right: 1px solid currentColor; opacity: 0.5; }
+        .slot-pos, .slot-pool-item { width: 64px; height: 64px; flex-shrink: 0; box-sizing: border-box; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset; }
+        .slot-pos { background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+        .slot-pos::before { content: ''; position: absolute; top: 3px; left: 3px; width: 6px; height: 6px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; opacity: 0.55; }
+        .slot-pos::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-bottom: 1.5px solid currentColor; border-right: 1.5px solid currentColor; opacity: 0.55; }
         .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.3) inset, 0 0 10px rgba(0,255,242,0.3); }
         .slot-pos.occupied { border-style: solid; cursor: grab; }
         .slot-pos.highlight { border-color: #ffff00; background: rgba(255,255,0,0.1); transform: scale(1.1); }
-                /* Pool items now match position square size (56x56) - see the
-           combined .slot-pos, .slot-pool-item rule above. The 50x50
-           override from earlier was a leftover from a smaller layout. */
-        .slot-pool-item { background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: grab; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset; }
-        .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.4) inset, 0 0 14px rgba(0,255,242,0.4); transform: scale(1.1); }
+                /* Phase 5b: pool items + position slots both 64x64. Bumped
+           from 56 in Phase 5a to make them easier to tap on mobile
+           (the 56 was almost too small to hit reliably with a thumb).
+           The 7-position row needs the 4px gap (was 6) to fit in
+           the 480px canvas: 7*64 + 6*4 = 472, leaving 4px margin
+           each side. The pool row widened from 180 to 200 to match
+           the new tile size: 3*64 + 2*4 = 200. */
+        .slot-pool-item { background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; cursor: grab; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+        .slot-pool-item::before { content: ''; position: absolute; top: 3px; left: 3px; width: 6px; height: 6px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; opacity: 0.55; }
+        .slot-pool-item::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-bottom: 1.5px solid currentColor; border-right: 1.5px solid currentColor; opacity: 0.55; }
+        .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.4) inset, 0 0 14px rgba(0,255,242,0.4); transform: scale(1.08); }
         .slot-pool-item.dragging { opacity: 0.5; }
         .slot-arranging-section { margin: 15px 0; text-align: center; }
         /* Phase 5: tap-to-select-tap-to-place feedback. The .selected
@@ -765,7 +771,7 @@
             
             <div class="slot-arranging-section">
                 <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Target Positions</div>
-                <div id="position-slots" style="display:flex;gap:6px;justify-content:center;margin-bottom:15px;"></div>
+                <div id="position-slots" style="display:flex;gap:4px;justify-content:center;margin-bottom:15px;"></div>
             </div>
             
             <div style="text-align:center;color:#8888aa;font-size:11px;letter-spacing:1px;margin:4px 0 6px;">↑ Tap a slot, then tap a position ↑</div>
@@ -773,7 +779,7 @@
             <div class="slot-arranging-section">
                 <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Available Effects</div>
                 <div id="slot-info" style="color:#00fff2;font-size:10px;margin:0 0 6px;letter-spacing:1px;text-align:center;text-transform:uppercase;"></div>
-                <div id="slot-pool" style="display:flex;gap:6px;justify-content:center;flex-wrap:nowrap;width:180px;margin:0 auto;"></div>
+                <div id="slot-pool" style="display:flex;gap:4px;justify-content:center;flex-wrap:nowrap;width:200px;margin:0 auto;"></div>
             </div>
             
             <div style="display:flex;gap:10px;justify-content:center;margin-top:15px;">
@@ -2981,7 +2987,7 @@
                     div.style.background = col + '55';
                     div.style.borderColor = col;
                     div.style.color = col;
-                    div.innerHTML = '<span class="svg-icon svg-icon-24" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">' + slotIconSvg + '</span>';
+                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + slotIconSvg + '</span>';
                     div.title = name + ' - Position ' + (i + 1) + ' (tap to swap)';
                 } else {
                     // Unlocked but no slot yet - tap target for new slot
@@ -2989,7 +2995,7 @@
                     div.style.borderColor = '#ffff00';
                     div.style.borderStyle = 'dashed';
                     div.style.color = '#ffff00';
-                    div.innerHTML = '<span class="svg-icon" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_PLUS + '</span>';
+                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_PLUS + '</span>';
                     div.title = 'Tap a slot, then tap here to place it';
                 }
             } else {
@@ -3000,7 +3006,7 @@
                     div.style.borderColor = '#ff00ff';
                     div.style.borderStyle = 'dashed';
                     div.style.color = '#ff00ff';
-                    div.innerHTML = '<span class="svg-icon" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_UNLOCK + '</span>';
+                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_UNLOCK + '</span>';
                     div.title = 'Tap a slot, then tap here to UNLOCK (1 per floor)';
                 } else {
                     // All slots unlocked or can't unlock this floor.
@@ -3009,7 +3015,7 @@
                     div.style.background = 'rgba(85,85,102,0.3)';
                     div.style.borderColor = '#555566';
                     div.style.color = '#555566';
-                    div.innerHTML = '<span class="svg-icon" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;opacity:0.6;">' + SVG_ICONS.UI_PLUS + '</span>';
+                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;opacity:0.6;">' + SVG_ICONS.UI_PLUS + '</span>';
                     div.title = 'Tap a slot, then tap here to rearrange';
                 }
             }
@@ -3052,7 +3058,7 @@
             poolDiv.style.background = col + '55';
             poolDiv.style.borderColor = col;
             poolDiv.style.color = col;
-            poolDiv.innerHTML = '<span class="svg-icon svg-icon-24" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">' + poolIconSvg + '</span>';
+            poolDiv.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + poolIconSvg + '</span>';
             poolDiv.title = name + ' (tap to pick)';
             poolDiv.dataset.poolIdx = j;
             poolDiv.dataset.slotType = poolSlotType;
@@ -3161,17 +3167,41 @@
                 }
 
                 if (sel.source === 'pool') {
-                    // Place the pool item. handlePoolDrop internally decides
-                    // whether to also unlock the position.
-                    // Populate the same dragging fields the old DnD path
-                    // used, so handlePoolDrop is unchanged.
-                    GS.isDraggingSlot = true;
-                    GS.draggingFromPos = -1;
-                    GS.draggingSlotType = sel.slotType;
-                    GS.draggingPoolIdx = sel.poolIdx;
-                    handlePoolDrop(targetPos); // handlePoolDrop unlocks+places if alsoUnlock needed
-                    // handlePoolDrop's own renderSlotSelector + state reset
-                    // handles clearing; clear the tap-selection too.
+                    // Place the pool item. Two cases:
+                    //  - target is empty (unlocked-empty or locked with
+                    //    canUnlockThisFloor): use handlePoolDrop, which
+                    //    places the item and (for locked targets) also
+                    //    unlocks the position. The pool loses the placed
+                    //    item; the other pool items are preserved.
+                    //  - target is occupied + unlocked: use handleSlotDrop
+                    //    with fromPos=-1, which is the "pool replaces
+                    //    existing slot" branch - it adds the existing
+                    //    slot back to the pool AND places the new one.
+                    //    This is the only way the player can move a pool
+                    //    item into an occupied position without losing
+                    //    the slot that was there. handlePoolDrop on an
+                    //    occupied position would just overwrite and drop
+                    //    the existing slot on the floor (a real bug
+                    //    that the previous implementation had).
+                    if (isTargetUnlocked && targetHasSlot) {
+                        // Pool-to-occupied: swap with pool
+                        GS.isDraggingSlot = true;
+                        GS.draggingFromPos = -1;
+                        GS.draggingSlotType = sel.slotType;
+                        GS.draggingPoolIdx = sel.poolIdx;
+                        handleSlotDrop(targetPos);
+                    } else {
+                        // Pool-to-empty (or pool-to-locked-unlockable):
+                        // standard place, optional unlock.
+                        GS.isDraggingSlot = true;
+                        GS.draggingFromPos = -1;
+                        GS.draggingSlotType = sel.slotType;
+                        GS.draggingPoolIdx = sel.poolIdx;
+                        handlePoolDrop(targetPos);
+                    }
+                    // handlePoolDrop / handleSlotDrop both call
+                    // renderSlotSelector() and reset the dragging
+                    // fields. Clear the tap-selection too.
                     GS.selectedSlot = null;
                 } else if (sel.source && sel.source.indexOf('pos') === 0) {
                     // Position-sourced selection: swap only (don't overwrite
@@ -5709,14 +5739,25 @@
     // current viewport, then apply it on every resize/orientation
     // change. The body's flex centering still works because the
     // #scaler wrapper keeps the same intrinsic 480x700 footprint;
-    // only the visual transform changes. The clamp range [0.55, 1.0]
-    // keeps the board from getting unusably small on tiny phones and
-    // from getting blurry on huge ones.
+    // only the visual transform changes.
+    //
+    // Phase 5b: lowered the minimum from 0.55 to 0.40. On a 320x568
+    // viewport (older/smaller Android), the old clamp left the board
+    // at 264x385 - still wider than the 320px viewport, so the user
+    // could not see the whole board. 0.40 floor keeps the 7-position
+    // row visible (32x32 tiles at 0.4x = 12.8px, still legible for
+    // the icons, and the user can scroll the overlay content within
+    // the 700px design space if they want to see more).
+    //
+    // The body's min-height is 100svh (smallest viewport height, with
+    // the iOS URL bar showing) plus env(safe-area-inset) padding, so
+    // the board is always sized to the visible viewport - the URL
+    // bar never covers the top of the board.
     function scaleToFit() {
         var s = Math.min(window.innerWidth / 480, window.innerHeight / 700);
-        s = Math.max(0.55, Math.min(1.0, s));
+        s = Math.max(0.40, Math.min(1.0, s));
         var el = document.getElementById('scaler');
-        if (el) el.style.transform = 'scale(' + s + ');'
+        if (el) el.style.transform = 'scale(' + s + ')';
         // Stash the active scale for any future code that needs
         // to compensate (none today, but it's the right hook).
         window.__slotScale = s;
