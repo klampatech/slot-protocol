@@ -515,7 +515,6 @@
     <div id="scaler">
     <div id="game-container">
         <canvas id="gc" width="480" height="700"></canvas>
-        <div id="tooltip" class="tooltip"></div>
         <div id="hud">
             <div>
                 <div class="hs">FLOOR <span id="fn">1</span></div>
@@ -789,6 +788,17 @@
         </div>
     </div>
     </div>
+
+    <!-- ========== TOOLTIP (Phase 7c) ==========
+         Hoisted out of the #scaler hierarchy to a direct child of <body>
+         so position:fixed is anchored to the viewport (not the
+         scaler's transformed containing block). The scaler's
+         transform: scale() creates a new containing block for
+         position:fixed descendants, which made the cursor-anchor
+         math (style.left = clientX + 14) silently use the scaler's
+         coord system - the tooltip ended up far from the cursor on
+         wide or high-DPI displays. -->
+    <div id="tooltip" class="tooltip"></div>
 
     <!-- ========== BACKGROUND MUSIC (Phase 4 Music Port) ========== -->
     <!-- HTML5 audio elements for BGM. Looping tracks use loop; one-shot stingers (connection-lost) do not. -->
@@ -2371,51 +2381,221 @@
         spawnParticles(C.PC[this.t] || '#00fff2', this.x, this.y, 20, 4);
     };
 
-    // ========== BOARD GENERATION ==========
+    // ========== BOARD GENERATION (Phase 7: templates + wall row) ==========
+    // Each floor picks a template by floor index (random for casual, seeded
+    // for daily). The template is rendered into a fixed 7x7 grid covering
+    // y=C.TOP..C.BOT, then a wall row of 25 pegs is added at y=WALL_ROW_Y
+    // (just above the slot row) to prevent straight-edge shots into slots.
+    //
+    // Templates are stored as 7 strings of 7 chars. '*' = peg, '.' = empty.
+    // Spelled out this way they're easy to read, easy to add, and trivial
+    // to diff in PR review.
+    var BOARD_TEMPLATES = {
+        // Classic 7x8 alternating-offset grid (7 rows of 8 cols, 56 pegs).
+        // Matches the pre-Phase-7 board density so veteran players get
+        // a familiar floor 1. The alternating-row offset (25px) creates
+        // the staggered hex look.
+        GRID: [
+            '********',
+            '********',
+            '********',
+            '********',
+            '********',
+            '********',
+            '********'
+        ],
+        // Symmetric diamond. 16 pegs - the sparsest template. Centered
+        // around col 3 so the ball naturally funnels into the middle.
+        GALAXY: [
+            '....*...',
+            '...*.*..',
+            '..*.*.*.',
+            '.*.*.*.*',
+            '..*.*.*.',
+            '...*.*..',
+            '....*...'
+        ],
+        // Staggered hex pattern. 28 pegs (4 per row alternating between
+        // even and odd cols). Visually flows left-to-right in zigzag
+        // bands, and the spacing gives the ball room to ricochet.
+        HONEYCOMB: [
+            '*.*.*.*.',
+            '.*.*.*.*',
+            '*.*.*.*.',
+            '.*.*.*.*',
+            '*.*.*.*.',
+            '.*.*.*.*',
+            '*.*.*.*.'
+        ],
+        // 3x3 center block (rows 2-4, cols 3-6) with corner satellites
+        // (rows 0 and 6, cols 0 and 7). Forces the ball through the
+        // center mass or to pinball around the corners.
+        HUB: [
+            '*......*',
+            '........',
+            '....****',
+            '....****',
+            '....****',
+            '........',
+            '*......*'
+        ],
+        // X pattern: two diagonal lines crossing at the center. 14 pegs.
+        // The ball naturally falls toward the center where the X is
+        // densest, or pinballs along the arms.
+        HERRINGBONE: [
+            '*......*',
+            '.*....*.',
+            '..*..*..',
+            '...**...',
+            '..*..*..',
+            '.*....*.',
+            '*......*'
+        ],
+        // 2-wide vertical line + 2-tall horizontal line = thin plus sign.
+        // 26 pegs. Centered around col 3.5 (the gap between cols 3 and 4).
+        CROSS: [
+            '....**..',
+            '....**..',
+            '....**..',
+            '********',
+            '********',
+            '....**..',
+            '....**..'
+        ]
+    };
+    var BOARD_TEMPLATE_NAMES = Object.keys(BOARD_TEMPLATES);
+
+    // Wall row above the slot row. 25 pegs at 20px spacing means the gap
+    // between adjacent peg edges is 4px (less than the 14px ball diameter),
+    // so the ball cannot fit through any gap. The leftmost peg is at x=0
+    // (right at the wall) and the rightmost at x=480 (also at the wall),
+    // so there's no edge bypass either. Result: every ball must hit at
+    // least one wall row peg before reaching a slot. (After the hit, the
+    // ball can still come back through a gap - it just can't fall through
+    // without ever touching a wall row peg.)
+    var WALL_ROW_Y = 510;            // 50px above the slot row (C.SY = 560)
+    var WALL_ROW_SPACING = 20;       // peg center-to-center
+    var WALL_ROW_COUNT = 25;         // pegs at x = 0, 20, 40, ..., 480
+
+    var TEMPLATE_TOP = C.TOP;        // 110
+    var TEMPLATE_SPACING_X = C.PS;   // 50
+    // 7 rows fit in C.BOT - C.TOP = 370px: 370/7 = 52.86, round down to 50
+    // so the bottom row lands at y = 110 + 6 * 50 + 25 = 435 (the row's
+    // vertical center; peg radius 8 reaches 443, well clear of the wall
+    // row at 510). Match the existing pre-Phase-7 spacing as closely as
+    // possible so the GRID template looks identical to the old default.
+    var TEMPLATE_SPACING_Y = 50;
+
+    // Map a (row, col) cell to its pixel (x, y) center. Alternating-row
+    // offset matches the pre-Phase-7 genBoard so the GRID template
+    // renders at the same positions as the old random grid.
+    function cellToPos(row, col) {
+        var y = TEMPLATE_TOP + TEMPLATE_SPACING_Y * row + TEMPLATE_SPACING_Y * 0.5;
+        var offset = (row % 2 === 0) ? 0 : TEMPLATE_SPACING_X * 0.5;
+        var x = 40 + offset + col * TEMPLATE_SPACING_X;  // 40 = (480 - 7*50) / 2
+        return { x: x, y: y };
+    }
+
+    // Roll a peg type using the same floor-scaled probabilities as the
+    // pre-Phase-7 inline code. When `rand` is supplied, uses that
+    // (deterministic for daily challenge); otherwise Math.random.
+    function rollPegType(rand) {
+        var t = C.PT.N;
+        var pExpl = 0.01 + GS.fl * 0.003;
+        var pSeis = 0.015 + GS.fl * 0.008;
+        var pCache = 0.02 + GS.fl * 0.008;
+        var pSpcl = 0.04 + GS.fl * 0.015;
+        var pDorm = 0.04;
+        var pIce = GS.fl >= 3 ? 0.02 + GS.fl * 0.005 : 0;
+        var pFiber = GS.fl >= 5 ? 0.015 + GS.fl * 0.004 : 0;
+        var pMirror = GS.fl >= 7 ? 0.01 + GS.fl * 0.003 : 0;
+        var pHoney = GS.fl >= 9 ? 0.008 + GS.fl * 0.002 : 0;
+        var pOverload = GS.fl >= 11 ? 0.005 + GS.fl * 0.001 : 0;
+
+        var cumulative = 0;
+        if (rand < (cumulative += pExpl)) t = C.PT.E;
+        else if (rand < (cumulative += pSeis)) t = C.PT.S;
+        else if (rand < (cumulative += pCache)) t = C.PT.C;
+        else if (rand < (cumulative += pSpcl) && /* row guard removed - all rows are field rows now */ true) t = C.PT.T;
+        else if (rand < (cumulative += pDorm)) t = C.PT.D;
+        else if (rand < (cumulative += pIce)) t = C.PT.I;
+        else if (rand < (cumulative += pFiber)) t = C.PT.F;
+        else if (rand < (cumulative += pMirror)) t = C.PT.M;
+        else if (rand < (cumulative += pHoney)) t = C.PT.H;
+        else if (rand < (cumulative += pOverload)) t = C.PT.O;
+        return t;
+    }
+
+    // Pick a template name for the current floor. Daily challenge is
+    // deterministic per date+floor; casual runs are random per floor.
+    function pickTemplateForFloor(floor, dailySeed) {
+        if (dailySeed !== null && dailySeed !== undefined) {
+            return BOARD_TEMPLATE_NAMES[
+                Math.floor(seededRandom(dailySeed + floor * 31) * BOARD_TEMPLATE_NAMES.length)
+            ];
+        }
+        return BOARD_TEMPLATE_NAMES[Math.floor(Math.random() * BOARD_TEMPLATE_NAMES.length)];
+    }
+
     function genBoard() {
         GS.bd = [];
-        // Daily mod: fewer_pegs cuts board density by 30%
-        var baseRows = 7 + Math.floor(GS.fl / 3);
-        var rows = modActive('fewer_pegs') ? Math.max(4, Math.floor(baseRows * 0.7)) : baseRows;
-        var spacing = (C.BOT - C.TOP) / (rows + 1);
+        var fewerPegs = modActive('fewer_pegs');
+        var dailySeed = (GS.dailyMods && GS.dailyMods.length > 0) ? getDailySeed() : null;
+        var templateName = pickTemplateForFloor(GS.fl, dailySeed);
+        var template = BOARD_TEMPLATES[templateName];
         var id = 0;
-        for (var r = 0; r < rows; r++) {
-            var y = C.TOP + spacing * (r + 1);
-            var offset = (r % 2 === 0) ? 0 : C.PS / 2;
-            var cols = Math.floor((C.W - 60) / C.PS);
-            var startX = (C.W - cols * C.PS) / 2 + offset;
-            for (var c = 0; c < cols; c++) {
-                var x = startX + c * C.PS;
-                var t = C.PT.N;
-                var rand = Math.random();
-                // Peg spawn probabilities (scale with floor)
-                var pExpl = 0.01 + GS.fl * 0.003;
-                var pSeis = 0.015 + GS.fl * 0.008;
-                var pCache = 0.02 + GS.fl * 0.008;
-                var pSpcl = 0.04 + GS.fl * 0.015;
-                var pDorm = 0.04;
-                // New peg type probabilities (introduced at higher floors)
-                var pIce = GS.fl >= 3 ? 0.02 + GS.fl * 0.005 : 0;
-                var pFiber = GS.fl >= 5 ? 0.015 + GS.fl * 0.004 : 0;
-                var pMirror = GS.fl >= 7 ? 0.01 + GS.fl * 0.003 : 0;
-                var pHoney = GS.fl >= 9 ? 0.008 + GS.fl * 0.002 : 0;
-                var pOverload = GS.fl >= 11 ? 0.005 + GS.fl * 0.001 : 0;
-                
-                var cumulative = 0;
-                if (rand < (cumulative += pExpl)) t = C.PT.E;
-                else if (rand < (cumulative += pSeis)) t = C.PT.S;
-                else if (rand < (cumulative += pCache)) t = C.PT.C;
-                else if (rand < (cumulative += pSpcl) && r > 0) t = C.PT.T;
-                else if (rand < (cumulative += pDorm)) t = C.PT.D;
-                else if (rand < (cumulative += pIce)) t = C.PT.I;
-                else if (rand < (cumulative += pFiber)) t = C.PT.F;
-                else if (rand < (cumulative += pMirror)) t = C.PT.M;
-                else if (rand < (cumulative += pHoney)) t = C.PT.H;
-                else if (rand < (cumulative += pOverload)) t = C.PT.O;
-                
-                GS.bd.push(new Peg(x, y, t, id++));
+        var pegCount = 0;
+
+        // Place template pegs. The 'fewer_pegs' mod drops ~30% of template
+        // pegs (seeded for daily, random for casual). The wall row is NOT
+        // affected by 'fewer_pegs' - it's a structural defense, not part
+        // of the "field."
+        for (var row = 0; row < template.length; row++) {
+            for (var col = 0; col < template[row].length; col++) {
+                if (template[row][col] !== '*') continue;
+                if (fewerPegs) {
+                    var dropRoll = dailySeed !== null
+                        ? seededRandom(dailySeed + row * 1000 + col * 7)
+                        : Math.random();
+                    if (dropRoll < 0.3) continue;
+                }
+                var pos = cellToPos(row, col);
+                var typeRoll = dailySeed !== null
+                    ? seededRandom(dailySeed + row * 100 + col * 11 + 17)
+                    : Math.random();
+                var t = rollPegType(typeRoll);
+                GS.bd.push(new Peg(pos.x, pos.y, t, id++));
+                pegCount++;
             }
         }
+
+        // Wall row: 25 pegs at 20px spacing. Mostly NODE with a CACHE
+        // sprinkled in for variety. No special pegs (T/S/E/D/I/F/M/H/O)
+        // to keep the wall semantics clear and to avoid weird interactions
+        // like an explosive chain at the slot row.
+        for (var i = 0; i < WALL_ROW_COUNT; i++) {
+            var wx = i * WALL_ROW_SPACING;
+            var wy = WALL_ROW_Y;
+            // Every 7th peg is a CACHE for flavor (matches the 7-slot
+            // pattern below the wall). The rest are NODE.
+            var wt = (i % 7 === 3) ? C.PT.C : C.PT.N;
+            // Override CACHE with NODE if daily-seeded variant wants it
+            // (deterministic but boring). For variety, keep the pattern.
+            if (dailySeed !== null) {
+                var wr = seededRandom(dailySeed + i * 13);
+                if (wr < 0.15) wt = C.PT.C;
+            }
+            GS.bd.push(new Peg(wx, wy, wt, id++));
+            pegCount++;
+        }
+
+        // Store the template name for display (e.g. "GALAXY" in the HUD).
+        // Read by an upcoming Phase 7b HUD pass; harmless to keep around.
+        GS.boardTemplate = templateName;
+
+        // Teleport pairing: every T peg pairs with the next T peg. Only
+        // template pegs can be T (wall row never spawns T), so the existing
+        // pair-up-by-2 logic still produces valid pairs.
         var tele = [];
         for (var i = 0; i < GS.bd.length; i++) {
             if (GS.bd[i].t === C.PT.T) tele.push(GS.bd[i]);
@@ -2988,7 +3168,7 @@
                     div.style.borderColor = col;
                     div.style.color = col;
                     div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + slotIconSvg + '</span>';
-                    div.title = name + ' - Position ' + (i + 1) + ' (tap to swap)';
+                    div.setAttribute('aria-label', name + ' - Position ' + (i + 1) + ' (tap to swap)');
                 } else {
                     // Unlocked but no slot yet - tap target for new slot
                     div.style.background = 'rgba(255,255,0,0.3)';
@@ -2996,7 +3176,7 @@
                     div.style.borderStyle = 'dashed';
                     div.style.color = '#ffff00';
                     div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_PLUS + '</span>';
-                    div.title = 'Tap a slot, then tap here to place it';
+                    div.setAttribute('aria-label', 'Tap a slot, then tap here to place it');
                 }
             } else {
                 // Position is locked
@@ -3007,7 +3187,7 @@
                     div.style.borderStyle = 'dashed';
                     div.style.color = '#ff00ff';
                     div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_UNLOCK + '</span>';
-                    div.title = 'Tap a slot, then tap here to UNLOCK (1 per floor)';
+                    div.setAttribute('aria-label', 'Tap a slot, then tap here to UNLOCK (1 per floor)');
                 } else {
                     // All slots unlocked or can't unlock this floor.
                     // Tap target for rearrangement (same affordance as the
@@ -3016,7 +3196,7 @@
                     div.style.borderColor = '#555566';
                     div.style.color = '#555566';
                     div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;opacity:0.6;">' + SVG_ICONS.UI_PLUS + '</span>';
-                    div.title = 'Tap a slot, then tap here to rearrange';
+                    div.setAttribute('aria-label', 'Tap a slot, then tap here to rearrange');
                 }
             }
 
@@ -3059,7 +3239,7 @@
             poolDiv.style.borderColor = col;
             poolDiv.style.color = col;
             poolDiv.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + poolIconSvg + '</span>';
-            poolDiv.title = name + ' (tap to pick)';
+            poolDiv.setAttribute('aria-label', name + ' (tap to pick)');
             poolDiv.dataset.poolIdx = j;
             poolDiv.dataset.slotType = poolSlotType;
             // Restore .selected highlight after re-render
@@ -4154,6 +4334,217 @@
             grid.appendChild(div);
         }
     }
+    // ========== PREDICTION LINE (Phase 6) ==========
+    // Simulate the ball's path from the dropper and draw it as a polyline
+    // that actually bounces off pegs, replacing the previous free-fall-only
+    // "trajectory preview" with a real bounce predictor. The same physics
+    // as Ball.update / checkCols is stepped forward, peg collisions are
+    // detected with the same overlap test, and the standard reflection is
+    // applied (we skip Mirror/Ice special cases - the basic reflection is
+    // close enough for a preview and avoids branching on every peg).
+    //
+    // Substep by 1/4 of a frame so the ball can't tunnel through a peg at
+    // max speed. At MAXS=21, one substep = 5.25px, well under the 15px min
+    // separation (C.PR + C.BR = 8 + 7). The simulation runs through up
+    // to PRED_MAX_BOUNCES=2 bounces - just enough to show "where will
+    // the ball land, then where it will go next". The bounces array
+    // is capped at 2, but the marker ring is independently capped at
+    // PRED_MAX_MARKERS=1 so only the FIRST peg is highlighted (the
+    // second peg is just where the line ends, no decoration). The
+    // simulation terminates naturally when the ball reaches the slot
+    // row, exits the bottom, goes off the top, or hits the
+    // PRED_MAX_FRAMES safety cap.
+    var PRED_SUBSTEPS = 4;
+    // The simulation runs through up to PRED_MAX_BOUNCES bounces (2),
+    // so the line shows the path dropper -> b1 -> b2 then stops. The
+    // bounces array is capped at the same number, but the marker
+    // ring loop is independently capped at PRED_MAX_MARKERS (1) so
+    // only the FIRST peg is highlighted. This gives the player the
+    // classic Peggle "where will the ball hit next" preview plus a
+    // single extra hop, without the visual clutter of multiple
+    // markers or a line that loops across the whole board.
+    var PRED_MAX_BOUNCES = 2;
+    var PRED_MAX_MARKERS = 1;
+    var PRED_MAX_FRAMES = 200; // safety cap so a runaway sim can't hang the frame
+
+    function simulateTrajectory() {
+        var points = [{x: GS.mouseX, y: C.DZY + 10}];
+        var bounces = [];
+        // Mirrors the b.hp[p.id] hit-set in checkCols - once the ball
+        // bounces off a peg, it cannot bounce off the same peg again on
+        // a later substep. Prevents the "reflect straight up, fall back
+        // through the same peg" double-count from inflating the bounce
+        // count when the ball's vertical path is tight on a single peg.
+        var hitPegs = {};
+        var x = GS.mouseX;
+        var y = C.DZY + 10;
+        var vx = 0;
+        var vy = 2;
+        var subDt = 1 / PRED_SUBSTEPS; // substep length, in frames
+        var gravity = C.G * GS.gravityMult;
+        // Friction per substep, not per frame. Math.pow(C.FR, subDt) raises
+        // the per-frame friction to the substep power.
+        var frictionSub = Math.pow(C.FR, subDt);
+        var bouncesLeft = PRED_MAX_BOUNCES;
+        var frames = 0;
+        // Dormant pegs: in checkCols they're skipped until checkDormantActivation
+        // flips them to N in a later frame. For a single-shot prediction we
+        // treat them as already active - the ball will activate them on
+        // approach, and the prediction is the more useful answer ("you will
+        // hit this peg") even if the actual bounce is one frame later.
+        while (frames < PRED_MAX_FRAMES) {
+            for (var s = 0; s < PRED_SUBSTEPS; s++) {
+                vy += gravity * subDt;
+                vx *= frictionSub;
+                vy *= frictionSub;
+                var sp = Math.sqrt(vx * vx + vy * vy);
+                if (sp > C.MAXS) {
+                    vx = vx / sp * C.MAXS;
+                    vy = vy / sp * C.MAXS;
+                }
+                x += vx * subDt;
+                y += vy * subDt;
+
+                // Wall bounce - same 0.8 coefficient as Ball.update
+                if (x < C.BR) { x = C.BR; vx = Math.abs(vx) * 0.8; }
+                if (x > C.W - C.BR) { x = C.W - C.BR; vx = -Math.abs(vx) * 0.8; }
+
+                // Peg collision - mirror the checkCols overlap test
+                for (var i = 0; i < GS.bd.length; i++) {
+                    if (hitPegs[i]) continue; // already hit, skip
+                    var p = GS.bd[i];
+                    var dx = x - p.x;
+                    var dy = y - p.y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    var minD = C.BR + p.r;
+                    if (dist < minD && dist > 0) {
+                        hitPegs[i] = true;
+                        if (bounces.length < PRED_MAX_BOUNCES) {
+                            bounces.push({x: p.x, y: p.y, t: p.t});
+                        }
+                        var nx = dx / dist;
+                        var ny = dy / dist;
+                        var overlap = minD - dist;
+                        x += nx * overlap;
+                        y += ny * overlap;
+                        var dot = vx * nx + vy * ny;
+                        // Standard bounce only - Mirror / Ice special
+                        // cases are skipped on purpose (see header comment).
+                        vx = (vx - 2 * dot * nx) * p.bc;
+                        vy = (vy - 2 * dot * ny) * p.bc;
+                        bouncesLeft--;
+                        break; // one peg per substep
+                    }
+                }
+
+                points.push({x: x, y: y});
+
+                // Stop conditions, ordered by "most useful exit first":
+                //   1. Hit the bounce-count cap (PRED_MAX_BOUNCES=2) -
+                //      the player wants a bounded preview, not a full
+                //      trajectory. The line ends at the 2nd bounce.
+                //   2. Ball reached the slot row - no pegs in the way,
+                //      it'll just drop into a slot.
+                //   3. Ball exited the bottom (overflow path).
+                //   4. Ball went off the top of the board (after a
+                //      straight-up wall bounce).
+                // PRED_MAX_FRAMES is the final safety net.
+                if (bounces.length >= PRED_MAX_BOUNCES) return { points: points, bounces: bounces };
+                if (y >= C.SY) return { points: points, bounces: bounces };
+                if (y > C.H + 50) return { points: points, bounces: bounces };
+                if (y < -20) return { points: points, bounces: bounces };
+            }
+            frames++;
+        }
+        return { points: points, bounces: bounces };
+    }
+
+    function drawPredictionLine() {
+        // Hide the line while a ball is in flight - matches Peggle's
+        // "show only when aiming" behavior and avoids clutter during play.
+        var ballInFlight = GS.ball || (GS.activeBalls && GS.activeBalls.length > 0);
+        if (ballInFlight) return;
+
+        var traj = simulateTrajectory();
+        if (traj.points.length < 2) return;
+
+        var ballColor = GS.ballSkin || PERSIST.currentBallSkin || '#00fff2';
+        var themeAccent = PERSIST.currentBoardTheme === 'matrix' ? '#00ff00' : ballColor;
+        // traj.bounces.length is 0 (ball reaches slot row without
+        // hitting anything) or 1 (ball hits a peg first, then
+        // continues - we record only the first bounce so the marker
+        // ring doesn't repeat for every subsequent peg hit).
+
+        // Single segment from the dropper to the first (and only) bounce
+        // point. The simulation already terminated at the bounce, so
+        // traj.points is a path from the dropper up to that peg.
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Outer glow
+        ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = themeAccent;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(traj.points[0].x, traj.points[0].y);
+        for (var i = 1; i < traj.points.length; i++) {
+            ctx.lineTo(traj.points[i].x, traj.points[i].y);
+        }
+        ctx.stroke();
+
+        // Inner line
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = themeAccent;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(traj.points[0].x, traj.points[0].y);
+        for (var i = 1; i < traj.points.length; i++) {
+            ctx.lineTo(traj.points[i].x, traj.points[i].y);
+        }
+        ctx.stroke();
+
+        // Bounce marker - a bright ring at the FIRST peg the ball
+        // hits, with the peg's own color as an inner ring so the
+        // player can see WHICH peg will catch the ball. The
+        // simulation continues past the first bounce to show the
+        // post-bounce trajectory (dropper -> b1 -> b2), but only
+        // b1 is highlighted - the 2nd peg is just where the line
+        // ends, no decoration. PRED_MAX_MARKERS caps the loop
+        // independently of PRED_MAX_BOUNCES so the path can extend
+        // further than the marker count.
+        for (var b = 0; b < Math.min(PRED_MAX_MARKERS, traj.bounces.length); b++) {
+            var bp = traj.bounces[b];
+            var pegColor = C.PC[bp.t] || '#ffffff';
+            // Outer white ring
+            ctx.globalAlpha = 0.9;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(bp.x, bp.y, C.PR + 5, 0, Math.PI * 2);
+            ctx.stroke();
+            // Inner colored ring
+            ctx.globalAlpha = 0.7;
+            ctx.strokeStyle = pegColor;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(bp.x, bp.y, C.PR + 2, 0, Math.PI * 2);
+            ctx.stroke();
+            // Center crosshair so it reads as a target
+            ctx.globalAlpha = 0.9;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(bp.x - 3, bp.y);
+            ctx.lineTo(bp.x + 3, bp.y);
+            ctx.moveTo(bp.x, bp.y - 3);
+            ctx.lineTo(bp.x, bp.y + 3);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
     // ========== RENDER ==========
     var canvas = document.getElementById('gc');
     var ctx = canvas.getContext('2d');
@@ -4261,34 +4652,6 @@
                 }
             }
             
-            // Enhanced trajectory preview with OVERCLOCK modifier
-            ctx.strokeStyle = trajColor;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 8]);
-            ctx.lineDashOffset = -dropPointPulse * 0.3;
-            ctx.beginPath();
-            var tx = dropX;
-            var ty = C.DZY + 20;
-            var tvx = 0;
-            var tvy = 2;
-            ctx.moveTo(tx, ty);
-            
-            // Draw trajectory with fading effect
-            for (var i = 0; i < 30; i++) {
-                tvx *= C.FR;
-                tvy += C.G * GS.gravityMult;
-                if (tvy > C.MAXV) tvy = C.MAXV;
-                tx += tvx;
-                ty += tvy;
-                if (ty > C.H) break;
-                
-                // Fade trajectory based on distance
-                ctx.globalAlpha = Math.max(0.1, 1 - i / 30);
-                ctx.lineTo(tx, ty);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.globalAlpha = 1;
         }
         
         // Slot collector - only show unlocked slots, styled by type
@@ -4603,7 +4966,16 @@
                 drawPegShape(p.t, p.x, p.y, p.r + glow, col, p.st);
             }
         }
-        
+
+        // Bounce-aware prediction line. Replaces the previous
+        // free-fall-only trajectory with a real 2-bounce lookahead
+        // (see simulateTrajectory / drawPredictionLine). Drawn after
+        // the pegs so the line and bounce markers are visible on top
+        // of the peg field, but before the FX (ripples, particles,
+        // balls) so post-hit FX feedback still reads correctly. Hidden
+        // while a ball is in flight (see drawPredictionLine).
+        drawPredictionLine();
+
         // Peg ripples - draw ripple effects for peg hits
         for (var i = 0; i < pegRipples.length; i++) {
             var ripple = pegRipples[i];
@@ -5179,23 +5551,39 @@
     }
 
     // ========== TOOLTIPS (peg + slot hover) ==========
+    // Single cursor-bottom-right anchor for every tooltip, no matter
+    // what screen or overlay the player is on (in-game canvas hover,
+    // slot-selector pool/position hover). The tooltip is always placed
+    // at (cursor + 14, cursor + 14) - the cursor's bottom-right - so
+    // moving the cursor produces a smooth, predictable follow. We
+    // clamp the LEFT/TOP edge only (to keep the tooltip from falling
+    // off the left or top of the viewport). The right/bottom is
+    // allowed to extend slightly past the viewport if needed rather
+    // than flipping the tooltip to the opposite side of the cursor,
+    // which was the previous "wonky" behavior: as the cursor neared
+    // the right or bottom edge, the tooltip would jump to the cursor's
+    // top-left, breaking the visual contract.
     var _tooltipEl = null;
+    var TOOLTIP_OFFSET = 14;
     function showTooltip(header, desc, color, clientX, clientY) {
         if (!_tooltipEl) _tooltipEl = document.getElementById('tooltip');
         if (!_tooltipEl) return;
         _tooltipEl.innerHTML = '<div class="tooltip-name" style="color:' + color + ';">' + header + '</div>' +
                                '<div class="tooltip-desc">' + desc + '</div>';
         _tooltipEl.style.display = 'block';
-        // Edge-clamp to viewport so the tooltip never overflows the window.
-        var off = 14;
-        var w = _tooltipEl.offsetWidth || 220;
-        var h = _tooltipEl.offsetHeight || 50;
-        var left = clientX + off;
-        var top = clientY + off;
-        if (left + w > window.innerWidth - 4)  left = clientX - off - w;
-        if (top + h > window.innerHeight - 4) top = clientY - off - h;
+        // Always peg to the cursor's bottom-right.
+        var left = clientX + TOOLTIP_OFFSET;
+        var top = clientY + TOOLTIP_OFFSET;
+        // Clamp LEFT to >= 4px so the tooltip stays on-screen when the
+        // cursor is at the left edge of the viewport.
         if (left < 4) left = 4;
+        // Clamp TOP to >= 4px so the tooltip stays on-screen when the
+        // cursor is at the top of the viewport.
         if (top < 4) top = 4;
+        // Right/bottom edges: don't flip the tooltip. It's OK for the
+        // tooltip to extend a few pixels past the viewport (it will
+        // just be clipped by the body overflow). Flipping to the
+        // cursor's top-left was the wonky behavior we're replacing.
         _tooltipEl.style.left = left + 'px';
         _tooltipEl.style.top = top + 'px';
     }
