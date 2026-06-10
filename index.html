@@ -822,18 +822,18 @@
 <script>
 (function() {
     // ========== VISUAL ENHANCEMENT TRACKERS ==========
-    var dropPointPulse = 0; // for pulsing drop point animation
-    var activePayloadIndex = 0; // which payload will be used next
-    var pegRipples = []; // visual ripples when pegs are hit
-    var teleportPortals = []; // active teleport portal effects
-    var evolutionPulses = []; // dormant peg evolution glow pulses
-    var collisionFlashes = []; // collision point flash effects
-    var comboIndicator = { scale: 1, timer: 0 }; // animated combo indicator
-    var lifeIndicators = []; // visual life/ball indicators
-    var jackpotPulse = 0; // jackpot counter pulse animation
-    
+    let dropPointPulse = 0; // for pulsing drop point animation
+    let activePayloadIndex = 0; // which payload will be used next
+    const pegRipples = []; // visual ripples when pegs are hit
+    const teleportPortals = []; // active teleport portal effects
+    const evolutionPulses = []; // dormant peg evolution glow pulses
+    const collisionFlashes = []; // collision point flash effects
+    const comboIndicator = { scale: 1, timer: 0 }; // animated combo indicator
+    let lifeIndicators = []; // visual life/ball indicators
+    let jackpotPulse = 0; // jackpot counter pulse animation
+
     // ========== CONSTANTS ==========
-    var C = {
+    const C = {
         W: 480, H: 700,
         G: 0.18, FR: 0.995, MAXV: 14, MAXS: 21, BR: 7,
         STUCK_F: 180, STUCK_D: 2,
@@ -985,7 +985,7 @@
             var bufferSize = Math.floor(this.ctx.sampleRate * dur);
             var buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
             var data = buffer.getChannelData(0);
-            for (var i = 0; i < bufferSize; i++) {
+            for (let i = 0; i < bufferSize; i++) {
                 data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
             }
             var source = this.ctx.createBufferSource();
@@ -1068,7 +1068,7 @@
         playJackpot: function() {
             if (!this.initialized || this.muted) return;
             var notes = [523, 659, 784, 1047]; // C E G C (major chord arpeggio)
-            for (var i = 0; i < notes.length; i++) {
+            for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
                     setTimeout(function() { Audio._tone(note, 0.3, 'square', 0.25); }, idx * 80);
                 })(notes[i], i);
@@ -1104,7 +1104,7 @@
         playAchievement: function() {
             if (!this.initialized || this.muted) return;
             var notes = [523, 659, 784, 1047, 1319]; // ascending major
-            for (var i = 0; i < notes.length; i++) {
+            for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
                     setTimeout(function() {
                         Audio._tone(note, 0.2, 'sine', 0.2);
@@ -1141,7 +1141,7 @@
         playFloorComplete: function() {
             if (!this.initialized || this.muted) return;
             var notes = [392, 494, 587, 784]; // G B D G
-            for (var i = 0; i < notes.length; i++) {
+            for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
                     setTimeout(function() { Audio._tone(note, 0.25, 'square', 0.2); }, idx * 100);
                 })(notes[i], i);
@@ -1152,7 +1152,7 @@
         playGameOver: function() {
             if (!this.initialized || this.muted) return;
             var notes = [392, 330, 262, 196];
-            for (var i = 0; i < notes.length; i++) {
+            for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
                     setTimeout(function() { Audio._tone(note, 0.3, 'sawtooth', 0.2); }, idx * 150);
                 })(notes[i], i);
@@ -1199,7 +1199,7 @@
         // Safe to call multiple times.
         initBgm: function() {
             var ids = ['title', 'gameplay', 'slot-spin', 'ending', 'connection-lost'];
-            for (var i = 0; i < ids.length; i++) {
+            for (let i = 0; i < ids.length; i++) {
                 var id = ids[i];
                 var el = document.getElementById('bgm-' + id);
                 if (!el) continue;
@@ -1326,7 +1326,7 @@
     };
 
     // ========== GS (GameState) ==========
-    var GS = {
+    const GS = {
         scr: C.SCR.M, fl: 1, sc: 0, bl: 5, mx: 1, bd: [], obj: {},
         jp: 500, fa: false, ft: 0, pl: [], cc: 0, ct: 0,
         pegsHit: 0, floorScore: 0, jackpotWon: 0, bestCombo: 0, maxComboHits: 0, floorBallsLeft: 5,
@@ -1367,7 +1367,7 @@
     };
 
     // ========== PERSIST ==========
-    var PERSIST = {
+    const PERSIST = {
         lb: 0, lf: 0, ls: 0, br: 0, ur: [], pu: {}, ach: [],
         hasTut: false, daily: {}, streak: 0, lastDay: '', tr: 0,
         leaderboard: [], contrastMode: false,
@@ -1387,7 +1387,7 @@
     };
     
     // ========== ACHIEVEMENTS ==========
-    var ACHIEVEMENTS = [
+    const ACHIEVEMENTS = [
         { id: 'first_blood', name: 'First Blood', desc: 'Hit your first peg', check: function() { return GS.pegsHit >= 1; } },
         { id: 'streak_master', name: 'Streak Master', desc: 'Get a x5 combo', check: function() { return GS.bestCombo >= 5; } },
         { id: 'jackpot_winner', name: 'Jackpot Winner', desc: 'Win the jackpot', check: function() { return GS.jackpotWon >= 500; } },
@@ -1409,7 +1409,7 @@
     
     // Achievement system
     function checkAchievements() {
-        for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+        for (let i = 0; i < ACHIEVEMENTS.length; i++) {
             var ach = ACHIEVEMENTS[i];
             if (PERSIST.ach.indexOf(ach.id) === -1 && ach.check()) {
                 unlockAchievement(ach);
@@ -1456,7 +1456,7 @@
     function updateAchievementsUI() {
         var grid = document.getElementById('achgrid');
         grid.innerHTML = '';
-        for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+        for (let i = 0; i < ACHIEVEMENTS.length; i++) {
             var ach = ACHIEVEMENTS[i];
             var unlocked = PERSIST.ach.indexOf(ach.id) !== -1;
             var div = document.createElement('div');
@@ -1472,7 +1472,7 @@
         var dateStr = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
         // Simple seeded random from date string
         var seed = 0;
-        for (var i = 0; i < dateStr.length; i++) {
+        for (let i = 0; i < dateStr.length; i++) {
             seed = ((seed << 5) - seed) + dateStr.charCodeAt(i);
             seed = seed & seed;
         }
@@ -1508,7 +1508,7 @@
         var easyTier = ['gravity', 'fewer_pegs', 'small_ball'];
         if (hardTier.indexOf(mod1.id) !== -1 && hardTier.indexOf(mod2.id) !== -1) {
             var easyPool = [];
-            for (var ei = 0; ei < mods.length; ei++) {
+            for (let ei = 0; ei < mods.length; ei++) {
                 if (easyTier.indexOf(mods[ei].id) !== -1) easyPool.push(mods[ei]);
             }
             mod2 = easyPool[Math.floor(seededRandom(seed + 2) * easyPool.length)];
@@ -1531,7 +1531,7 @@
             return;
         }
         // Apply modifiers
-        for (var i = 0; i < mods.length; i++) {
+        for (let i = 0; i < mods.length; i++) {
             if (mods[i].fn) mods[i].fn();
         }
         PERSIST.daily = { date: today, completed: false };
@@ -1541,10 +1541,10 @@
     }
     
     // ========== JACKPOT SYSTEM ==========
-    var jackpotReels = [0, 0, 0];
-    var jackpotSpinning = false;
-    var jackpotSpinsLeft = 2; // 2 spins per floor
-    var jackpotWonThisFloor = false;
+    let jackpotReels = [0, 0, 0];
+    let jackpotSpinning = false;
+    let jackpotSpinsLeft = 2; // 2 spins per floor
+    let jackpotWonThisFloor = false;
     
     function resetJackpotSpins() {
         jackpotSpinsLeft = 2;
@@ -1607,7 +1607,7 @@
     // Spawn coin burst effect
     function spawnCoinBurst(x, y) {
         var symbols = ['★', '$', '✦', '●'];
-        for (var i = 0; i < 8; i++) {
+        for (let i = 0; i < 8; i++) {
             var coin = document.createElement('div');
             coin.className = 'coin';
             coin.textContent = symbols[Math.floor(Math.random() * symbols.length)];
@@ -1771,7 +1771,7 @@
                             // Spawn coin bursts
                             var fcEl = document.getElementById('fc');
                             var rect = fcEl.getBoundingClientRect();
-                            for (var burst = 0; burst < 3; burst++) {
+                            for (let burst = 0; burst < 3; burst++) {
                                 setTimeout(function() {
                                     spawnCoinBurst(200 + Math.random() * 80, 250);
                                 }, burst * 200);
@@ -1919,7 +1919,7 @@
     
     function updateJackpotUI() {
         var reels = ['jreel0', 'jreel1', 'jreel2'];
-        for (var i = 0; i < 3; i++) {
+        for (let i = 0; i < 3; i++) {
             var el = document.getElementById(reels[i]);
             if (el) el.textContent = jackpotReels[i];
         }
@@ -1979,7 +1979,7 @@
             grid.innerHTML = '<div style="color:#8888aa;text-align:center;padding:20px;">No scores yet. Play a game!</div>';
             return;
         }
-        for (var i = 0; i < lb.length; i++) {
+        for (let i = 0; i < lb.length; i++) {
             var entry = lb[i];
             var div = document.createElement('div');
             div.className = 'lb-item ' + (i < 3 ? 'top3' : '');
@@ -2121,13 +2121,13 @@
         }
         if (this.cl && this.mb.length === 0 && this.tr.length < 5) {
             this.cl = false;
-            for (var i = 0; i < 3; i++) {
+            for (let i = 0; i < 3; i++) {
                 var b = new Ball(this.x, this.y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, []);
                 b.r = this.r * 0.6;
                 this.mb.push(b);
             }
         }
-        for (var i = 0; i < this.mb.length; i++) {
+        for (let i = 0; i < this.mb.length; i++) {
             this.mb[i].update(dt);
         }
         if (this.y > C.H + 50) {
@@ -2199,7 +2199,7 @@
         // fragments without actually removing the pegs — too weak for a 85cr payload.
         if (b && b.explosive) {
             b.explosive = false;
-            for (var i = GS.bd.length - 1; i >= 0; i--) {
+            for (let i = GS.bd.length - 1; i >= 0; i--) {
                 var p = GS.bd[i];
                 if (p === this) continue;  // skip the hit peg itself
                 var dx = p.x - b.x, dy = p.y - b.y;
@@ -2233,7 +2233,7 @@
         // they update independently via Ball.update (and can trigger overflow on exit).
         if (b && b.trojanActive) {
             b.trojanActive = false;
-            for (var i = 0; i < 2; i++) {
+            for (let i = 0; i < 2; i++) {
                 var clone = new Ball(b.x, b.y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, []);
                 clone.r = b.r * 0.6;
                 b.mb.push(clone);
@@ -2281,7 +2281,7 @@
             triggerPegExplosion(this);
         } else if (this.t === C.PT.T) {
             var pair = null;
-            for (var i = 0; i < GS.bd.length; i++) {
+            for (let i = 0; i < GS.bd.length; i++) {
                 var p = GS.bd[i];
                 if (p !== this && p.t === C.PT.T && !p.paired) {
                     pair = p;
@@ -2347,7 +2347,7 @@
                 GS.sc += 500 + GS.cc * 150;
                 createFloat(this.x, this.y, 'HONEYCOMB! +' + (500 + GS.cc * 150), '#ffcc00');
                 // Spawn honeycomb burst effect
-                for (var i = 0; i < 6; i++) {
+                for (let i = 0; i < 6; i++) {
                     var angle = (i / 6) * Math.PI * 2;
                     frags.push({
                         x: this.x, y: this.y,
@@ -2359,7 +2359,7 @@
                     });
                 }
                 // Attract nearby pegs and remove them for bonus
-                for (var i = GS.bd.length - 1; i >= 0; i--) {
+                for (let i = GS.bd.length - 1; i >= 0; i--) {
                     var p = GS.bd[i];
                     var d = Math.sqrt((p.x - this.x) * (p.x - this.x) + (p.y - this.y) * (p.y - this.y));
                     if (d < 80 && d > 0 && p !== this && p.t !== C.PT.E && p.t !== C.PT.S) {
@@ -2381,7 +2381,7 @@
             createFloat(this.x, this.y, 'OVERLOAD! -' + jackpotDrain, '#ff4488');
             triggerScreenShake(2);
             // Spawn electric discharge effect
-            for (var i = 0; i < 4; i++) {
+            for (let i = 0; i < 4; i++) {
                 var angle = Math.random() * Math.PI * 2;
                 parts.push({
                     x: this.x, y: this.y,
@@ -2409,7 +2409,7 @@
     // Templates are stored as 7 strings of 7 chars. '*' = peg, '.' = empty.
     // Spelled out this way they're easy to read, easy to add, and trivial
     // to diff in PR review.
-    var BOARD_TEMPLATES = {
+    const BOARD_TEMPLATES = {
         // Classic 7x8 alternating-offset grid (7 rows of 8 cols, 56 pegs).
         // Matches the pre-Phase-7 board density so veteran players get
         // a familiar floor 1. The alternating-row offset (25px) creates
@@ -2482,7 +2482,7 @@
             '....**..'
         ]
     };
-    var BOARD_TEMPLATE_NAMES = Object.keys(BOARD_TEMPLATES);
+    const BOARD_TEMPLATE_NAMES = Object.keys(BOARD_TEMPLATES);
 
     // Wall row above the slot row. 25 pegs at 20px spacing means the gap
     // between adjacent peg edges is 4px (less than the 14px ball diameter),
@@ -2492,18 +2492,18 @@
     // least one wall row peg before reaching a slot. (After the hit, the
     // ball can still come back through a gap - it just can't fall through
     // without ever touching a wall row peg.)
-    var WALL_ROW_Y = 510;            // 50px above the slot row (C.SY = 560)
-    var WALL_ROW_SPACING = 20;       // peg center-to-center
-    var WALL_ROW_COUNT = 25;         // pegs at x = 0, 20, 40, ..., 480
+    const WALL_ROW_Y = 510;            // 50px above the slot row (C.SY = 560)
+    const WALL_ROW_SPACING = 20;       // peg center-to-center
+    const WALL_ROW_COUNT = 25;         // pegs at x = 0, 20, 40, ..., 480
 
-    var TEMPLATE_TOP = C.TOP;        // 110
-    var TEMPLATE_SPACING_X = C.PS;   // 50
+    const TEMPLATE_TOP = C.TOP;        // 110
+    const TEMPLATE_SPACING_X = C.PS;   // 50
     // 7 rows fit in C.BOT - C.TOP = 370px: 370/7 = 52.86, round down to 50
     // so the bottom row lands at y = 110 + 6 * 50 + 25 = 435 (the row's
     // vertical center; peg radius 8 reaches 443, well clear of the wall
     // row at 510). Match the existing pre-Phase-7 spacing as closely as
     // possible so the GRID template looks identical to the old default.
-    var TEMPLATE_SPACING_Y = 50;
+    const TEMPLATE_SPACING_Y = 50;
 
     // Map a (row, col) cell to its pixel (x, y) center. Alternating-row
     // offset matches the pre-Phase-7 genBoard so the GRID template
@@ -2569,8 +2569,8 @@
         // pegs (seeded for daily, random for casual). The wall row is NOT
         // affected by 'fewer_pegs' - it's a structural defense, not part
         // of the "field."
-        for (var row = 0; row < template.length; row++) {
-            for (var col = 0; col < template[row].length; col++) {
+        for (let row = 0; row < template.length; row++) {
+            for (let col = 0; col < template[row].length; col++) {
                 if (template[row][col] !== '*') continue;
                 if (fewerPegs) {
                     var dropRoll = dailySeed !== null
@@ -2592,7 +2592,7 @@
         // sprinkled in for variety. No special pegs (T/S/E/D/I/F/M/H/O)
         // to keep the wall semantics clear and to avoid weird interactions
         // like an explosive chain at the slot row.
-        for (var i = 0; i < WALL_ROW_COUNT; i++) {
+        for (let i = 0; i < WALL_ROW_COUNT; i++) {
             var wx = i * WALL_ROW_SPACING;
             var wy = WALL_ROW_Y;
             // Every 7th peg is a CACHE for flavor (matches the 7-slot
@@ -2616,10 +2616,10 @@
         // template pegs can be T (wall row never spawns T), so the existing
         // pair-up-by-2 logic still produces valid pairs.
         var tele = [];
-        for (var i = 0; i < GS.bd.length; i++) {
+        for (let i = 0; i < GS.bd.length; i++) {
             if (GS.bd[i].t === C.PT.T) tele.push(GS.bd[i]);
         }
-        for (var i = 0; i < tele.length; i += 2) {
+        for (let i = 0; i < tele.length; i += 2) {
             if (i + 1 < tele.length) {
                 tele[i].paired = false;
                 tele[i + 1].paired = false;
@@ -2641,7 +2641,7 @@
 
     // ========== PHYSICS ==========
     function checkCols(b) {
-        for (var i = 0; i < GS.bd.length; i++) {
+        for (let i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
             if (b.hp[p.id]) continue;
             if (p.t === C.PT.D && p.st === C.PSTATES.D) continue;
@@ -2724,7 +2724,7 @@
         }
         
         // Update all balls
-        for (var i = 0; i < activeBalls.length; i++) {
+        for (let i = 0; i < activeBalls.length; i++) {
             var b = activeBalls[i];
             if (b && b.on) {
                 b.update(dt);
@@ -2753,7 +2753,7 @@
             // Find the first still-active mini to promote
             var newMain = null;
             var newMb = [];
-            for (var i = 1; i < activeBalls.length; i++) {
+            for (let i = 1; i < activeBalls.length; i++) {
                 var m = activeBalls[i];
                 if (!m || !m.on) continue;
                 if (!newMain) newMain = m;
@@ -2785,7 +2785,7 @@
         //      loop that called checkBallExit(mb) was a double-count
         //      hazard once this loop is live (both would decrement GS.bl).
         if (activeBalls.length > 1) {
-            for (var i = activeBalls.length - 1; i >= 1; i--) {
+            for (let i = activeBalls.length - 1; i >= 1; i--) {
                 var mb = activeBalls[i];
                 if (mb && !mb.on) {
                     if (!PERSIST.multiballEnabled) {
@@ -2819,7 +2819,7 @@
         // the still-active ball list so they flip off the moment the
         // last ball carrying the flag has left the play field.
         var anySlowmo = false, anyGhost = false;
-        for (var ai = 0; ai < GS.activeBalls.length; ai++) {
+        for (let ai = 0; ai < GS.activeBalls.length; ai++) {
             var ab = GS.activeBalls[ai];
             if (!ab) continue;
             if (ab.slowmoMode) anySlowmo = true;
@@ -2863,7 +2863,7 @@
         GS.gravityMult = 1;
     }
     // ========== SLOT COLLECTOR ==========
-    var slots = [C.ST.E, C.ST.CR, C.ST.AM, C.ST.PA, C.ST.CM, C.ST.SH, C.ST.OC];
+    const slots = [C.ST.E, C.ST.CR, C.ST.AM, C.ST.PA, C.ST.CM, C.ST.SH, C.ST.OC];
 
     // Get slot X position (center of slot)
     function getSlotX(slotIdx) {
@@ -2890,8 +2890,6 @@
 
         // Only check unlocked slots!
         if (!isSlotUnlocked(si)) return;
-
-        console.log('SLOT HIT - pos:', si, 'type:', slots[si], 'name:', C.ST_NAMES[slots[si]]);
 
         var st = slots[si];
         triggerSlotCollected(si, st);
@@ -2931,7 +2929,7 @@
                 
             case C.ST.CM: // CRUMBLE: Destroy up to 3 random non-seismic/non-explosive pegs, +1 toward objective
                 var crumbleCount = 0;
-                for (var i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
+                for (let i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
                     var p = GS.bd[i];
                     if (p.t !== C.PT.E && p.t !== C.PT.S) {
                         createFrag(p.x, p.y);
@@ -3001,7 +2999,7 @@
     }
 
     function genSlots() {
-        for (var i = 0; i < slots.length; i++) {
+        for (let i = 0; i < slots.length; i++) {
             var r = Math.random();
             if (r < 0.03) slots[i] = C.ST.JP; // 3% jackpot
             else if (r < 0.10) slots[i] = C.ST.OC; // 7% overclock
@@ -3044,9 +3042,9 @@
         var POOL_SIZE = 3;
         var usefulTypes = [C.ST.CR, C.ST.AM, C.ST.PA, C.ST.CM, C.ST.SH, C.ST.OC, C.ST.JP];
         var poolSlots = [];
-        for (var i = 0; i < POOL_SIZE; i++) {
+        for (let i = 0; i < POOL_SIZE; i++) {
             var picked = -1;
-            for (var attempt = 0; attempt < 30; attempt++) {
+            for (let attempt = 0; attempt < 30; attempt++) {
                 var r = Math.random();
                 // Rebalanced weights summing to 1.0 across the 7 useful
                 // types. The previous 35% EMPTY weight is redistributed
@@ -3068,7 +3066,7 @@
             } else {
                 // Fallback: pick any unused useful type so the pool always
                 // reaches POOL_SIZE.
-                for (var t = 0; t < usefulTypes.length; t++) {
+                for (let t = 0; t < usefulTypes.length; t++) {
                     if (poolSlots.indexOf(usefulTypes[t]) === -1) {
                         poolSlots.push(usefulTypes[t]);
                         break;
@@ -3161,7 +3159,7 @@
         // selectOrPlace below). The .selected class on the picked element
         // gives persistent visual feedback for the tap-to-select step.
         posContainer.innerHTML = '';
-        for (var i = 0; i < C.SC; i++) {
+        for (let i = 0; i < C.SC; i++) {
             var isUnlocked = GS.unlockedSlots.indexOf(i) !== -1;
             var slotType = GS.slotArrangement[i];
             var hasSlot = slotType !== undefined && slotType !== null;
@@ -3246,7 +3244,7 @@
             poolContainer.appendChild(infoDiv);
         }
 
-        for (var j = 0; j < GS.slotPool.length; j++) {
+        for (let j = 0; j < GS.slotPool.length; j++) {
             var poolSlotType = GS.slotPool[j];
             var col = getSlotColor(poolSlotType);
             var name = C.ST_NAMES[poolSlotType];
@@ -3282,7 +3280,7 @@
         // Clear all .selected highlights from positions and pool items.
         function clearSelectedHighlight() {
             var els = _slotSel.querySelectorAll('.slot-pos.selected, .slot-pool-item.selected');
-            for (var k = 0; k < els.length; k++) els[k].classList.remove('selected');
+            for (let k = 0; k < els.length; k++) els[k].classList.remove('selected');
         }
 
         // Tapping the AUTO-ARRANGE / CONFIRM buttons should also clear
@@ -3535,7 +3533,7 @@
         // Auto-unlock next position if available
         if (GS.canUnlockThisFloor && GS.unlockedSlots.length < 7) {
             // Find first locked position
-            for (var k = 0; k < C.SC; k++) {
+            for (let k = 0; k < C.SC; k++) {
                 if (GS.unlockedSlots.indexOf(k) === -1) {
                     unlockSlotPosition(k);
                     break;
@@ -3544,7 +3542,7 @@
         }
 
         // Auto-assign remaining pool slots to any unlocked positions without slots
-        for (var i = 0; i < GS.unlockedSlots.length && GS.slotPool.length > 0; i++) {
+        for (let i = 0; i < GS.unlockedSlots.length && GS.slotPool.length > 0; i++) {
             var pos = GS.unlockedSlots[i];
             if (GS.slotArrangement[pos] === undefined || GS.slotArrangement[pos] === null) {
                 GS.slotArrangement[pos] = GS.slotPool.shift();
@@ -3556,7 +3554,7 @@
 
     function confirmSlotArrangement() {
         // Ensure all unlocked positions have a slot assigned
-        for (var i = 0; i < GS.unlockedSlots.length; i++) {
+        for (let i = 0; i < GS.unlockedSlots.length; i++) {
             var pos = GS.unlockedSlots[i];
             if ((GS.slotArrangement[pos] === undefined || GS.slotArrangement[pos] === null) && GS.slotPool.length > 0) {
                 GS.slotArrangement[pos] = GS.slotPool.shift();
@@ -3564,14 +3562,14 @@
         }
 
         // Fill any undefined positions with empty slot type
-        for (var i = 0; i < C.SC; i++) {
+        for (let i = 0; i < C.SC; i++) {
             if (GS.slotArrangement[i] === undefined || GS.slotArrangement[i] === null) {
                 GS.slotArrangement[i] = C.ST.E;
             }
         }
         
         // Copy arrangement to actual slots array
-        for (var i = 0; i < C.SC; i++) {
+        for (let i = 0; i < C.SC; i++) {
             slots[i] = GS.slotArrangement[i];
         }
         GS.slotsArranged = true;
@@ -3589,11 +3587,11 @@
     }
 
     // ========== EFFECTS ==========
-    var parts = [];
-    var floats = [];
-    var frags = [];
-    var waves = [];
-    var screenShake = { x: 0, y: 0, dur: 0 };
+    const parts = [];
+    const floats = [];
+    const frags = [];
+    const waves = [];
+    const screenShake = { x: 0, y: 0, dur: 0 };
     
     // Helper function to darken a hex color
     function darkenColor(hex, factor) {
@@ -3629,7 +3627,7 @@
                 toRemove--;
             }
         }
-        for (var i = 0; i < count; i++) {
+        for (let i = 0; i < count; i++) {
             var a = Math.random() * Math.PI * 2;
             var s = 1 + Math.random() * spread;
             parts.push({x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c: color, l: 30});
@@ -3648,7 +3646,7 @@
                 toRemove--;
             }
         }
-        for (var i = 0; i < 8; i++) {
+        for (let i = 0; i < 8; i++) {
             var a = Math.random() * Math.PI * 2;
             frags.push({
                 x: peg.x, y: peg.y,
@@ -3678,7 +3676,7 @@
     function checkDormantActivation(ball) {
         // Daily mod: fast_timer shrinks the activation radius from 40 to 25
         var activationRadius = modActive('fast_timer') ? 25 : 40;
-        for (var i = 0; i < GS.bd.length; i++) {
+        for (let i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
             if (p.t === C.PT.D && p.st === C.PSTATES.D) {
                 var dx = ball.x - p.x;
@@ -3715,7 +3713,7 @@
         Audio.playExplosion();
 
         // Damage adjacent pegs
-        for (var i = 0; i < GS.bd.length; i++) {
+        for (let i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
             var d = Math.sqrt((p.x - peg.x) * (p.x - peg.x) + (p.y - peg.y) * (p.y - peg.y));
             if (d < 60 && d > 0 && p !== peg) {
@@ -3762,7 +3760,7 @@
     // Spawn shatter debris effect (for fiber peg break)
     function spawnShatterDebris(peg) {
         var col = C.PC[peg.t] || '#00fff2';
-        for (var i = 0; i < 12; i++) {
+        for (let i = 0; i < 12; i++) {
             var a = Math.random() * Math.PI * 2;
             var speed = 2 + Math.random() * 5;
             frags.push({
@@ -3784,7 +3782,7 @@
     function spawnIceCrystal(x, y, frozen) {
         if (frozen) {
             // Ice crystal formation - radial shards
-            for (var i = 0; i < 8; i++) {
+            for (let i = 0; i < 8; i++) {
                 var angle = (i / 8) * Math.PI * 2;
                 var length = C.PR + 5 + Math.random() * 3;
                 frags.push({
@@ -3866,7 +3864,7 @@
         dropPointPulse += dt60;
         
         // Update peg ripples
-        for (var i = pegRipples.length - 1; i >= 0; i--) {
+        for (let i = pegRipples.length - 1; i >= 0; i--) {
             var ripple = pegRipples[i];
             ripple.r += 1.5 * dt60;
             ripple.life -= dt60;
@@ -3874,7 +3872,7 @@
         }
         
         // Update teleport portals
-        for (var i = teleportPortals.length - 1; i >= 0; i--) {
+        for (let i = teleportPortals.length - 1; i >= 0; i--) {
             var portal = teleportPortals[i];
             portal.r += 0.8 * dt60;
             portal.spiral += 0.15 * dt60;
@@ -3883,7 +3881,7 @@
         }
         
         // Update evolution pulses
-        for (var i = evolutionPulses.length - 1; i >= 0; i--) {
+        for (let i = evolutionPulses.length - 1; i >= 0; i--) {
             var pulse = evolutionPulses[i];
             pulse.r += 1.2 * dt60;
             pulse.pulse += 0.2 * dt60;
@@ -3892,7 +3890,7 @@
         }
         
         // Update collision flashes
-        for (var i = collisionFlashes.length - 1; i >= 0; i--) {
+        for (let i = collisionFlashes.length - 1; i >= 0; i--) {
             var flash = collisionFlashes[i];
             flash.life -= dt60;
             if (flash.life <= 0) collisionFlashes.splice(i, 1);
@@ -3911,9 +3909,9 @@
         
         // Update life indicators visual
         lifeIndicators = [];
-        for (var i = 0; i < GS.bl; i++) {
+        for (let i = 0; i < GS.bl; i++) {
             lifeIndicators.push({
-                pulse: (Date.now() / 500 + i * 0.5) % 1,
+                pulse: (ts / 500 + i * 0.5) % 1,
                 color: i < GS.bl ? GS.ballSkin || '#00fff2' : '#333333'
             });
         }
@@ -3924,7 +3922,7 @@
     }
     
     function triggerExplosion(x, y) {
-        for (var i = 0; i < GS.bd.length; i++) {
+        for (let i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
             var d = Math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y));
             if (d < 80 && p.t !== C.PT.E) {
@@ -3944,19 +3942,19 @@
 
     function updateFX(dt) {
         var dt60 = dt * 60;
-        for (var i = parts.length - 1; i >= 0; i--) {
+        for (let i = parts.length - 1; i >= 0; i--) {
             var p = parts[i];
             p.x += p.vx * dt60;
             p.y += p.vy * dt60;
             p.l -= dt60;
             if (p.l <= 0) parts.splice(i, 1);
         }
-        for (var i = floats.length - 1; i >= 0; i--) {
+        for (let i = floats.length - 1; i >= 0; i--) {
             floats[i].y -= 1 * dt60;
             floats[i].l -= dt60;
             if (floats[i].l <= 0) floats.splice(i, 1);
         }
-        for (var i = frags.length - 1; i >= 0; i--) {
+        for (let i = frags.length - 1; i >= 0; i--) {
             var f = frags[i];
             f.x += f.vx * dt60;
             f.y += f.vy * dt60;
@@ -3964,7 +3962,7 @@
             f.l -= dt60;
             if (f.l <= 0) frags.splice(i, 1);
         }
-        for (var i = waves.length - 1; i >= 0; i--) {
+        for (let i = waves.length - 1; i >= 0; i--) {
             waves[i].r += 3 * dt60;
             if (waves[i].r >= waves[i].m) waves.splice(i, 1);
         }
@@ -3993,7 +3991,7 @@
             GS.selectedSlot = null;
         }
         var screens = ['menu', 'fc', 're', 'shop', 'tut', 'ach', 'lb', 'settings', 'resetconfirm', 'slot-selector'];
-        for (var i = 0; i < screens.length; i++) {
+        for (let i = 0; i < screens.length; i++) {
             var el = document.getElementById(screens[i]);
             if (el) el.classList.remove('on');
         }
@@ -4027,8 +4025,8 @@
     }
 
     // ========== PHASE 4: AMBIENT MENU PARTICLES ==========
-    var menuParticleInterval = null;
-    var menuParticleTimeouts = [];
+    let menuParticleInterval = null;
+    const menuParticleTimeouts = [];
     function spawnMenuParticles() {
         var container = document.getElementById('menu-particles');
         if (!container) return;
@@ -4040,13 +4038,13 @@
             menuParticleInterval = null;
         }
         // Cancel any pending timeouts
-        for (var i = 0; i < menuParticleTimeouts.length; i++) {
+        for (let i = 0; i < menuParticleTimeouts.length; i++) {
             clearTimeout(menuParticleTimeouts[i]);
         }
         menuParticleTimeouts = [];
         var colors = ['#00fff2', '#ff00ff', '#ffff00', '#00ff88', '#ff6600'];
         // Spawn 8 initial particles staggered
-        for (var i = 0; i < 6; i++) {
+        for (let i = 0; i < 6; i++) {
             (function(idx) {
                 var t = setTimeout(function() { createMenuParticle(container, colors); }, idx * 600);
                 menuParticleTimeouts.push(t);
@@ -4086,7 +4084,7 @@
             menuParticleInterval = null;
         }
         // Cancel pending timeouts
-        for (var i = 0; i < menuParticleTimeouts.length; i++) {
+        for (let i = 0; i < menuParticleTimeouts.length; i++) {
             clearTimeout(menuParticleTimeouts[i]);
         }
         menuParticleTimeouts = [];
@@ -4119,10 +4117,24 @@
     var _prevJackpot = 500;
     var _lastCriticalChime = 0;
 
+    // Cache DOM references for frequently-accessed HUD elements (updated once per frame)
+    const _hud = {};
+    function cacheHudElements() {
+        _hud.sv = document.getElementById('sv');
+        _hud.jv = document.getElementById('jv');
+        _hud.bv = document.getElementById('bv');
+        _hud.fn = document.getElementById('fn');
+        _hud.mv = document.getElementById('mv');
+        _hud.cf = document.getElementById('cf');
+        _hud.of = document.getElementById('of');
+        _hud.ps1 = document.getElementById('ps1');
+        _hud.ps2 = document.getElementById('ps2');
+    }
+
     function updateHUD() {
-        var sv = document.getElementById('sv');
-        var jv = document.getElementById('jv');
-        var bv = document.getElementById('bv');
+        var sv = _hud.sv;
+        var jv = _hud.jv;
+        var bv = _hud.bv;
 
         // Score tick-up animation
         if (GS.sc > _prevScore) {
@@ -4153,11 +4165,11 @@
         bv.textContent = GS.bl;
         _prevBalls = GS.bl;
 
-        document.getElementById('fn').textContent = GS.fl;
+        _hud.fn.textContent = GS.fl;
 
         // Chain multiplier display with animated color coding and scale effect
         var mult = GS.cc + 1;
-        var mv = document.getElementById('mv');
+        var mv = _hud.mv;
         mv.textContent = 'x' + mult;
 
         // Apply animated scale effect from combo indicator
@@ -4213,7 +4225,7 @@
 
         // Animated chain timer bar with gradient fill
         var chainProgress = Math.max(0, (GS.ct / C.CHAIN_T * 100));
-        var cf = document.getElementById('cf');
+        var cf = _hud.cf;
         cf.style.width = chainProgress + '%';
 
         // Color the chain bar based on remaining time
@@ -4234,7 +4246,7 @@
 
         // Animated progress bar with shimmer effect
         var progressPercent = Math.min(100, (GS.obj.prg / GS.obj.tgt) * 100);
-        var of = document.getElementById('of');
+        var of = _hud.of;
         of.style.width = progressPercent + '%';
         
         // Add pulsing glow when progress is high
@@ -4245,13 +4257,13 @@
         }
         
         // Jackpot counter with pulse animation
-        var jvEl = document.getElementById('jv');
+        var jvEl = _hud.jv;
         var jackpotPulseFactor = 1 + Math.sin(jackpotPulse) * 0.1;
         jvEl.style.transform = 'scale(' + jackpotPulseFactor + ')';
         
         // Payload inventory with visual enhancement
-        var ps1 = document.getElementById('ps1');
-        var ps2 = document.getElementById('ps2');
+        var ps1 = _hud.ps1;
+        var ps2 = _hud.ps2;
         if (GS.pl[0]) {
             var payload0Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[0][0]);
             var payload0Icon = SVG_ICONS.getPayloadIcon(payload0Type >= 0 ? payload0Type : 0);
@@ -4302,7 +4314,7 @@
         var rda = document.getElementById('rda');
         if (GS.dailyMods && GS.dailyMods.length) {
             var html = '<div style="color:#ff00ff;font-size:11px;font-weight:bold;margin-bottom:4px;">DAILY CHALLENGE MODIFIERS</div>';
-            for (var i = 0; i < GS.dailyMods.length; i++) {
+            for (let i = 0; i < GS.dailyMods.length; i++) {
                 html += '<div style="font-size:12px;color:#e0e0ff;">' + GS.dailyMods[i].name + ': <span style="color:#8888aa;">' + GS.dailyMods[i].desc + '</span></div>';
             }
             rda.innerHTML = html;
@@ -4335,7 +4347,7 @@
             {n: 'Explosive', c: 180,  d: 'Chain explosions', idx: 7},
             {n: 'Slowmo', c: 150,     d: 'Slows ball speed', idx: 8}
         ];
-        for (var i = 0; i < items.length; i++) {
+        for (let i = 0; i < items.length; i++) {
             var item = items[i];
             var div = document.createElement('div');
             div.className = 'si';
@@ -4373,7 +4385,7 @@
     // simulation terminates naturally when the ball reaches the slot
     // row, exits the bottom, goes off the top, or hits the
     // PRED_MAX_FRAMES safety cap.
-    var PRED_SUBSTEPS = 4;
+    const PRED_SUBSTEPS = 4;
     // The simulation runs through up to PRED_MAX_BOUNCES bounces (2),
     // so the line shows the path dropper -> b1 -> b2 then stops. The
     // bounces array is capped at the same number, but the marker
@@ -4382,9 +4394,9 @@
     // classic Peggle "where will the ball hit next" preview plus a
     // single extra hop, without the visual clutter of multiple
     // markers or a line that loops across the whole board.
-    var PRED_MAX_BOUNCES = 2;
-    var PRED_MAX_MARKERS = 1;
-    var PRED_MAX_FRAMES = 200; // safety cap so a runaway sim can't hang the frame
+    const PRED_MAX_BOUNCES = 2;
+    const PRED_MAX_MARKERS = 1;
+    const PRED_MAX_FRAMES = 200; // safety cap so a runaway sim can't hang the frame
 
     function simulateTrajectory() {
         var points = [{x: GS.mouseX, y: C.DZY + 10}];
@@ -4412,7 +4424,7 @@
         // approach, and the prediction is the more useful answer ("you will
         // hit this peg") even if the actual bounce is one frame later.
         while (frames < PRED_MAX_FRAMES) {
-            for (var s = 0; s < PRED_SUBSTEPS; s++) {
+            for (let s = 0; s < PRED_SUBSTEPS; s++) {
                 vy += gravity * subDt;
                 vx *= frictionSub;
                 vy *= frictionSub;
@@ -4429,7 +4441,7 @@
                 if (x > C.W - C.BR) { x = C.W - C.BR; vx = -Math.abs(vx) * 0.8; }
 
                 // Peg collision - mirror the checkCols overlap test
-                for (var i = 0; i < GS.bd.length; i++) {
+                for (let i = 0; i < GS.bd.length; i++) {
                     if (hitPegs[i]) continue; // already hit, skip
                     var p = GS.bd[i];
                     var dx = x - p.x;
@@ -4507,7 +4519,7 @@
         ctx.lineWidth = 5;
         ctx.beginPath();
         ctx.moveTo(traj.points[0].x, traj.points[0].y);
-        for (var i = 1; i < traj.points.length; i++) {
+        for (let i = 1; i < traj.points.length; i++) {
             ctx.lineTo(traj.points[i].x, traj.points[i].y);
         }
         ctx.stroke();
@@ -4518,7 +4530,7 @@
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(traj.points[0].x, traj.points[0].y);
-        for (var i = 1; i < traj.points.length; i++) {
+        for (let i = 1; i < traj.points.length; i++) {
             ctx.lineTo(traj.points[i].x, traj.points[i].y);
         }
         ctx.stroke();
@@ -4532,7 +4544,7 @@
         // ends, no decoration. PRED_MAX_MARKERS caps the loop
         // independently of PRED_MAX_BOUNCES so the path can extend
         // further than the marker count.
-        for (var b = 0; b < Math.min(PRED_MAX_MARKERS, traj.bounces.length); b++) {
+        for (let b = 0; b < Math.min(PRED_MAX_MARKERS, traj.bounces.length); b++) {
             var bp = traj.bounces[b];
             var pegColor = C.PC[bp.t] || '#ffffff';
             // Outer white ring
@@ -4565,10 +4577,16 @@
     }
 
     // ========== RENDER ==========
-    var canvas = document.getElementById('gc');
-    var ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('gc');
+    const ctx = canvas ? canvas.getContext('2d') : null;
 
-    function render() {
+    if (!ctx) {
+        // Canvas not supported - show error message
+        document.body.innerHTML = '<div style="color:#ff2244;font-family:monospace;padding:40px;text-align:center;"><h2>WebGL/Canvas Not Supported</h2><p>Your browser does not support the HTML5 Canvas API required to run this game.</p></div>';
+        throw new Error('Canvas 2D context not available');
+    }
+
+    function render(ts) {
         ctx.clearRect(0, 0, C.W, C.H);
         
         // Apply screen shake
@@ -4579,13 +4597,13 @@
         var gridColor = PERSIST.currentBoardTheme === 'matrix' ? 'rgba(0,255,0,0.03)' : 'rgba(0,255,242,0.05)';
         ctx.strokeStyle = gridColor;
         ctx.lineWidth = 1;
-        for (var x = 0; x < C.W; x += 30) {
+        for (let x = 0; x < C.W; x += 30) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, C.H);
             ctx.stroke();
         }
-        for (var y = 0; y < C.H; y += 30) {
+        for (let y = 0; y < C.H; y += 30) {
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(C.W, y);
@@ -4674,7 +4692,7 @@
         }
         
         // Slot collector - only show unlocked slots, styled by type
-        for (var i = 0; i < C.SC; i++) {
+        for (let i = 0; i < C.SC; i++) {
             var x = i * C.SW;
             var unlocked = isSlotUnlocked(i);
 
@@ -4861,7 +4879,7 @@
         }
 
         // Pegs
-        for (var i = 0; i < GS.bd.length; i++) {
+        for (let i = 0; i < GS.bd.length; i++) {
             var p = GS.bd[i];
             var col = PERSIST.contrastMode ? (C.PC_CONTRAST[p.t] || '#cccccc') : (C.PC[p.t] || '#00fff2');
             if (p.st === C.PSTATES.D) col = PERSIST.contrastMode ? '#666666' : '#444466';
@@ -4885,7 +4903,7 @@
                 // Draw frost rays
                 ctx.strokeStyle = 'rgba(255,255,255,0.5)';
                 ctx.lineWidth = 1;
-                for (var ray = 0; ray < 6; ray++) {
+                for (let ray = 0; ray < 6; ray++) {
                     var angle = (ray / 6) * Math.PI * 2;
                     ctx.beginPath();
                     ctx.moveTo(p.x + Math.cos(angle) * (p.r + 2), p.y + Math.sin(angle) * (p.r + 2));
@@ -4905,7 +4923,7 @@
                 // Draw fiber strands
                 ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                 ctx.lineWidth = 1;
-                for (var strand = 0; strand <= p.fiberHits; strand++) {
+                for (let strand = 0; strand <= p.fiberHits; strand++) {
                     var strandY = p.y - p.r + (p.r * 2 / 3) * (strand / 3);
                     ctx.beginPath();
                     ctx.moveTo(p.x - p.r + 2, strandY);
@@ -4935,7 +4953,7 @@
                 // HONEYCOMB PEG: Hexagonal with honeycomb pattern
                 ctx.beginPath();
                 var hexRadius = p.r + glow;
-                for (var h = 0; h < 6; h++) {
+                for (let h = 0; h < 6; h++) {
                     var hx = p.x + Math.cos((h / 6) * Math.PI * 2 - Math.PI / 2) * hexRadius;
                     var hy = p.y + Math.sin((h / 6) * Math.PI * 2 - Math.PI / 2) * hexRadius;
                     if (h === 0) ctx.moveTo(hx, hy);
@@ -4951,7 +4969,7 @@
                 ctx.strokeStyle = 'rgba(200,150,0,0.5)';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                for (var h2 = 0; h2 < 6; h2++) {
+                for (let h2 = 0; h2 < 6; h2++) {
                     var hx2 = p.x + Math.cos((h2 / 6) * Math.PI * 2 - Math.PI / 2) * (p.r * 0.5);
                     var hy2 = p.y + Math.sin((h2 / 6) * Math.PI * 2 - Math.PI / 2) * (p.r * 0.5);
                     if (h2 === 0) ctx.moveTo(hx2, hy2);
@@ -4961,7 +4979,7 @@
                 ctx.stroke();
             } else if (p.t === C.PT.O) {
                 // OVERLOAD PEG: Pulsing danger appearance
-                var pulsePhase = (Date.now() / 200) % (Math.PI * 2);
+                var pulsePhase = (ts / 200) % (Math.PI * 2);
                 var pulseSize = Math.sin(pulsePhase) * 2;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.r + glow + pulseSize, 0, Math.PI * 2);
@@ -4996,7 +5014,7 @@
         drawPredictionLine();
 
         // Peg ripples - draw ripple effects for peg hits
-        for (var i = 0; i < pegRipples.length; i++) {
+        for (let i = 0; i < pegRipples.length; i++) {
             var ripple = pegRipples[i];
             ctx.globalAlpha = (ripple.life / ripple.maxLife) * 0.6;
             ctx.strokeStyle = ripple.color;
@@ -5012,7 +5030,7 @@
         ctx.globalAlpha = 1;
         
         // Teleport portals - draw spiral portal effects
-        for (var i = 0; i < teleportPortals.length; i++) {
+        for (let i = 0; i < teleportPortals.length; i++) {
             var portal = teleportPortals[i];
             var alpha = portal.life / portal.maxLife;
             
@@ -5028,7 +5046,7 @@
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            for (var a = 0; a < Math.PI * 4; a += 0.1) {
+            for (let a = 0; a < Math.PI * 4; a += 0.1) {
                 var sr = portal.r * (1 - a / (Math.PI * 8));
                 var sx = portal.x + Math.cos(a + portal.spiral) * sr;
                 var sy = portal.y + Math.sin(a + portal.spiral) * sr;
@@ -5050,7 +5068,7 @@
         ctx.globalAlpha = 1;
         
         // Evolution pulses - draw evolution glow for dormant peg activation
-        for (var i = 0; i < evolutionPulses.length; i++) {
+        for (let i = 0; i < evolutionPulses.length; i++) {
             var pulse = evolutionPulses[i];
             var alpha = pulse.life / pulse.maxLife;
             var pulseR = pulse.r + Math.sin(pulse.pulse) * 5;
@@ -5080,7 +5098,7 @@
         ctx.globalAlpha = 1;
         
         // Collision flashes - draw impact flashes at collision points
-        for (var i = 0; i < collisionFlashes.length; i++) {
+        for (let i = 0; i < collisionFlashes.length; i++) {
             var flash = collisionFlashes[i];
             var alpha = flash.life / flash.maxLife;
             
@@ -5099,7 +5117,7 @@
             ctx.fill();
         }
         ctx.globalAlpha = 1;
-        for (var i = 0; i < waves.length; i++) {
+        for (let i = 0; i < waves.length; i++) {
             var w = waves[i];
             ctx.beginPath();
             ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
@@ -5111,7 +5129,7 @@
         ctx.globalAlpha = 1;
         
         // Fragments
-        for (var i = 0; i < frags.length; i++) {
+        for (let i = 0; i < frags.length; i++) {
             var f = frags[i];
             ctx.globalAlpha = f.l / 40;
             ctx.fillStyle = f.col || '#00fff2';
@@ -5121,7 +5139,7 @@
         
         // Ball rendering with support for multiball
         var allBalls = GS.activeBalls || (GS.ball ? [GS.ball] : []);
-        for (var ballIdx = 0; ballIdx < allBalls.length; ballIdx++) {
+        for (let ballIdx = 0; ballIdx < allBalls.length; ballIdx++) {
             var b = allBalls[ballIdx];
             if (!b || !b.on) continue;
             
@@ -5134,7 +5152,7 @@
             }
             
             // Enhanced glowing trail
-            for (var i = 0; i < b.tr.length; i++) {
+            for (let i = 0; i < b.tr.length; i++) {
                 var t = b.tr[i];
                 var trailAlpha = (i / b.tr.length) * 0.6;
                 var trailColor = GS.cc >= 5 ? '#ff00ff' : (GS.cc >= 3 ? '#ffff00' : ballColor);
@@ -5173,7 +5191,7 @@
                 ctx.fillStyle = '#88ddff';
                 
                 // Draw ghost trail effect
-                for (var gi = 0; gi < b.tr.length; gi++) {
+                for (let gi = 0; gi < b.tr.length; gi++) {
                     var gt = b.tr[gi];
                     ctx.globalAlpha = (gi / b.tr.length) * 0.3;
                     ctx.fillStyle = '#88ddff';
@@ -5207,7 +5225,7 @@
             // Shield ring for shielded balls
             if (b.sh) {
                 // Animated shield ring
-                var shieldPulse = Math.sin(Date.now() / 100) * 2;
+                var shieldPulse = Math.sin(ts / 100) * 2;
                 ctx.strokeStyle = '#00ff88';
                 ctx.lineWidth = 3;
                 ctx.globalAlpha = 0.8;
@@ -5223,8 +5241,8 @@
                 // Energy sparks on shield
                 ctx.strokeStyle = '#00ffaa';
                 ctx.lineWidth = 1;
-                for (var s = 0; s < 4; s++) {
-                    var sparkAngle = Date.now() / 200 + s * Math.PI / 2;
+                for (let s = 0; s < 4; s++) {
+                    var sparkAngle = ts / 200 + s * Math.PI / 2;
                     var sparkR = b.r + 8 + shieldPulse;
                     ctx.beginPath();
                     ctx.moveTo(b.x + Math.cos(sparkAngle) * sparkR, b.y + Math.sin(sparkAngle) * sparkR);
@@ -5245,7 +5263,7 @@
             
             // Mini balls (cluster payload)
             ctx.fillStyle = '#9944ff';
-            for (var i = 0; i < b.mb.length; i++) {
+            for (let i = 0; i < b.mb.length; i++) {
                 var mb = b.mb[i];
                 if (!mb.on) continue;
                 ctx.beginPath();
@@ -5265,7 +5283,7 @@
             ctx.fillStyle = 'rgba(0,0,255,0.1)';
             ctx.beginPath();
             var octSize = Math.min(C.W, C.H) * 0.4;
-            for (var o = 0; o < 8; o++) {
+            for (let o = 0; o < 8; o++) {
                 var ox = C.W / 2 + Math.cos((o / 8) * Math.PI * 2 - Math.PI / 8) * octSize * 1.5;
                 var oy = C.H / 2 + Math.sin((o / 8) * Math.PI * 2 - Math.PI / 8) * octSize * 1.5;
                 if (o === 0) ctx.moveTo(ox, oy);
@@ -5281,7 +5299,7 @@
         }
         
         // Particles
-        for (var i = 0; i < parts.length; i++) {
+        for (let i = 0; i < parts.length; i++) {
             var p = parts[i];
             ctx.globalAlpha = p.l / 30;
             ctx.fillStyle = p.c;
@@ -5294,7 +5312,7 @@
         // Float text
         ctx.font = '12px Courier New';
         ctx.textAlign = 'center';
-        for (var i = 0; i < floats.length; i++) {
+        for (let i = 0; i < floats.length; i++) {
             var f = floats[i];
             ctx.globalAlpha = f.l / 60;
             ctx.fillStyle = f.c;
@@ -5327,7 +5345,7 @@
     }
 
     // ========== GAME LOOP ==========
-    var lastT = 0;
+    let lastT = 0;
 
     function loop(ts) {
         var dt = Math.min((ts - lastT) / 1000, 0.05);
@@ -5403,7 +5421,7 @@
             }
         }
         
-        render();
+        render(ts);
         updateHUD();
         requestAnimationFrame(loop);
     }
@@ -5582,8 +5600,8 @@
     // which was the previous "wonky" behavior: as the cursor neared
     // the right or bottom edge, the tooltip would jump to the cursor's
     // top-left, breaking the visual contract.
-    var _tooltipEl = null;
-    var TOOLTIP_OFFSET = 14;
+    let _tooltipEl = null;
+    const TOOLTIP_OFFSET = 14;
     function showTooltip(header, desc, color, clientX, clientY) {
         if (!_tooltipEl) _tooltipEl = document.getElementById('tooltip');
         if (!_tooltipEl) return;
@@ -5634,7 +5652,7 @@
     // not a tooltip scrub). This is a UX win on desktop too: a
     // mouse-drag that ends over the canvas no longer drops a ball
     // unintentionally.
-    var _dropDownX = 0, _dropDownY = 0, _dropActive = false;
+    let _dropDownX = 0, _dropDownY = 0, _dropActive = false;
     canvas.addEventListener('pointermove', function(e) {
         var rect = canvas.getBoundingClientRect();
         GS.mouseX = (e.clientX - rect.left) * (C.W / rect.width);
@@ -5648,7 +5666,7 @@
         if (GS.scr === C.SCR.P) {
             var foundHeader = null, foundDesc = null, foundColor = null;
             // Peg hit-test (small margin for forgiveness on the edges)
-            for (var i = 0; i < GS.bd.length; i++) {
+            for (let i = 0; i < GS.bd.length; i++) {
                 var p = GS.bd[i];
                 var dx = GS.mouseX - p.x;
                 var dy = mouseYCanvas - p.y;
@@ -5887,7 +5905,7 @@
         
         var msg = 'Daily Challenge modifiers:\n';
         var modList = '<div class="daily-mods-container">';
-        for (var i = 0; i < mods.length; i++) {
+        for (let i = 0; i < mods.length; i++) {
             msg += '• ' + mods[i].name + ': ' + mods[i].desc + '\n';
             modList += '<div class="daily-mod">' +
                 '<span class="daily-mod-icon">' + (modIcons[mods[i].id] || modIcons['gravity']) + '</span>' +
@@ -6087,7 +6105,7 @@
                 var saved = JSON.parse(data);
                 // Validate that saved data is an object (not array, not null)
                 if (typeof saved === 'object' && saved !== null && !Array.isArray(saved)) {
-                    for (var key in saved) {
+                    for (let key in saved) {
                         PERSIST[key] = saved[key];
                     }
                 } else {
@@ -6130,6 +6148,7 @@
 
         // ========== INIT ==========
     loadPersist();
+    cacheHudElements();
 
     // ========== PHASE 5: MOBILE SCALE-TO-FIT + ORIENTATION LOCK ==========
     // Compute the CSS scale that fits the 480x700 design into the
@@ -6187,10 +6206,10 @@
     // every frame for every unlocked slot, never actually drew it, and fell
     // back to a 3-letter text label. The cache means we create each image
     // once at init, wait for it to load, and drawImage() the cached bitmap.
-    var slotIconCache = {}; // slotType (int) -> { img: Image, loaded: bool }
+    const slotIconCache = {}; // slotType (int) -> { img: Image, loaded: bool }
     (function preloadSlotIcons() {
         if (!SVG_ICONS || !SVG_ICONS.getSlotIcon) return;
-        for (var st = 0; st < C.ST_NAMES.length; st++) {
+        for (let st = 0; st < C.ST_NAMES.length; st++) {
             (function(slotType) {
                 var svg = SVG_ICONS.getSlotIcon(slotType);
                 var img = new Image();
