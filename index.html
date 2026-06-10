@@ -820,6 +820,7 @@
 
 <script src="svg-icons.js"></script>
 <script>
+(function() {
     // ========== VISUAL ENHANCEMENT TRACKERS ==========
     var dropPointPulse = 0; // for pulsing drop point animation
     var activePayloadIndex = 0; // which payload will be used next
@@ -1982,7 +1983,27 @@
             var entry = lb[i];
             var div = document.createElement('div');
             div.className = 'lb-item ' + (i < 3 ? 'top3' : '');
-            div.innerHTML = '<span class="lb-rank">#' + (i + 1) + '</span><span class="lb-name">' + entry.name + '</span><span class="lb-score">' + entry.score + '</span><span class="lb-date">F' + entry.floor + '</span>';
+
+            var rankSpan = document.createElement('span');
+            rankSpan.className = 'lb-rank';
+            rankSpan.textContent = '#' + (i + 1);
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'lb-name';
+            nameSpan.textContent = entry.name;
+
+            var scoreSpan = document.createElement('span');
+            scoreSpan.className = 'lb-score';
+            scoreSpan.textContent = entry.score;
+
+            var dateSpan = document.createElement('span');
+            dateSpan.className = 'lb-date';
+            dateSpan.textContent = 'F' + entry.floor;
+
+            div.appendChild(rankSpan);
+            div.appendChild(nameSpan);
+            div.appendChild(scoreSpan);
+            div.appendChild(dateSpan);
             grid.appendChild(div);
         }
     }
@@ -2319,8 +2340,6 @@
             // MIRROR PEG: Deflects ball in a specific direction
             GS.sc += 100 + GS.cc * 25;
             createFloat(this.x, this.y, 'MIRROR!', '#ffffff');
-            // Store the mirror direction for collision handling
-            this.mirrorDir = this.mirrorDir;
         } else if (this.t === C.PT.H) {
             // HONEYCOMB PEG: Attracts nearby pegs, bonus on 5th hit
             this.attractCount++;
@@ -5897,16 +5916,6 @@
         });
     });
     
-    // ========== ACHIEVEMENT CHECKING ==========
-    function checkAchievements() {
-        for (var i = 0; i < ACHIEVEMENTS.length; i++) {
-            var ach = ACHIEVEMENTS[i];
-            if (PERSIST.ach.indexOf(ach.id) === -1 && ach.check()) {
-                unlockAchievement(ach);
-            }
-        }
-    }
-    
     document.getElementById('spinjp').addEventListener('click', function() {
         spinJackpot(function() {
             updateJackpotUI();
@@ -6275,6 +6284,7 @@
     }
     
     requestAnimationFrame(loop);
+})();
     </script>
 </body>
 </html>
