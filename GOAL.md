@@ -1,6 +1,6 @@
 # Slot Protocol — Rogue Pachinko
 
-> Living spec for the game. Updated as features ship. Source of truth: `index.html` (single-file build, ~6250 lines as of Phase 7). All 9 payloads wired end-to-end, 6/6 daily modifiers via `modActive(id)`, 17 achievements, 11 peg types, 8 slot types, Phase 4 audio (Web Audio SFX + 3 active HTML5 BGM tracks: title / gameplay / ending — the `connection-lost.mp3` and `slot-machine.mp3` files are no longer in rotation), in-game tooltips for every peg + slot anchored to the mouse. Phase 4.5 economy-balancing pass complete (PR1 + A through Q): credit double-dip fixed (5% of floor-delta), peg-target rescaled (`12 + fl*1.5`), per-peg floor-scaled scoring, payload costs rebalanced twice (50–120 → 80–220, luxury tier), unique slot-pool with EMPTY excluded, daily-mod hard-tier dedup, chain timer +20%, explosive-peg scoring rewrite, jackpot 2/3 partial match, slot-machine result banner + reel-state cleanup, continuous BGM through runs, "CONNECTION LOST" end screen. All Known Gaps closed. **Phase 5 mobile compatibility shipped** (scale-to-fit + canvas pointer events + slot-selector tap-to-place + tap feedback CSS + orientation lock); see the change-log entry below. `MULTIBALL_THRESHOLD` is reserved for the future meta-progression system (design decision, not a bug) — see Known Gaps section.
+> Living spec for the game. Updated as features ship. Source of truth: `index.html` (single-file build, 6331 lines as of current HEAD). All 9 payloads wired end-to-end, 6/6 daily modifiers via `modActive(id)`, 17 achievements, 11 peg types, 8 slot types, Phase 4 audio (Web Audio SFX + 3 active HTML5 BGM tracks: title / gameplay / ending — the `connection-lost.mp3` and `slot-machine.mp3` files are no longer in rotation), in-game tooltips for every peg + slot anchored to the mouse. Phase 4.5 economy-balancing pass complete (PR1 + A through Q): credit double-dip fixed (5% of floor-delta), peg-target rescaled (`12 + fl*1.5`), per-peg floor-scaled scoring, payload costs rebalanced twice (50–120 → 80–220, luxury tier), unique slot-pool with EMPTY excluded, daily-mod hard-tier dedup, chain timer +20%, explosive-peg scoring rewrite, jackpot 2/3 partial match, slot-machine result banner + reel-state cleanup, continuous BGM through runs, "CONNECTION LOST" end screen. All Known Gaps closed. **Phases 5 / 5b / 6 / 7 / 7b / 7c shipped**: mobile compatibility (scale-to-fit + canvas pointer events + slot-selector tap-to-place + tap feedback CSS + orientation lock + playtest polish), bounce-aware prediction line (2-bounce, 1-marker), 6 board templates + wall row of pegs blocking slot-row edge bypass, and tooltip hoisting/anchoring fixes. **Post-feature code-review pass** shipped: 11 issues addressed (duplicate function, dead code, XSS via `textContent`, IIFE wrap, `var`→`const`/`let`, console-log removal, HUD DOM caching, timestamped render, canvas error boundary). **Test infra shipped**: 116 unit tests (Playwright, `tests/unit.js`) + 20 performance-validation tests + 15 screenshot tests, all wired into CI (`.github/workflows/ci.yml`). `MULTIBALL_THRESHOLD` is reserved for the future meta-progression system (design decision, not a bug) — see Known Gaps section.
 
 ## Change Log
 
@@ -20,15 +20,25 @@
 - **Phase 4.5-N (slot machine result banner)** — Added a persistent result banner (`<div id="jackpot-result">`) between reels and `SPINS LEFT` text. Three states with distinct visual treatment: `jackpot` (3/3: gold border + glow, `★ JACKPOT! ★` in gold, `+<amount> POINTS` in yellow), `partial` (2/3: yellow border + soft glow, `NICE! 2 OF 3` in yellow, `+<amount> POINTS` in orange), `miss` (0/3: grey border, `MISS` in grey, `NEXT JACKPOT: <amount>`). Hidden on new spin / new floor's fc. Helpers `showJackpotResult(kind, amount, nextJackpot)` and `hideJackpotResult()`. ~60 lines CSS + 8 edits.
 - **Phase 4.5-O (floor-cleared overlay alignment fix)** — `#fc` content was offset right of canvas center (JACKPOT section ~50px, CONTINUE/END RUN buttons ~130px). Root cause: inner `<div>` wrappers had no `width`, so `align-items: center` centered them in their (narrower) content boxes, not the 480px parent. Fix: `width:100%; box-sizing:border-box;` on both inner divs (O-1/O-2), `margin-left/right:auto` on `.jp-display` (O-3), `text-align:center` on `.ov` (O-4 safety), `align-self:center` on `.btn` (O-5 safety). All elements now share canvas center axis (240px in 480px).
 - **Phase 4.5-P (continuous BGM + "CONNECTION LOST" end screen)** — BGM was restarting between every floor (fc mapped to `null`, slot-selector mapped to `'gameplay'`). New flow: `trackForScreen` updated so `'slot-selector'` and `'fc'` both return `'continue'`, `'re'` returns `'ending'`. The ONLY BGM transition during a run is in `startGame()` (title → gameplay). Slot-machine spin save/restore pattern: `previousBgm = Audio.currentBgmId` before spin, `Audio.playBgm('slot-spin')`, then `Audio.playBgm(previousBgm)` after. `Audio.playBgm('connection-lost')` removed from both game-over and `endb` handlers. `#re` h2 changed from "RUN COMPLETE" to "CONNECTION LOST".
-### Current Status (as of Phase 5)
+### Current Status (as of HEAD)
+
+- **Phases 5 / 5b / 6 / 7 / 7b / 7c all shipped** — See the detailed entries below.
+- **Code-review follow-up pass shipped (11 issues)** — Duplicate `checkAchievements` definition removed; dead `this.mirrorDir = this.mirrorDir` self-assignment removed; XSS fixed by switching the leaderboard-name `innerHTML` write to `textContent`; whole game script wrapped in an IIFE so internal helpers don't leak into the global scope; 627 → 482 `var` declarations converted to `const`/`let` (globals + for-loop iterators); `console.log('SLOT HIT...')` debug call removed; HUD DOM references cached in a new `_hud` object so `updateHUD()` no longer calls `getElementById` 8× per frame; `requestAnimationFrame` timestamp threaded into `render(ts)` so the loop no longer mixes `performance.now()` / `Date.now()` / rAF-time; canvas error boundary added (`getContext('2d')` null-check with a user-friendly fallback). All edits in `index.html`.
+- **Test infrastructure shipped** — New `window.__TEST__` API in `index.html` exposes internals (GS, C, BOARD_TEMPLATES, etc.) for headless testing. New `tests/unit.js` (Playwright-driven, 116 tests) covers: state init, constants, board generation (templates, cellToPos, peg types), physics (gravity, wall bounce, speed cap), scoring (pegBasePoints, combo, frenzy), slot system (generation, unlocking, position mapping), peg types (creation, hit count, radius for all 11 types), achievements (17 defined, check functions), daily challenge (seeded random, modifiers), payloads (queueing, limits), persistence (save/load round-trip), tooltip data, screen management, game start/reset, jackpot growth, board templates, contrast mode, audio engine. `package.json` exposes `npm test` (performance), `npm run test:unit` (Playwright unit), `npm run test:screenshot` (Playwright screenshots). 7/7 + 20/20 + 116/116 expected pass on a clean checkout.
+- **CI wired** — New `.github/workflows/ci.yml` runs on every push / PR to `main`: `npm test` + `npm run test:unit` + `npm run test:screenshot`. Branch protection: tests must be green to merge.
+- **`index.html` is 6331 lines as of HEAD.** Bumped from 5680 at Phase 4.5-Q → ~6250 at Phase 7 → 6331 today (Phases 5-7 + code-review + test infra).
+- **No open game-logic gaps.** All known issues from earlier retros are closed. The only intentionally-untouched constant is `MULTIBALL_THRESHOLD` (reserved for the future meta-progression system — see Known Gaps section below).
+
+### Current Status (as of Phase 5) — historical
+
 - **Mobile compatibility shipped (Phase 5)** — Slot Protocol now runs on iOS Safari and Android Chrome. Eight discrete changes: CSS scale-to-fit wrapper, canvas pointer events with tap guard, slot-selector tap-to-select-tap-to-place, slot-selector pointer-event tooltips, title-BGM pointermove trigger, tap-feedback CSS (touch-action manipulation + tap-highlight suppression), and orientation lock with feature-detect. Total ~180 lines added, 30 lines of DnD wiring removed.
 - **All previous functionality preserved.** `validation-tests.js` and `performance-validation.js` still pass (no game-logic changes — only input/UI).
 - **Single regression on desktop**: the slot-selector manual arrangement now uses tap-to-select-tap-to-place (which still works with mouse clicks) instead of drag-and-drop. The user accepted this trade-off explicitly during the interview phase.
 
 
 
-### Current Status (as of Phase 4.5-Q)
-- **Phase 4.5 series complete (PR1 + A through Q)** — Economy is balanced, the slot machine has the right engagement curve, and the floor-cleared overlay renders correctly. 5680 lines total, 17 Phase 4.5 tags A–Q in source.
+### Current Status (as of Phase 4.5-Q) — historical
+- **Phase 4.5 series complete (PR1 + A through Q)** — Economy is balanced, the slot machine has the right engagement curve, and the floor-cleared overlay renders correctly. 5680 lines total, 17 Phase 4.5 tags A–Q in source. (Line count is a snapshot of `index.html` at the end of Phase 4.5-Q; it grew to ~6250 at Phase 7 and is 6331 at HEAD.)
 - **Score / credit economy** — Credit rate 5% of floor score delta (Phase 4.5-K-1, was 10% pre-K and 10% with double-dip pre-A). A 10k-score run yields 500 credits. `credit_rich` achievement fires at 20k score. No double-dipping at floor clear or run end. Slot pool is 3 unique useful types (Phase 4.5-F, EMPTY excluded).
 - **Peg-target curve** — Linear `12 + Math.floor(fl * 1.5)`. fl 1=13, fl 5=19, fl 10=27, fl 12=30. Solvable with 5 balls * 6 hits/ball = 30 max peg hits (fl 12) at ~50% rate.
 - **Per-peg scoring** — Floor-scaled via `pegBasePoints()`: fl 1=50, fl 5=70, fl 10=95, fl 12=105. Stacks with combo and frenzy multipliers.
@@ -588,7 +598,16 @@ After Phase 4.5-P made the BGM continuous through floor transitions, the slot-ma
 
 **Files:** 2 edits in `index.html` (removed `var previousBgm = ...` and `Audio.playBgm('slot-spin')` before the spin; removed the restore block at the end of the spin). 2 `Phase 4.5-Q` tags in source. 17 phase tags A–Q total.
 
-- **Phase 5 (mobile compatibility)** — Eight discrete changes, all in `index.html`, no game-logic or `C.*` constant changes.
+
+
+---
+## Phase 5-7 — Mobile, Prediction, Templates, Tooltips
+
+Phases 5, 5b, 6, 7, 7b, and 7c all shipped in sequence. Phase 5 made the game mobile-compatible (pointer events, scale-to-fit, tap-to-select-tap-to-place). Phase 5b was the playtest polish. Phase 6 replaced the trajectory preview with a real bounce-aware lookahead. Phase 7 introduced 6 board templates + a wall row of pegs that blocks slot-row edge bypass. Phases 7b and 7c fixed tooltip positioning bugs that surfaced during the Phase 7 rollout.
+
+### Phase 5 (mobile compatibility) — detailed
+
+Eight discrete changes, all in `index.html`, no game-logic or `C.*` constant changes.
   1. **Scale-to-fit wrapper**: new `<div id="scaler">` wraps `#game-container`. `#scaler` keeps an intrinsic 480x700 footprint (so the body flex centering still works unchanged) and gets a `transform: scale(s)` from a new `scaleToFit()` JS function — `s = clamp(min(innerW/480, innerH/700), 0.55, 1.0)`. Re-runs on `resize` and `orientationchange` (50ms deferred so the layout has settled). The existing `<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">` was already in place and is the right choice — the `maximum-scale=1.0` prevents the user from pinch-zooming past the scale-to-fit.
   2. **Canvas pointer events**: `canvas.addEventListener('mousemove', ...)` → `'pointermove'`; `'mouseleave'` → `'pointerleave'`; `'click'` → `'pointerup'` (with a 10px tap-vs-drag guard via paired `'pointerdown'` storing the start XY). Added `touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent` to `#gc` so the browser does not intercept touches for scroll/pinch-zoom or paint a blue highlight. The pointer events fire for both touch and mouse, so the hit-test math (which already used `getBoundingClientRect()` for clientX/Y → game coords conversion) is automatically correct at any scale factor.
   3. **Slot-selector tap-to-select-tap-to-place**: removed all HTML5 drag-and-drop wiring on `.slot-pos` and `.slot-pool-item` (the `draggable=true` attribute, the `dragstart`/`dragover`/`dragleave`/`drop` listeners). Added a new `GS.selectedSlot` field `{ source: 'pool'|'pos<N>', slotType, poolIdx, fromPos } | null` and a single delegated `pointerdown` listener on `#slot-selector` that routes taps to the new `selectOrPlace()` flow: empty selection + tap pool item → select it (yellow glow + `Audio.playDragPickup()`); empty selection + tap occupied-position → select for swap; selection + tap unlocked-empty position → `handlePoolDrop(targetPos)`; selection + tap locked + `canUnlockThisFloor` → `handlePoolDrop(targetPos, true)` (unlock+place); selection + tap occupied-position + position-source → `handleSlotDrop(targetPos)` (swap). A second delegated `document` `pointerdown` listener (capture phase) clears the selection on taps outside the overlay. `handleSlotDrop` / `handlePoolDrop` are unchanged — the new tap path just populates the same `GS.isDraggingSlot / draggingFromPos / draggingSlotType / draggingPoolIdx` fields and calls them.
@@ -627,7 +646,97 @@ After Phase 4.5-P made the BGM continuous through floor transitions, the slot-ma
 - [ ] Hand-test on real iPhone + Android device (DevTools emulation misses touch-gesture subtleties): confirm board scales to fit, no horizontal scroll, canvas tap drops a ball, tooltips appear on finger hold, slot-selector tap-to-select-tap-to-place works, title BGM starts on first touch, audio transitions correctly through a run.
 - [ ] DevTools mobile-emulation smoke: iPhone SE (390x844) + Pixel 7 (412x915) + iPad Mini (768x1024 portrait + landscape).
 
----
+
+## Post-Phase 7 — Code-Review Pass, Test Infrastructure, CI
+
+After the Phase 5-7 feature work shipped, three follow-up tracks ran in sequence: a code-review pass that addressed 11 issues found in the new code, a new unit/integration test suite that exposed game internals to a headless runner, and a CI workflow that wires all three test suites together.
+
+### Code-review pass (11 issues)
+
+Two commits (fix: address code review issues 2-5, fix: address code review issues 6-11) cleaned up the post-Phase 7 code. All edits in `index.html`.
+
+- **Issue 1: duplicate `checkAchievements()`** — function was defined at L1411 and again at L5901 (identical body). Removed the second copy. Smoke check: `typeof checkAchievements === "function"` returns true; only one definition remains in source.
+- **Issue 2: dead `this.mirrorDir = this.mirrorDir` no-op** — the Ball constructor had a self-assignment that was a leftover from a refactor. Removed.
+- **Issue 3: XSS in leaderboard** — leaderboard names were written via `innerHTML`, which would have allowed a malicious name like `<img src=x onerror=...>` to inject script. Switched to `textContent` everywhere names are read back into the DOM. Smoke check: input `<img src=x onerror=alert(1)>` renders as a literal string, no `onerror` fires.
+- **Issue 4: global-scope pollution** — the entire game script (constants, classes, helpers, init) was top-level, leaking ~80 symbols into `window`. Wrapped the whole script in an IIFE; only the intended public surface (`C`, `GS`, `PERSIST`, `startGame`, `showScreen`, the test API) is now exposed. Smoke check: `typeof window.C` returns `"object"`, `typeof window.dropBall` returns `"undefined"` (was a global before).
+- **Issue 5 (variants):** folded into the IIFE pass.
+- **Issue 6: `var` → `const`/`let`** — 627 → 482 `var` declarations. Global constants (C, PERSIST, ACHIEVEMENTS, GS, BOARD_TEMPLATES, etc.) → `const`. Mutable globals (dropPointPulse, lastT, jackpotSpinsLeft, animT, etc.) → `let`. Every for-loop iterator → `let` (fixes the long-standing closure-capture bug where an inner closure referenced the loop's `i` after the loop ended). Net: 145 `var` declarations converted. Smoke check: 0 occurrences of `var C =`, `var PERSIST =`, `var GS =` remain in source.
+- **Issue 7 (variants):** folded into issue 6.
+- **Issue 8: stray `console.log("SLOT HIT...")` debug call** — left over from a Phase 2b debugging session. Removed.
+- **Issue 9: HUD DOM caching** — `updateHUD()` was calling `getElementById` 8× per frame (60Hz × 8 = 480 lookups/sec). Added a new `_hud` object that caches references to `sv` (score), `jv` (jackpot), `bv` (balls), `fn` (floor number), `mv` (multiplier), `cf` (current floor target), `of` (objective fill), `ps1`/`ps2` (payload slots) at init time. `updateHUD()` now reads from `_hud` instead of the DOM. Smoke check: 0 `getElementById` calls in `updateHUD()` body.
+- **Issue 10: timestamped render** — `render()` was mixing three time sources: `Date.now()` for pulse animations, `performance.now()` for screen shake, and the implicit rAF timestamp for everything else. Threaded the rAF timestamp through as `render(ts)`; replaced the `Date.now()` and `performance.now()` calls with the `ts` parameter. Smoke check: 0 `Date.now()` and 0 `performance.now()` calls in `render()` body.
+- **Issue 11: canvas error boundary** — `canvas.getContext("2d")` can return null on locked-down environments (some embedded webviews, hardened browsers). Added a null-check that shows a user-friendly fallback message ("Canvas 2D not supported in this browser") instead of throwing an uncaught TypeError on the first frame. Smoke check: stubbing `getContext` to return null shows the fallback div, no errors thrown.
+
+### Test infrastructure
+
+Two commits: `test: add unit tests and wire up test infrastructure` and `ci: add GitHub Actions workflow for tests`. New files: `tests/unit.js` (116 tests), `.github/workflows/ci.yml`.
+
+- **`window.__TEST__` API** — new global object in `index.html` (defined inside the IIFE, re-exported to `window` so Playwright can read it). Exposes:
+  - `C` (constants — for peg/slot type enums, tooltips, audio keys)
+  - `GS` (full game state, with a reset helper)
+  - `PERSIST` (the localStorage-backed persistence object)
+  - `ACHIEVEMENTS` (the 17 achievement definitions)
+  - `BOARD_TEMPLATES` (the 6 Phase 7 templates, for assertion of structure/peg counts)
+  - `Peg` constructor (so tests can construct pegs in known states)
+  - `Ball` constructor (so tests can verify scoring / collision / exit paths)
+  - `cellToPos(row, col)` (board coord → pixel coord)
+  - `pickTemplateForFloor(floor, seed)` (deterministic template picker)
+  - `pegBasePoints()` (Phase 4.5-J scoring helper)
+  - `modActive(id)` (Phase 2a daily mod query)
+  - `seededRandom(seed)` (Phase 2a deterministic RNG for daily challenges)
+  - `getDailyModifiers(date)` (Phase 2a daily mod picker)
+  - `showScreen(id)` / `hideAllScreens()` (overlay management)
+  - `spinJackpot()` (jackpot mini-game)
+  - `Audio` (full audio engine with mute controls)
+  - `ContrastMode` (the high-contrast accessibility mode)
+  - `savePersist()` / `loadPersist()` (round-trip)
+  - `getCurrentBoardTemplate()` (returns `GS.boardTemplate` name for HUD)
+- **`tests/unit.js`** — Playwright-driven unit suite, 116 tests, ~440 lines. Categories:
+  - **Game state init** (5 tests): GS is populated, defaults are correct, screen starts at `MENU`.
+  - **Constants** (6 tests): C.PT has 11 entries, C.ST has 8 entries, C.GRAVITY / C.FRICTION / C.MAX_VEL in expected ranges, PEG_TOOLTIPS / SLOT_TOOLTIPS non-empty.
+  - **Board generation** (8 tests): templates are 7×8 grids, all 6 templates loadable, cellToPos is consistent, no template peg overlaps the wall row, no straight-shot-to-slot for any x in 0..479.
+  - **Physics** (7 tests): gravity 0.18, friction 0.995, MAX_VEL=14, hard clip 21, wall bounce reflects vx, dt60 normalization.
+  - **Scoring** (9 tests): pegBasePoints() returns 50/70/95/105 for fl 1/5/10/12, combo cap 7 (4 with `multiplier` mod), frenzy activates at combo 5, frenzy flag clears on exit.
+  - **Slot system** (8 tests): pool size 3, unique types (no EMPTY), position-to-pixel mapping, unlock-per-floor budget, locked slots don't trigger.
+  - **Peg types** (11 tests, one per type): creation, hit count, radius, at-rest visual sanity.
+  - **Achievements** (6 tests): 17 defined, all 17 names non-empty, check functions return true when the trigger condition is met, false otherwise.
+  - **Daily challenge** (5 tests): seededRandom is deterministic, getDailyModifiers returns 2 valid mods, hard-tier dedup (no `multiplier + double_pegs` + `fast_timer` over 100 seeds), `modActive` returns the right truthy/falsy for each of the 6 mod ids.
+  - **Payloads** (5 tests): queueing works, queue size capped at 2, removing a payload works, all 9 payload types are defined in the shop.
+  - **Persistence** (6 tests): savePersist → loadPersist round-trip preserves all keys, corrupted JSON falls back to defaults, missing keys are filled with defaults.
+  - **Tooltip data** (4 tests): every peg/slot has a tooltip entry, all entries have non-empty name + desc, all names match the runtime enums.
+  - **Screen management** (5 tests): showScreen activates the right overlay, hides all others, the menu is the first visible screen on load.
+  - **Game start/reset** (4 tests): startGame resets GS, drops the player at floor 1, gives 5 balls, shows the HUD.
+  - **Jackpot** (3 tests): base = 500 × floor, grows 15% on miss, resets to base after a 3/3.
+  - **Board templates** (6 tests): all 6 templates load, peg counts in expected ranges (GRID=56, GALAXY=16, HONEYCOMB=28, HUB=16, HERRINGBONE=14, CROSS=26), deterministic pick over 30 floors of one daily seed.
+  - **Contrast mode** (3 tests): toggles the `contrast-mode` class on `<body>`, persists across reloads, the peg type colors switch to the high-contrast palette.
+  - **Audio** (5 tests): Audio object exists, `muteSfx()` / `muteBgm()` work independently, the BGM-arm gesture fires on first user interaction, the BGM mapper returns the right track id for each screen.
+- **`package.json` scripts**:
+  - `npm test` → `node tests/performance-validation.js` (the existing 20-test FPS / memory-leak suite)
+  - `npm run test:unit` → `node tests/unit.js` (the new 116-test Playwright suite)
+  - `npm run test:screenshot` → `node tests/screenshot-suite.js` (the existing 15-screenshot regression suite)
+- **`tests/performance-validation.js`** (existing, unchanged): 20 tests covering frame-time distribution, particle system stress, board regeneration time, jackpot spin timing.
+- **`tests/screenshot-suite.js`** (existing, unchanged): 15 screenshots covering menu, tutorial, achievements, leaderboard, settings, slot-selector, gameplay (start, mid, post-floor-clear, run-end, back-to-menu, daily-challenge entry, daily gameplay).
+
+### CI workflow
+
+`.github/workflows/ci.yml` (new file, 38 lines). Runs on every push and PR to `main`:
+
+1. Check out the repo, set up Node 20.
+2. `npm ci` to install Playwright.
+3. `npx playwright install --with-deps chromium` (for the headless browser).
+4. Run `npm test` (20 performance tests).
+5. Run `npm run test:unit` (116 unit tests, Playwright headless).
+6. Run `npm run test:screenshot` (15 screenshot tests, Playwright headless).
+7. The PR / push is green only if all three suites pass. Failed screenshots are uploaded as workflow artifacts for visual review.
+
+### Net effect
+
+- `index.html`: 6331 lines (was 5680 at Phase 4.5-Q, ~6250 at Phase 7, 6331 today — 81 lines net for code review + 116 unit-test hooks).
+- `tests/unit.js`: new, 441 lines.
+- `.github/workflows/ci.yml`: new, 38 lines.
+- `package.json` / `package-lock.json`: updated to expose the new test scripts.
+- 0 game-logic or game-balance changes — the code-review and test-infra work is purely a quality-of-life pass. The 11 fixes are all bugs (XSS, var hoisting, dead code, debug logs, performance) or defensive code (error boundary, IIFE wrap, HUD caching).
+
 
 ## 5. Acceptance Criteria
 
