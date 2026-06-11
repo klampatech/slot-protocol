@@ -946,13 +946,13 @@
         return 2 + Math.floor(GS.fl / 10);
     }
 
-    // Phase 8b: render all N payload slots in #pi. Appends new .ps
+    // Phase 8b + 8c: render all N payload slots in #pi. Appends new .ps
     // divs if the cap grew since the last call, then populates each
     // from C.PAYLOADS (icon + color) or empty state (-). Called from
     // updateHUD every frame so the slots stay in sync with GS.pl and
-    // the floor-driven cap. Defensive against the GS.pl[i] shape: 8a
-    // stored 1-element arrays (['daemon']), 8c will flatten to plain
-    // strings ('daemon') - both work with the Array.isArray check.
+    // the floor-driven cap. 8c flattened GS.pl entries from 1-element
+    // arrays (['daemon']) to plain strings ('daemon') - dedup + consume-
+    // all on drop are now safe to assume.
     function renderPayloadSlots() {
         var container = _hud && _hud.pi;
         if (!container) return;
@@ -968,8 +968,11 @@
         }
         for (let i = 0; i < cap; i++) {
             var ps = container.children[i];
-            var entry = GS.pl[i];
-            var name = entry == null ? null : (Array.isArray(entry) ? entry[0] : entry);
+            // Phase 8c: GS.pl[i] is a plain string (e.g. 'daemon'),
+            // not a 1-element array. 8a/8b used ['daemon']; the
+            // flattening happened in the shop buy handler and the
+            // PA slot effect.
+            var name = GS.pl[i] || null;
             var p = name ? C.PAYLOADS[name] : null;
             if (p) {
                 var iconSvg = SVG_ICONS.getPayloadIcon(p.icon);
@@ -2995,16 +2998,32 @@
                 break;
                 
             case C.ST.PA: // PAYLOAD: Add free payload
-                // Phase 8b: random roll now reads from C.PAYLOADS
-                // (single source of truth from 8a) and the cap is
-                // dynamic (2/3/4/5 by floor). 8c will add dedup so
-                // a random roll that's already in the queue gets
-                // re-rolled.
+                // Phase 8c: dedup + flatten. The random roll reads
+                // from C.PAYLOADS (single source of truth from 8a)
+                // and the cap is dynamic (2/3/4/5 by floor, 8b). If
+                // the first roll matches a payload already in the
+                // queue, re-roll up to 20 times looking for a unique
+                // type. With 9 payload types and a cap of 2-5 there
+                // are always at least 4 unused types, so a unique
+                // roll is guaranteed well before the 20-attempt cap.
+                // The defensive cap protects against any future
+                // C.PAYLOADS shrinkage. If a unique roll is found,
+                // push the string (not a 1-element array - 8a/8b
+                // form) and float the +PAYLOAD message. If the cap
+                // is full OR all 9 are somehow queued (impossible in
+                // practice), no-op silently.
                 if (GS.pl.length < maxPayloads()) {
                     var payloadKeys = Object.keys(C.PAYLOADS);
                     var randomKey = payloadKeys[Math.floor(Math.random() * payloadKeys.length)];
-                    GS.pl.push([randomKey]);
-                    createFloat(C.W / 2, C.SY - 20, '+PAYLOAD', '#9944ff');
+                    var attempts = 0;
+                    while (GS.pl.indexOf(randomKey) !== -1 && attempts < 20) {
+                        randomKey = payloadKeys[Math.floor(Math.random() * payloadKeys.length)];
+                        attempts++;
+                    }
+                    if (GS.pl.indexOf(randomKey) === -1) {
+                        GS.pl.push(randomKey);
+                        createFloat(C.W / 2, C.SY - 20, '+PAYLOAD', '#9944ff');
+                    }
                 }
                 break;
                 
@@ -4413,32 +4432,55 @@
         document.getElementById('scr').textContent = PERSIST.br;
         var grid = document.getElementById('sg');
         grid.innerHTML = '';
-        // Phase 8b: iterate C.PAYLOADS (single source of truth from
-        // 8a) and use maxPayloads() for the buy cap. Shop tiles for
-        // which the player has no slot are styled .disabled and the
-        // click handler silently no-ops (8c will also dedup within
-        // the slot set so duplicates are blocked too).
+        // Phase 8b + 8c: iterate C.PAYLOADS (single source of truth
+        // from 8a) and use maxPayloads() for the buy cap. Two
+        // independent "disabled" conditions per tile:
+        //   1. Queue is full (full = GS.pl.length >= cap) - applies
+        //      to every tile the same way (no slot to put a new
+        //      payload in).
+        //   2. Payload is already queued (isQueued) - the dedup
+        //      added in 8c. Each tile computes its own isQueued
+        //      from the current GS.pl contents. Tiles that are
+        //      full OR already-queued get the .disabled class
+        //      (50% opacity, not-allowed cursor). The click handler
+        //      is a defensive no-op for any disabled tile, so a
+        //      double-click or a tile that became disabled between
+        //      render and click can't sneak a duplicate through.
         var cap = maxPayloads();
         var full = GS.pl.length >= cap;
         Object.keys(C.PAYLOADS).forEach(function(key) {
             var p = C.PAYLOADS[key];
+            var isQueued = GS.pl.indexOf(key) !== -1;
+            var disabled = full || isQueued;
             var div = document.createElement('div');
-            div.className = 'si' + (full ? ' disabled' : '');
+            div.className = 'si' + (disabled ? ' disabled' : '');
             var iconSvg = SVG_ICONS.getPayloadIcon(p.icon);
             div.innerHTML = '<div class="in">' + p.name + '</div><div class="ic"><span class="svg-icon svg-icon-24" style="display:inline-block;width:24px;height:24px;vertical-align:middle;">' + iconSvg + '</span> ' + p.cost + '</div><div class="ii">' + p.desc + '</div>';
-            div.addEventListener('click', (function(payloadKey, pData) {
+            div.addEventListener('click', (function(payloadKey, pData, isDisabled) {
                 return function() {
-                    if (PERSIST.br >= pData.cost && GS.pl.length < cap) {
-                        PERSIST.br -= pData.cost;
-                        // Push the lowercase key (matches dropBall /
-                        // triggerSlotCollected / updateHUD lookups).
-                        // 8a stores 1-element arrays; 8c flattens to
-                        // plain strings - both are accepted.
-                        GS.pl.push([payloadKey]);
-                        updateShop();
-                    }
+                    // Defensive no-op for any disabled tile (queue
+                    // full or already-queued). The .disabled class
+                    // is the visual cue; the cursor is not-allowed
+                    // and the click sound is suppressed.
+                    if (isDisabled) return;
+                    if (PERSIST.br < pData.cost) return;
+                    // Phase 8c: dedup guard inside the click handler
+                    // (belt + suspenders with the .disabled class).
+                    // indexOf is O(n) on a cap-sized array so this
+                    // is essentially free.
+                    if (GS.pl.indexOf(payloadKey) !== -1) return;
+                    PERSIST.br -= pData.cost;
+                    // Phase 8c: push the lowercase key as a plain
+                    // string (not a 1-element array). Matches the
+                    // new dropBall consume-all / dedup-re-roll /
+                    // renderPayloadSlots form. dropBall's local
+                    // `pl` variable is still the array returned by
+                    // GS.pl.splice(0), so the existing
+                    // `pl.indexOf('ghost')` checks still work.
+                    GS.pl.push(payloadKey);
+                    updateShop();
                 };
-            })(key, p));
+            })(key, p, disabled));
             grid.appendChild(div);
         });
     }
@@ -4743,9 +4785,14 @@
             // Phase 8b: read metadata from C.PAYLOADS instead of the
             // three parallel arrays (payloadNames, payloadColors, the
             // indexOf lookup). 8a already centralized the table.
+            // Phase 8c: GS.pl[0] is now a plain string ('daemon') not a
+            // 1-element array. With consume-all-on-drop, the queue
+            // shows the FIRST payload's icon + a small "xN" count
+            // badge when more than one is queued, so the player can
+            // see "how many will fire on the next drop" without
+            // having to look at the .ps row at the bottom of the board.
             if (GS.pl.length > 0) {
-                var nextEntry = GS.pl[0];
-                var nextName = nextEntry ? (Array.isArray(nextEntry) ? nextEntry[0] : nextEntry) : null;
+                var nextName = GS.pl[0];
                 if (nextName && C.PAYLOADS[nextName]) {
                     var pMeta = C.PAYLOADS[nextName];
                     // Payload indicator at drop point
@@ -4762,6 +4809,16 @@
                     ctx.font = 'bold 8px Courier New';
                     ctx.textAlign = 'center';
                     ctx.fillText(pMeta.short.substring(0, 4), dropX, dropY + 38);
+                    // Phase 8c: count badge in the top-right of the
+                    // circle when more than one payload is queued.
+                    // Yellow so it pops against the dark backdrop and
+                    // is unambiguous with the white short-name text.
+                    if (GS.pl.length > 1) {
+                        ctx.fillStyle = '#ffff00';
+                        ctx.font = 'bold 7px Courier New';
+                        ctx.textAlign = 'left';
+                        ctx.fillText('x' + GS.pl.length, dropX + 9, dropY + 28);
+                    }
                 }
             }
             
@@ -5600,7 +5657,17 @@
         if (!PERSIST.multiballEnabled && GS.ball) return;
         
         GS.canDrop = false;
-        var pl = GS.pl.shift() || [];
+        // Phase 8c: consume ALL queued payloads on drop, not just the
+        // first one. 8a/8b used `GS.pl.shift()` which took only the
+        // head of the queue and left the rest. The new model is a
+        // "loadout": every queued payload fires on the next drop. With
+        // the dedup added in 8c (shop + PA slot), the queue contains
+        // up to maxPayloads() UNIQUE types - dropping a ball with
+        // [daemon, ghost, cluster] applies all three effects at once
+        // (shield + phasing + 3-mini split). The local `pl` variable
+        // is still the array the Ball constructor and the per-payload
+        // indexOf() checks below iterate over.
+        var pl = GS.pl.splice(0);
         
         var newBall = new Ball(GS.mouseX, C.DZY + 10, 0, 2, pl);
 
