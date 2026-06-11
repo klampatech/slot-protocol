@@ -3974,7 +3974,7 @@
     }
     
     // Update all visual enhancement effects
-    function updateVisualEffects(dt) {
+    function updateVisualEffects(dt, ts) {
         var dt60 = dt * 60;
         
         // Update drop point pulse
@@ -4024,7 +4024,18 @@
         // Update jackpot pulse
         jackpotPulse += dt60 * 0.05;
         
-        // Update life indicators visual
+        // Update life indicators visual. `ts` is the rAF timestamp
+        // (threaded all the way from loop() -> updateFX() -> here) so
+        // the pulse phase is in the same time base as the rest of the
+        // per-frame animations. Previously `ts` was referenced but
+        // never passed in (a leftover from the post-feature code-
+        // review pass that threaded ts through render() but missed
+        // this nested call site), so this line threw a ReferenceError
+        // every frame and silently killed the render loop after the
+        // player entered PLAYING state - the canvas froze, the board
+        // stopped updating, and the slot selector drop-zone indicator
+        // went blank. Fixed in the same PR as Phase 8c after the
+        // screenshot test exposed it.
         lifeIndicators = [];
         for (let i = 0; i < GS.bl; i++) {
             lifeIndicators.push({
@@ -4057,7 +4068,7 @@
         spawnFloatText(x, y, txt, col || '#00fff2');
     }
 
-    function updateFX(dt) {
+    function updateFX(dt, ts) {
         var dt60 = dt * 60;
         for (let i = parts.length - 1; i >= 0; i--) {
             var p = parts[i];
@@ -4094,7 +4105,7 @@
         }
         
         // Update visual enhancement effects
-        updateVisualEffects(dt);
+        updateVisualEffects(dt, ts);
     }
 
     // ========== UI ==========
@@ -5496,7 +5507,7 @@
                 if (GS.ft <= 0) GS.fa = false;
             }
             updateBalls(dt);
-            updateFX(dt);
+            updateFX(dt, ts);
             
             // Check floor complete
             if (GS.obj.prg >= GS.obj.tgt && GS.activeBalls.length === 0) {
@@ -6516,6 +6527,12 @@
         modActive: modActive, getDailySeed: getDailySeed,
         seededRandom: seededRandom, getDailyModifiers: getDailyModifiers,
         startGame: startGame, showScreen: showScreen,
+        // Exposed for the render-loop regression test (ts-bug guard).
+        // The functions are scoped to the IIFE, so the test suite can't
+        // call them directly; exposing the .length (parameter arity) is
+        // enough to assert the (dt, ts) signature is intact.
+        updateFXArity: updateFX.length,
+        updateVisualEffectsArity: updateVisualEffects.length,
         Ball: Ball, Peg: Peg,
         BOARD_TEMPLATES: BOARD_TEMPLATES,
         rollPegType: rollPegType, cellToPos: cellToPos,
