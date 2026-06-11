@@ -792,6 +792,90 @@ function section(title) {
     assert(audioData.hasInit === true, 'Audio.init is a function');
     assert(audioData.hasPlayBgm === true, 'Audio.playBgm is a function');
 
+    // ========== RENDER LOOP: REGRESSION TESTS ==========
+    // Bug history: the post-feature code-review pass (issue #10) threaded
+    // the rAF `ts` timestamp through render(ts), but missed the nested
+    // call to updateVisualEffects(dt). That function referenced `ts` for
+    // a per-ball pulse phase, but `ts` was never passed in. Every frame
+    // the game spent in PLAYING state threw a `ReferenceError: ts is not
+    // defined`, which propagated up out of loop() and killed the render
+    // loop. The canvas froze after the player entered PLAYING (e.g. after
+    // clicking through the slot selector), so the board pegs, prediction
+    // line, drop indicator, and slot bar all stopped updating. The
+    // screenshot suite ran without error (it just saves whatever's on the
+    // page) so the bug shipped undetected.
+
+    section('Render Loop Regression');
+
+    // 1. updateFX signature accepts (dt, ts). The functions are scoped
+    //    to the IIFE, so we read the arity via window.__TEST__ (the
+    //    value is captured at IIFE-init time). If someone removes the
+    //    ts parameter, the arity drops to 1 and this fails.
+    let fxSignature = await inGame(() => {
+        return { arity: window.__TEST__.updateFXArity };
+    });
+    assert(fxSignature.arity >= 2, 'updateFX signature accepts (dt, ts) — bug regression guard', 'arity is ' + fxSignature.arity);
+
+    // 2. updateVisualEffects signature accepts (dt, ts). Same shape.
+    let veSignature = await inGame(() => {
+        return { arity: window.__TEST__.updateVisualEffectsArity };
+    });
+    assert(veSignature.arity >= 2, 'updateVisualEffects signature accepts (dt, ts) — bug regression guard', 'arity is ' + veSignature.arity);
+
+    // 3. The live render loop doesn't throw. Drive several frames of
+    //    PLAYING-state render via rAF, then check that the canvas has
+    //    actual content in the peg-field region (y=100..550). Before
+    //    the fix, the loop died on the first PLAYING frame and the
+    //    peg-field region stayed transparent (clearRect + no further
+    //    draws) — the bug manifested as a blank board.
+    let renderCheck = await inGame(async () => {
+        const t = window.__TEST__;
+        // Capture pageerrors during the render
+        const original = window.onerror;
+        const errs = [];
+        window.addEventListener('error', (e) => errs.push(e.message));
+
+        // Reset to a known PLAYING state
+        t.startGame();
+        t.showScreen('none');
+
+        // Wait for the next 3 animation frames so updateFX has been
+        // called at least 3 times (the bug fires on the first call).
+        await new Promise((res) => {
+            let n = 0;
+            const tick = () => {
+                n++;
+                if (n >= 3) res();
+                else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        });
+
+        const canvas = document.getElementById('gc');
+        const ctx = canvas.getContext('2d');
+        // Sample the peg-field band (y=100..550, full width). With the
+        // bug, this region is all transparent. With the fix, it has
+        // hundreds of cyan pegs + grid lines.
+        const data = ctx.getImageData(0, 100, 480, 450).data;
+        let nonZero = 0;
+        let cyan = 0;
+        for (let i = 3; i < data.length; i += 4) {
+            if (data[i] > 50) nonZero++;
+            if (data[i] > 100 && data[i - 1] > 100) cyan++;
+        }
+
+        window.removeEventListener('error', errs.length ? null : null);
+        return {
+            errors: errs,
+            nonZero,
+            cyan,
+            pegCount: t.GS.bd.length
+        };
+    });
+    assert(renderCheck.errors.length === 0, 'No JS errors thrown during PLAYING render', JSON.stringify(renderCheck.errors));
+    assert(renderCheck.pegCount > 0, 'Board has pegs (sanity check)');
+    assert(renderCheck.cyan > 500, 'Peg-field band has visible cyan content (board is rendering)', 'only ' + renderCheck.cyan + ' cyan pixels in 480x450 peg-field band');
+
     // ========== CLEANUP ==========
     await browser.close();
 
