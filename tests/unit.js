@@ -306,6 +306,98 @@ function section(title) {
     });
     assert(payloadLimit === 2, 'Payload limit enforced to 2');
 
+    // Phase 8b: maxPayloads() is the dynamic cap. Verify the curve
+    // at every floor boundary (1, 9, 10, 19, 20, 29, 30, 39, 50)
+    // and confirm a fresh renderPayloadSlots() builds the right
+    // number of .ps children.
+    let capCurve = await inGame(() => {
+        const out = {};
+        for (const fl of [1, 5, 9, 10, 15, 19, 20, 29, 30, 39, 50]) {
+            GS.fl = fl;
+            out['fl' + fl] = maxPayloads();
+        }
+        return out;
+    });
+    assert(capCurve.fl1 === 2, 'maxPayloads(1) = 2');
+    assert(capCurve.fl5 === 2, 'maxPayloads(5) = 2');
+    assert(capCurve.fl9 === 2, 'maxPayloads(9) = 2 (just below boundary)');
+    assert(capCurve.fl10 === 3, 'maxPayloads(10) = 3 (cap increases)');
+    assert(capCurve.fl19 === 3, 'maxPayloads(19) = 3 (just below next boundary)');
+    assert(capCurve.fl20 === 4, 'maxPayloads(20) = 4');
+    assert(capCurve.fl29 === 4, 'maxPayloads(29) = 4');
+    assert(capCurve.fl30 === 5, 'maxPayloads(30) = 5');
+    assert(capCurve.fl50 === 7, 'maxPayloads(50) = 7');
+
+    // Phase 8b: renderPayloadSlots() creates maxPayloads() children
+    // in #pi, populates populated entries with icon + data-payload,
+    // and leaves the rest as empty '-'.
+    let slotRender = await inGame(() => {
+        // Reset #pi to a known state, then populate 2 of 3 slots.
+        const pi = document.getElementById('pi');
+        pi.innerHTML = '';
+        GS.fl = 10; // cap = 3
+        GS.pl = [['daemon'], ['ghost']];
+        renderPayloadSlots();
+        const kids = Array.from(pi.children);
+        return {
+            childCount: kids.length,
+            firstClass: kids[0].className,
+            firstPayload: kids[0].dataset.payload,
+            firstHasIcon: kids[0].querySelector('.ps-icon') !== null,
+            secondClass: kids[1].className,
+            secondPayload: kids[1].dataset.payload,
+            thirdClass: kids[2].className,
+            thirdHasPayload: 'payload' in kids[2].dataset,
+            thirdDash: kids[2].textContent.trim() === '-'
+        };
+    });
+    assert(slotRender.childCount === 3, 'renderPayloadSlots(fl 10) creates 3 children');
+    assert(slotRender.firstClass === 'ps on', 'Slot 0 populated has ps on class');
+    assert(slotRender.firstPayload === 'daemon', 'Slot 0 data-payload is daemon');
+    assert(slotRender.firstHasIcon, 'Slot 0 contains an icon span');
+    assert(slotRender.secondClass === 'ps on', 'Slot 1 populated has ps on class');
+    assert(slotRender.secondPayload === 'ghost', 'Slot 1 data-payload is ghost');
+    assert(slotRender.thirdClass === 'ps', 'Slot 2 (empty) has ps class only');
+    assert(!slotRender.thirdHasPayload, 'Slot 2 has no data-payload attribute');
+    assert(slotRender.thirdDash, 'Slot 2 shows the empty "-"');
+
+    // Phase 8b: growing the cap further only appends, never shrinks
+    // (cap monotonically increases during a run).
+    let slotGrow = await inGame(() => {
+        const pi = document.getElementById('pi');
+        pi.innerHTML = '';
+        GS.fl = 5; GS.pl = []; renderPayloadSlots();
+        const after5 = pi.children.length;
+        GS.fl = 25; renderPayloadSlots();
+        const after25 = pi.children.length;
+        GS.fl = 35; renderPayloadSlots();
+        const after35 = pi.children.length;
+        return { after5, after25, after35 };
+    });
+    assert(slotGrow.after5 === 2, 'fl 5: 2 slots');
+    assert(slotGrow.after25 === 4, 'fl 25: 4 slots (grew from 2)');
+    assert(slotGrow.after35 === 5, 'fl 35: 5 slots (grew from 4)');
+
+    // Phase 8b: startGame resets lastMaxPayloads and clears #pi.
+    // If a previous run reached fl 20 (cap 4) and a new run starts
+    // at fl 1 (cap 2), #pi must be empty before the first
+    // renderPayloadSlots() call.
+    let startGameReset = await inGame(() => {
+        // Simulate a late-game state left over from a prior run
+        const pi = document.getElementById('pi');
+        pi.innerHTML = '<div class="ps"></div><div class="ps"></div><div class="ps"></div><div class="ps"></div>';
+        GS.fl = 20; GS.pl = []; renderPayloadSlots();
+        const before = pi.children.length;
+        // Now run startGame (fl resets to 1, #pi should be emptied)
+        startGame();
+        const after = pi.children.length;
+        const tracker = GS.lastMaxPayloads;
+        return { before, after, tracker };
+    });
+    assert(startGameReset.before === 4, 'Pre-startGame: #pi has 4 stale divs');
+    assert(startGameReset.after === 0, 'Post-startGame: #pi is empty');
+    assert(startGameReset.tracker === 2, 'Post-startGame: lastMaxPayloads = 2 (fl 1)');
+
     // ========== PERSISTENCE ==========
     section('Persistence');
 
@@ -335,6 +427,37 @@ function section(title) {
     assert(tooltipData.slotCount === 8, '8 slot tooltips defined');
     assert(tooltipData.pegKeys.includes(0), 'Tooltip for NODE (0) exists');
     assert(tooltipData.pegKeys.includes(10), 'Tooltip for OVERLOAD (10) exists');
+
+    // Phase 8a: payload metadata table is the single source of truth
+    // for tooltip text, shop cost, in-game color, and icon index.
+    let payloadMeta = await inGame(() => {
+        const keys = Object.keys(C.PAYLOADS);
+        const allFields = keys.every(k =>
+            C.PAYLOADS[k].name && C.PAYLOADS[k].short &&
+            C.PAYLOADS[k].desc && typeof C.PAYLOADS[k].cost === 'number' &&
+            C.PAYLOADS[k].color && typeof C.PAYLOADS[k].icon === 'number'
+        );
+        const names = keys.map(k => C.PAYLOADS[k].name);
+        // Icon indices must be 0..8 and unique - the existing updateShop
+        // and updateHUD arrays use the same order, so this catches any
+        // accidental reorder or dup.
+        const icons = keys.map(k => C.PAYLOADS[k].icon);
+        const uniqueIcons = new Set(icons).size === icons.length;
+        return {
+            count: keys.length,
+            allFields,
+            names,
+            icons,
+            uniqueIcons
+        };
+    });
+    assert(payloadMeta.count === 9, '9 payloads defined in C.PAYLOADS');
+    assert(payloadMeta.allFields, 'Every C.PAYLOADS entry has name, short, desc, cost, color, icon');
+    assert(payloadMeta.uniqueIcons, 'C.PAYLOADS icon indices are unique');
+    assert(payloadMeta.icons.sort((a, b) => a - b).every((v, i) => v === i), 'C.PAYLOADS icon indices are 0..8 contiguous');
+    assert(payloadMeta.names.includes('DAEMON'), 'C.PAYLOADS includes DAEMON');
+    assert(payloadMeta.names.includes('LOGIC BOMB'), 'C.PAYLOADS includes LOGIC BOMB');
+    assert(payloadMeta.names.includes('SLOWMO'), 'C.PAYLOADS includes SLOWMO');
 
     // ========== SCREEN MANAGEMENT ==========
     section('Screen Management');

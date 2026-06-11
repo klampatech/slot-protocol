@@ -880,6 +880,28 @@
             6: { name: 'OVERCLOCK', desc: '1.5× gravity for the current ball only.' },
             7: { name: 'JACKPOT',   desc: 'Adds the current jackpot to your score. Jackpot grows 15% if missed.' }
         },
+        // Phase 8a: payload metadata table - single source of truth for
+        // the 9 payload types. Fields: name (display, uppercase), short
+        // (4-letter badge text for the drop-zone indicator), desc (effect
+        // description for tooltips), cost (in credits, shop price), color
+        // (in-game + tooltip header color), icon (integer 0..8 passed to
+        // SVG_ICONS.getPayloadIcon). Order matches the existing
+        // updateShop / updateHUD / triggerSlotCollected PA-case arrays, so
+        // the icon index here is consistent with the current visual layout.
+        // 8a uses this for tooltips; 8b will refactor updateShop +
+        // updateHUD to read from it; 8c will use it for the buy-handler
+        // dedup and the all-on-drop flag application.
+        PAYLOADS: {
+            scrambler: { name: 'SCRAMBLER',  short: 'SCRAM',  desc: 'Reverses ball direction on first peg hit.',        cost:  80, color: '#ff6600', icon: 0 },
+            trojan:    { name: 'TROJAN',     short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',     cost: 140, color: '#ff2244', icon: 1 },
+            worm:      { name: 'WORM',       short: 'WORM',   desc: 'Ball passes through pegs without bouncing.',      cost: 180, color: '#00ff88', icon: 2 },
+            logicbomb: { name: 'LOGIC BOMB', short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',     cost: 220, color: '#ffff00', icon: 3 },
+            daemon:    { name: 'DAEMON',     short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).', cost: 130, color: '#9944ff', icon: 4 },
+            ghost:     { name: 'GHOST',      short: 'GHOST',  desc: 'Ball phases through pegs (lifetime).',            cost: 100, color: '#88ddff', icon: 5 },
+            cluster:   { name: 'CLUSTER',    short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',    cost: 180, color: '#ff00ff', icon: 6 },
+            explosive: { name: 'EXPLOSIVE',  short: 'EXPL',   desc: 'Chain-destroys nearby pegs on first peg hit.',    cost: 180, color: '#ff4444', icon: 7 },
+            slowmo:    { name: 'SLOWMO',     short: 'SLOW',   desc: 'Slows the ball to half speed (lifetime).',        cost: 150, color: '#00fff2', icon: 8 }
+        },
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
         // Multiball settings
@@ -911,6 +933,59 @@
     // clean number.
     function pegBasePoints() {
         return 50 * (1 + (GS.fl - 1) * 0.1);
+    }
+
+    // Phase 8b: dynamic payload-slot cap. Starts at 2 (fl 1-9),
+    // +1 every 10 floors. fl 10-19 = 3, fl 20-29 = 4, fl 30-39 = 5,
+    // etc. The cap only ever goes up during a run (never down), which
+    // matters for the dynamic slot div creation in updateHUD - once
+    // a .ps div exists, it stays for the run. Used by updateShop
+    // (buy handler), triggerSlotCollected (PA slot effect), dropBall
+    // (overflow guard), and initSlotArrangement (toast on increase).
+    function maxPayloads() {
+        return 2 + Math.floor(GS.fl / 10);
+    }
+
+    // Phase 8b: render all N payload slots in #pi. Appends new .ps
+    // divs if the cap grew since the last call, then populates each
+    // from C.PAYLOADS (icon + color) or empty state (-). Called from
+    // updateHUD every frame so the slots stay in sync with GS.pl and
+    // the floor-driven cap. Defensive against the GS.pl[i] shape: 8a
+    // stored 1-element arrays (['daemon']), 8c will flatten to plain
+    // strings ('daemon') - both work with the Array.isArray check.
+    function renderPayloadSlots() {
+        var container = _hud && _hud.pi;
+        if (!container) return;
+        var cap = maxPayloads();
+        // Append any new slots. The cap only goes UP, so this never
+        // shrinks the DOM - once a div is created, it persists for
+        // the rest of the run. startGame() empties #pi so a new run
+        // starts clean.
+        while (container.children.length < cap) {
+            var div = document.createElement('div');
+            div.className = 'ps';
+            container.appendChild(div);
+        }
+        for (let i = 0; i < cap; i++) {
+            var ps = container.children[i];
+            var entry = GS.pl[i];
+            var name = entry == null ? null : (Array.isArray(entry) ? entry[0] : entry);
+            var p = name ? C.PAYLOADS[name] : null;
+            if (p) {
+                var iconSvg = SVG_ICONS.getPayloadIcon(p.icon);
+                ps.innerHTML = '<span class="ps-icon" style="color:' + p.color + ';">' + iconSvg + '</span>';
+                ps.className = 'ps on';
+                ps.style.borderColor = p.color;
+                // Phase 8a: data-payload attribute for the tooltip
+                // listener (e.target.closest('.ps').dataset.payload).
+                ps.dataset.payload = name;
+            } else {
+                ps.innerHTML = '<span style="color:#555566;">-</span>';
+                ps.className = 'ps';
+                ps.style.borderColor = '#555566';
+                delete ps.dataset.payload;
+            }
+        }
     }
 
     // ========== AUDIO ENGINE (Phase 4) ==========
@@ -2920,9 +2995,15 @@
                 break;
                 
             case C.ST.PA: // PAYLOAD: Add free payload
-                if (GS.pl.length < 2) {
-                    var payloads = ['scrambler', 'trojan', 'worm', 'logicbomb', 'daemon', 'ghost', 'cluster', 'explosive', 'slowmo'];
-                    GS.pl.push([payloads[Math.floor(Math.random() * payloads.length)]]);
+                // Phase 8b: random roll now reads from C.PAYLOADS
+                // (single source of truth from 8a) and the cap is
+                // dynamic (2/3/4/5 by floor). 8c will add dedup so
+                // a random roll that's already in the queue gets
+                // re-rolled.
+                if (GS.pl.length < maxPayloads()) {
+                    var payloadKeys = Object.keys(C.PAYLOADS);
+                    var randomKey = payloadKeys[Math.floor(Math.random() * payloadKeys.length)];
+                    GS.pl.push([randomKey]);
                     createFloat(C.W / 2, C.SY - 20, '+PAYLOAD', '#9944ff');
                 }
                 break;
@@ -3014,6 +3095,23 @@
     
     // ========== SLOT SELECTOR ==========
     function initSlotArrangement() {
+        // Phase 8b: detect cap increase and toast. The slot selector
+        // opens on every floor (startGame + contb), so it's the
+        // natural place to surface the new-cap notification. The
+        // player sees the slot selector with N+1 slots AND the toast
+        // at the same moment. GS.lastMaxPayloads is initialized in
+        // startGame() and bumped here on increase.
+        var newCap = maxPayloads();
+        if (GS.lastMaxPayloads !== undefined && newCap > GS.lastMaxPayloads) {
+            var gained = newCap - GS.lastMaxPayloads;
+            showToast(
+                gained > 1 ? '+' + gained + ' PAYLOAD SLOTS' : '+1 PAYLOAD SLOT',
+                'You can now queue ' + newCap + ' payloads per drop!',
+                'achievement'
+            );
+        }
+        GS.lastMaxPayloads = newCap;
+
         // Initialize unlocked slots array for new runs
         // Start with NO slots unlocked - player chooses which to unlock each floor
         if (GS.unlockedSlots.length === 0) {
@@ -4127,8 +4225,11 @@
         _hud.mv = document.getElementById('mv');
         _hud.cf = document.getElementById('cf');
         _hud.of = document.getElementById('of');
-        _hud.ps1 = document.getElementById('ps1');
-        _hud.ps2 = document.getElementById('ps2');
+        // Phase 8b: dynamic payload slots. Cache the #pi container;
+        // renderPayloadSlots() iterates over container.children to
+        // populate each .ps div. Replaces the hardcoded _hud.ps1/
+        // _hud.ps2 which couldn't handle N=3,4,5 at fl 10/20/30.
+        _hud.pi = document.getElementById('pi');
     }
 
     function updateHUD() {
@@ -4262,33 +4363,13 @@
         jvEl.style.transform = 'scale(' + jackpotPulseFactor + ')';
         
         // Payload inventory with visual enhancement
-        var ps1 = _hud.ps1;
-        var ps2 = _hud.ps2;
-        if (GS.pl[0]) {
-            var payload0Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[0][0]);
-            var payload0Icon = SVG_ICONS.getPayloadIcon(payload0Type >= 0 ? payload0Type : 0);
-            var payloadColors = ['#ff6600', '#ff2244', '#00ff88', '#ffff00', '#9944ff', '#88ddff', '#ff00ff', '#ff4444', '#00fff2'];
-            var pColor0 = payloadColors[Math.max(0, payload0Type)];
-            ps1.innerHTML = '<span class="ps-icon" style="color:' + pColor0 + ';">' + payload0Icon + '</span>';
-            ps1.className = 'ps on';
-            ps1.style.borderColor = pColor0;
-        } else {
-            ps1.innerHTML = '<span style="color:#555566;">-</span>';
-            ps1.className = 'ps';
-            ps1.style.borderColor = '#555566';
-        }
-        if (GS.pl[1]) {
-            var payload1Type = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(GS.pl[1][0]);
-            var payload1Icon = SVG_ICONS.getPayloadIcon(payload1Type >= 0 ? payload1Type : 0);
-            var pColor1 = payloadColors[Math.max(0, payload1Type)];
-            ps2.innerHTML = '<span class="ps-icon" style="color:' + pColor1 + ';">' + payload1Icon + '</span>';
-            ps2.className = 'ps on';
-            ps2.style.borderColor = pColor1;
-        } else {
-            ps2.innerHTML = '<span style="color:#555566;">-</span>';
-            ps2.className = 'ps';
-            ps2.style.borderColor = '#555566';
-        }
+        // Phase 8b: dynamic slot count via renderPayloadSlots(). The
+        // helper handles ensure-population (appends .ps divs as the
+        // cap grows) and per-slot population (icon + color from
+        // C.PAYLOADS, data-payload for the tooltip listener). Replaces
+        // the Phase 8a inline ps1/ps2 blocks and the parallel
+        // payloadColors/payloadNames arrays.
+        renderPayloadSlots();
         
         // Update menu stats
         document.getElementById('msc').textContent = PERSIST.ls;
@@ -4332,38 +4413,34 @@
         document.getElementById('scr').textContent = PERSIST.br;
         var grid = document.getElementById('sg');
         grid.innerHTML = '';
-        // Phase 4.5-K: payload cost rebalance v2 (see also K-1 credit
-        // rate cut). Pairs with the 5% credit rate so powers are a real
-        // luxury - 1-2 premium payloads per run, not 6-8 cheap ones.
-        // New spread 80-220 (was 50-120 after Phase 4.5-C).
-        var items = [
-            {n: 'Scrambler', c: 80,   d: 'Reverses direction', idx: 0},
-            {n: 'Trojan', c: 140,     d: 'Spawns clone balls', idx: 1},
-            {n: 'Worm', c: 180,       d: 'Passes through pegs', idx: 2},
-            {n: 'Logic Bomb', c: 220, d: 'x3 score on hit', idx: 3},
-            {n: 'Daemon', c: 130,     d: 'Shields one ball', idx: 4},
-            {n: 'Ghost', c: 100,      d: 'Phase through pegs', idx: 5},
-            {n: 'Cluster', c: 180,    d: 'Splits into 3 balls', idx: 6},
-            {n: 'Explosive', c: 180,  d: 'Chain explosions', idx: 7},
-            {n: 'Slowmo', c: 150,     d: 'Slows ball speed', idx: 8}
-        ];
-        for (let i = 0; i < items.length; i++) {
-            var item = items[i];
+        // Phase 8b: iterate C.PAYLOADS (single source of truth from
+        // 8a) and use maxPayloads() for the buy cap. Shop tiles for
+        // which the player has no slot are styled .disabled and the
+        // click handler silently no-ops (8c will also dedup within
+        // the slot set so duplicates are blocked too).
+        var cap = maxPayloads();
+        var full = GS.pl.length >= cap;
+        Object.keys(C.PAYLOADS).forEach(function(key) {
+            var p = C.PAYLOADS[key];
             var div = document.createElement('div');
-            div.className = 'si';
-            var iconSvg = SVG_ICONS.getPayloadIcon(item.idx);
-            div.innerHTML = '<div class="in">' + item.n + '</div><div class="ic"><span class="svg-icon svg-icon-24" style="display:inline-block;width:24px;height:24px;vertical-align:middle;">' + iconSvg + '</span> ' + item.c + '</div><div class="ii">' + item.d + '</div>';
-            div.addEventListener('click', (function(it) {
+            div.className = 'si' + (full ? ' disabled' : '');
+            var iconSvg = SVG_ICONS.getPayloadIcon(p.icon);
+            div.innerHTML = '<div class="in">' + p.name + '</div><div class="ic"><span class="svg-icon svg-icon-24" style="display:inline-block;width:24px;height:24px;vertical-align:middle;">' + iconSvg + '</span> ' + p.cost + '</div><div class="ii">' + p.desc + '</div>';
+            div.addEventListener('click', (function(payloadKey, pData) {
                 return function() {
-                    if (PERSIST.br >= it.c) {
-                        PERSIST.br -= it.c;
-                        if (GS.pl.length < 2) GS.pl.push([it.n.toLowerCase()]);
+                    if (PERSIST.br >= pData.cost && GS.pl.length < cap) {
+                        PERSIST.br -= pData.cost;
+                        // Push the lowercase key (matches dropBall /
+                        // triggerSlotCollected / updateHUD lookups).
+                        // 8a stores 1-element arrays; 8c flattens to
+                        // plain strings - both are accepted.
+                        GS.pl.push([payloadKey]);
                         updateShop();
                     }
                 };
-            })(item));
+            })(key, p));
             grid.appendChild(div);
-        }
+        });
     }
     // ========== PREDICTION LINE (Phase 6) ==========
     // Simulate the ball's path from the dropper and draw it as a polyline
@@ -4663,18 +4740,17 @@
             ctx.globalAlpha = 1;
             
             // Ball selection indicator (shows which payload will be used)
+            // Phase 8b: read metadata from C.PAYLOADS instead of the
+            // three parallel arrays (payloadNames, payloadColors, the
+            // indexOf lookup). 8a already centralized the table.
             if (GS.pl.length > 0) {
-                var payloadNames = ['SCRAM', 'TROJ', 'WORM', 'L.BOMB', 'DAEMON', 'GHOST', 'CLUST', 'EXPL', 'SLOW'];
-                var payloadColors = ['#ff6600', '#ff2244', '#00ff88', '#ffff00', '#9944ff', '#88ddff', '#ff00ff', '#ff4444', '#00fff2'];
-                var nextPayload = GS.pl[0] ? GS.pl[0][0] : null;
-                if (nextPayload) {
-                    var payloadIdx = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'].indexOf(nextPayload);
-                    var pColor = payloadColors[Math.max(0, payloadIdx)];
-                    var pName = payloadNames[Math.max(0, payloadIdx)];
-                    
+                var nextEntry = GS.pl[0];
+                var nextName = nextEntry ? (Array.isArray(nextEntry) ? nextEntry[0] : nextEntry) : null;
+                if (nextName && C.PAYLOADS[nextName]) {
+                    var pMeta = C.PAYLOADS[nextName];
                     // Payload indicator at drop point
                     ctx.globalAlpha = 0.8;
-                    ctx.fillStyle = pColor;
+                    ctx.fillStyle = pMeta.color;
                     ctx.beginPath();
                     ctx.arc(dropX, dropY + 35, 12, 0, Math.PI * 2);
                     ctx.fill();
@@ -4685,7 +4761,7 @@
                     ctx.fillStyle = '#000000';
                     ctx.font = 'bold 8px Courier New';
                     ctx.textAlign = 'center';
-                    ctx.fillText(pName.substring(0, 4), dropX, dropY + 38);
+                    ctx.fillText(pMeta.short.substring(0, 4), dropX, dropY + 38);
                 }
             }
             
@@ -5467,6 +5543,15 @@
         // floor-clear payout can pay the *delta* (this floor's contribution)
         // instead of the cumulative score. Initialized to 0 on every new run.
         GS.lastFloorScore = 0;
+        // Phase 8b: track the last maxPayloads() value so
+        // initSlotArrangement can toast when the cap grows.
+        // startGame resets both the tracker AND the DOM (#pi children)
+        // - if a previous run reached fl 20 (cap 4) and the new run
+        // starts at fl 1 (cap 2), we'd otherwise show 4 stale divs.
+        // The tracker is the source of truth; #pi is rebuilt from it.
+        GS.lastMaxPayloads = maxPayloads();
+        var piEl = document.getElementById('pi');
+        if (piEl) piEl.innerHTML = '';
         // Reset slot system for new run - no slots unlocked, player chooses each floor
         GS.unlockedSlots = [];
         GS.slotsArranged = false;
@@ -5495,10 +5580,12 @@
         Audio.playDrop();
 
         // Payload injection protection: enforce max payload limit
-        var MAX_PAYLOADS = 2;
-        if (GS.pl.length > MAX_PAYLOADS) {
-            console.warn('Payload limit exceeded, truncating to max ' + MAX_PAYLOADS);
-            GS.pl = GS.pl.slice(0, MAX_PAYLOADS);
+        // Phase 8b: cap is now maxPayloads() (dynamic, 2-5 by floor)
+        // instead of the hardcoded MAX_PAYLOADS=2.
+        var cap = maxPayloads();
+        if (GS.pl.length > cap) {
+            console.warn('Payload limit exceeded, truncating to max ' + cap);
+            GS.pl = GS.pl.slice(0, cap);
         }
         
         // Check if we can drop more balls (multiball mode)
@@ -5608,19 +5695,26 @@
         _tooltipEl.innerHTML = '<div class="tooltip-name" style="color:' + color + ';">' + header + '</div>' +
                                '<div class="tooltip-desc">' + desc + '</div>';
         _tooltipEl.style.display = 'block';
-        // Always peg to the cursor's bottom-right.
+        // Phase 8a: the payload slots live in the bottom 60px of the
+        // viewport, and a below-cursor tooltip (the default) would be
+        // clipped by body overflow. Auto-flip to above the cursor when
+        // the cursor is in the bottom 80px so the full description
+        // is visible. The slot-collector zone (y=560..610) is above
+        // the threshold so its tooltips are unaffected. Phase 7b
+        // explicitly removed the flip behavior; 8a reintroduces it
+        // narrowly for the bottom edge only (the top-edge clamp
+        // below still works for the top case).
+        var tipHeight = _tooltipEl.offsetHeight || 40;
         var left = clientX + TOOLTIP_OFFSET;
-        var top = clientY + TOOLTIP_OFFSET;
-        // Clamp LEFT to >= 4px so the tooltip stays on-screen when the
-        // cursor is at the left edge of the viewport.
+        var top;
+        if (clientY > window.innerHeight - 80) {
+            top = clientY - tipHeight - TOOLTIP_OFFSET;
+            if (top < 4) top = 4;
+        } else {
+            top = clientY + TOOLTIP_OFFSET;
+            if (top < 4) top = 4;
+        }
         if (left < 4) left = 4;
-        // Clamp TOP to >= 4px so the tooltip stays on-screen when the
-        // cursor is at the top of the viewport.
-        if (top < 4) top = 4;
-        // Right/bottom edges: don't flip the tooltip. It's OK for the
-        // tooltip to extend a few pixels past the viewport (it will
-        // just be clipped by the body overflow). Flipping to the
-        // cursor's top-left was the wonky behavior we're replacing.
         _tooltipEl.style.left = left + 'px';
         _tooltipEl.style.top = top + 'px';
     }
@@ -6245,6 +6339,41 @@
         // circles) which are intentionally literal previews - leave those.
     })();
 
+    // Phase 8a: tooltip wiring for the in-game payload slots. A single
+    // delegated pointermove/pointerleave on #pi (the parent of the .ps
+    // divs) follows the same pattern as the slot-selector tooltip
+    // wiring. e.target.closest('.ps') finds the hovered slot;
+    // describe() reads its data-payload attribute (set in updateHUD
+    // when the slot is populated) and looks up the metadata in
+    // C.PAYLOADS. Empty slots (no 'on' class, no data-payload) are
+    // silently skipped - nothing to describe. The tooltip element
+    // is a direct child of <body> (hoisted in Phase 7c) so its
+    // position:fixed anchor is in viewport coords, matching
+    // clientX/Y from the event.
+    (function() {
+        var _pi = document.getElementById('pi');
+        if (!_pi) return;
+        function describe(target) {
+            if (!target.classList.contains('on')) return null;
+            var name = target.dataset.payload;
+            if (!name) return null;
+            var p = C.PAYLOADS[name];
+            if (!p) return null;
+            return { name: p.name, desc: p.desc, color: p.color };
+        }
+        _pi.addEventListener('pointermove', function(e) {
+            var ps = e.target.closest && e.target.closest('.ps');
+            if (!ps) { hideTooltip(); return; }
+            var info = describe(ps);
+            if (info) {
+                showTooltip(info.name, info.desc, info.color, e.clientX, e.clientY);
+            } else {
+                hideTooltip();
+            }
+        });
+        _pi.addEventListener('pointerleave', hideTooltip);
+    })();
+
     // Audio initialization on first user interaction (browsers require this)
     function audioInitOnce() {
         Audio.init();
@@ -6310,6 +6439,8 @@
         GS: GS, PERSIST: PERSIST, C: C, Audio: Audio,
         slots: slots, ACHIEVEMENTS: ACHIEVEMENTS,
         pegBasePoints: pegBasePoints,
+        maxPayloads: maxPayloads,
+        renderPayloadSlots: renderPayloadSlots,
         genBoard: genBoard, setupObj: setupObj,
         genSlots: genSlots, checkSlot: checkSlot,
         getSlotForX: getSlotForX, getSlotX: getSlotX,
