@@ -1,13 +1,15 @@
 {
   "name": "slot-protocol",
   "version": "1.0.0",
-  "description": "",
-  "main": "validation-tests.js",
+  "description": "Rogue pachinko game",
+  "main": "index.html",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/performance-validation.js",
+    "test:screenshot": "node tests/screenshot-suite.js",
+    "test:unit": "node tests/unit.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +24,7 @@
   },
   "homepage": "https://github.com/klampatech/slot-protocol#readme",
   "dependencies": {
+    "@playwright/test": "^1.60.0",
     "playwright": "^1.60.0"
   }
 }

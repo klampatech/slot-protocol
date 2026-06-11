@@ -4026,7 +4026,7 @@
 
     // ========== PHASE 4: AMBIENT MENU PARTICLES ==========
     let menuParticleInterval = null;
-    const menuParticleTimeouts = [];
+    let menuParticleTimeouts = [];
     function spawnMenuParticles() {
         var container = document.getElementById('menu-particles');
         if (!container) return;
@@ -6303,6 +6303,28 @@
     }
     
     requestAnimationFrame(loop);
+
+    // ========== TEST API (exposes internals for Playwright testing) ==========
+    // Only exposed in development/testing. Remove for production if needed.
+    window.__TEST__ = {
+        GS: GS, PERSIST: PERSIST, C: C, Audio: Audio,
+        slots: slots, ACHIEVEMENTS: ACHIEVEMENTS,
+        pegBasePoints: pegBasePoints,
+        genBoard: genBoard, setupObj: setupObj,
+        genSlots: genSlots, checkSlot: checkSlot,
+        getSlotForX: getSlotForX, getSlotX: getSlotX,
+        isSlotUnlocked: isSlotUnlocked, unlockSlotPosition: unlockSlotPosition,
+        checkAchievements: checkAchievements,
+        modActive: modActive, getDailySeed: getDailySeed,
+        seededRandom: seededRandom, getDailyModifiers: getDailyModifiers,
+        startGame: startGame, showScreen: showScreen,
+        Ball: Ball, Peg: Peg,
+        BOARD_TEMPLATES: BOARD_TEMPLATES,
+        rollPegType: rollPegType, cellToPos: cellToPos,
+        triggerSlotCollected: triggerSlotCollected,
+        savePersist: savePersist, loadPersist: loadPersist,
+        applyContrastMode: applyContrastMode
+    };
 })();
     </script>
 </body>
