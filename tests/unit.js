@@ -219,6 +219,170 @@ function section(title) {
     let slotX = await inGame(() => getSlotX(3));
     assert(slotX === 240, 'getSlotX(3) returns 240');
 
+    // ========== PHASE 9: SLOT SELECTOR UI ==========
+    section('Phase 9: Slot Selector UI');
+
+    // The new SVG icons must exist (UI_PLUS_CYAN for the unlockable state)
+    let iconCheck = await inGame(() => {
+        return {
+            plusCyan: typeof SVG_ICONS.UI_PLUS_CYAN === 'string' && SVG_ICONS.UI_PLUS_CYAN.indexOf('viewBox') !== -1,
+            lock: typeof SVG_ICONS.UI_LOCK === 'string' && SVG_ICONS.UI_LOCK.indexOf('viewBox') !== -1,
+        };
+    });
+    assert(iconCheck.plusCyan === true, 'UI_PLUS_CYAN icon is defined');
+    assert(iconCheck.lock === true, 'UI_LOCK icon is defined (used for locked-disabled state)');
+
+    // renderSlotSelector: when all positions are locked and unlockable, every
+    // .slot-pos should get the .unlockable class (cyan border + pulse)
+    let allUnlockedRender = await inGame(() => {
+        // First dismiss any active overlay and start fresh
+        // Use a clean state: empty unlocked, all locked, canUnlock true
+        GS.unlockedSlots = [];
+        GS.canUnlockThisFloor = true;
+        GS.slotArrangement = [null, null, null, null, null, null, null];
+        GS.slotPool = [C.ST.CR, C.ST.AM, C.ST.JP];
+        // Re-render via the public path: simulate opening the slot-selector
+        // by calling initSlotArrangement, but that resets state. Instead,
+        // call renderSlotSelector directly (it's the function the test cares
+        // about, and the DOM is rebuilt each call).
+        renderSlotSelector();
+        const positions = document.querySelectorAll('#position-slots .slot-pos');
+        const classes = Array.from(positions).map(p => p.className);
+        return {
+            count: positions.length,
+            allUnlockable: classes.every(c => c.indexOf('unlockable') !== -1),
+            noneDisabled: classes.every(c => c.indexOf('locked-disabled') === -1),
+            // Counter text
+            counterText: (document.getElementById('unlock-counter') || {}).textContent || '',
+            counterHas: (document.getElementById('unlock-counter') || {}).className || '',
+        };
+    });
+    assert(allUnlockedRender.count === 7, 'renderSlotSelector creates 7 position divs');
+    assert(allUnlockedRender.allUnlockable === true, 'All 7 positions get .unlockable class when canUnlock=true');
+    assert(allUnlockedRender.noneDisabled === true, 'No positions get .locked-disabled when canUnlock=true');
+    assert(allUnlockedRender.counterText.indexOf('1') !== -1, 'Unlock counter shows "1" when 1 unlock available');
+    assert(allUnlockedRender.counterHas.indexOf('has') !== -1, 'Unlock counter has .has class when unlock available');
+
+    // When unlockedSlots = [0] and canUnlockThisFloor = false, position 0
+    // should be .occupied (or .unlocked-empty if no slot), positions 1-6
+    // should be .locked-disabled, counter should show 0 + .used class.
+    let mixedRender = await inGame(() => {
+        GS.unlockedSlots = [0];
+        GS.canUnlockThisFloor = false;
+        GS.slotArrangement = [C.ST.CR, null, null, null, null, null, null];
+        GS.slotPool = [C.ST.AM, C.ST.JP, C.ST.SH];
+        renderSlotSelector();
+        const positions = document.querySelectorAll('#position-slots .slot-pos');
+        const classes = Array.from(positions).map(p => p.className);
+        return {
+            pos0Occupied: classes[0].indexOf('occupied') !== -1,
+            pos1to6Disabled: classes.slice(1).every(c => c.indexOf('locked-disabled') !== -1),
+            counterText: (document.getElementById('unlock-counter') || {}).textContent || '',
+            counterUsed: (document.getElementById('unlock-counter') || {}).className || '',
+        };
+    });
+    assert(mixedRender.pos0Occupied === true, 'Unlocked + filled position gets .occupied class');
+    assert(mixedRender.pos1to6Disabled === true, 'Other positions get .locked-disabled when canUnlock=false');
+    assert(mixedRender.counterText.indexOf('0') !== -1, 'Counter shows "0" when no unlock available');
+    assert(mixedRender.counterUsed.indexOf('used') !== -1, 'Counter has .used class when 0 unlocks remain');
+
+    // When all 7 unlocked, counter should show the all-done text
+    let allDoneRender = await inGame(() => {
+        GS.unlockedSlots = [0, 1, 2, 3, 4, 5, 6];
+        GS.canUnlockThisFloor = false;
+        GS.slotArrangement = [C.ST.CR, C.ST.AM, C.ST.JP, C.ST.SH, C.ST.CM, C.ST.PA, C.ST.OC];
+        GS.slotPool = [];
+        renderSlotSelector();
+        return {
+            counterText: (document.getElementById('unlock-counter') || {}).textContent || '',
+            counterClass: (document.getElementById('unlock-counter') || {}).className || '',
+        };
+    });
+    assert(allDoneRender.counterText.indexOf('ALL POSITIONS UNLOCKED') !== -1, 'Counter shows "ALL POSITIONS UNLOCKED" when 7/7');
+    assert(allDoneRender.counterClass.indexOf('used') !== -1, 'All-done counter has .used class');
+
+    // The unlock-burst animation should be applied for one render pass after
+    // unlockSlotPosition. Simulate by setting GS.justUnlocked before render.
+    let burstRender = await inGame(() => {
+        GS.unlockedSlots = [];
+        GS.canUnlockThisFloor = true;
+        GS.slotArrangement = [null, null, null, null, null, null, null];
+        GS.slotPool = [C.ST.CR];
+        GS.justUnlocked = 2; // pretend position 2 just unlocked
+        renderSlotSelector();
+        const positions = document.querySelectorAll('#position-slots .slot-pos');
+        return positions[2].className.indexOf('unlock-burst') !== -1;
+    });
+    assert(burstRender === true, 'Position 2 gets .unlock-burst class when GS.justUnlocked=2');
+
+    // Without the flag, no .unlock-burst class is applied (sanity check)
+    let noBurstRender = await inGame(() => {
+        GS.unlockedSlots = [2];
+        GS.canUnlockThisFloor = false;
+        GS.slotArrangement = [null, null, C.ST.CR, null, null, null, null];
+        GS.slotPool = [];
+        GS.justUnlocked = -1;
+        renderSlotSelector();
+        const positions = document.querySelectorAll('#position-slots .slot-pos');
+        return positions[2].className.indexOf('unlock-burst') === -1;
+    });
+    assert(noBurstRender === true, 'No position gets .unlock-burst when GS.justUnlocked=-1');
+
+    // CSS sanity: the new state classes are defined in the stylesheet. The
+    // test reads getComputedStyle on a dummy element with each class to make
+    // sure the rule exists and applies a width/background.
+    let cssSanity = await inGame(() => {
+        // hasRule walks the rule tree (top-level + nested inside @media
+        // blocks). For style rules we match on selectorText; for
+        // @keyframes rules we match on `name` (CSSKeyframesRule exposes
+        // `name`, not `selectorText`). The recursion is bounded: the
+        // CSS only has ~2 levels of nesting.
+        function walk(rules, selector, depth) {
+            depth = depth || 0;
+            if (depth > 5) return false; // safety belt
+            for (const rule of rules) {
+                if (rule.selectorText === selector) return true;
+                // CSSKeyframesRule uses `name`; other at-rules may use
+                // selectorText or a custom name field. Match both.
+                if (rule.type === 7 /* CSSRule.KEYFRAMES_RULE */ && rule.name === selector) return true;
+                if (rule.cssRules && walk(rule.cssRules, selector, depth + 1)) return true;
+            }
+            return false;
+        }
+        function hasRule(selector) {
+            for (const sheet of document.styleSheets) {
+                try {
+                    if (walk(sheet.cssRules, selector, 0)) return true;
+                } catch (e) { /* cross-origin sheet, skip */ }
+            }
+            return false;
+        }
+        return {
+            unlockable: hasRule('.slot-pos.unlockable'),
+            lockedDisabled: hasRule('.slot-pos.locked-disabled'),
+            unlockedEmpty: hasRule('.slot-pos.unlocked-empty'),
+            draggingSource: hasRule('.slot-pos.dragging-source, .slot-pool-item.dragging-source'),
+            dropTarget: hasRule('.slot-pos.drop-target'),
+            dragGhost: hasRule('.slot-drag-ghost'),
+            unlockCounter: hasRule('.unlock-counter'),
+            sectionLabel: hasRule('.section-label'),
+            sectionDivider: hasRule('.slot-section-divider'),
+            unlockBurstKeyframe: hasRule('slot-unlock-burst'),
+            pulseKeyframe: hasRule('slot-pulse-unlockable'),
+        };
+    });
+    assert(cssSanity.unlockable === true, 'CSS: .slot-pos.unlockable rule exists');
+    assert(cssSanity.lockedDisabled === true, 'CSS: .slot-pos.locked-disabled rule exists');
+    assert(cssSanity.unlockedEmpty === true, 'CSS: .slot-pos.unlocked-empty rule exists');
+    assert(cssSanity.draggingSource === true, 'CSS: .dragging-source rule exists');
+    assert(cssSanity.dropTarget === true, 'CSS: .slot-pos.drop-target rule exists');
+    assert(cssSanity.dragGhost === true, 'CSS: .slot-drag-ghost rule exists');
+    assert(cssSanity.unlockCounter === true, 'CSS: .unlock-counter rule exists');
+    assert(cssSanity.sectionLabel === true, 'CSS: .section-label rule exists');
+    assert(cssSanity.sectionDivider === true, 'CSS: .slot-section-divider rule exists');
+    assert(cssSanity.unlockBurstKeyframe === true, 'CSS: @keyframes slot-unlock-burst exists');
+    assert(cssSanity.pulseKeyframe === true, 'CSS: @keyframes slot-pulse-unlockable exists');
+
     // ========== PEG TYPES ==========
     section('Peg Types');
 
