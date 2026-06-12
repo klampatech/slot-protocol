@@ -308,10 +308,14 @@
         .daily-mod-text { flex: 1; }
         .daily-mods-container { margin: 15px 0; display: flex; flex-direction: column; gap: 10px; }
         /* Slot selector styles */
-        /* Effect tiles: positions and pool items share the same physical
-           size (56x56) and corner-bracket treatment so the eye reads
-           them as one visual system. 56px gives icons room to breathe
-           AND leaves healthy 24px margin on each side of the 7-position
+        /* Phase 9: positions and pool items share the same physical
+           size (64x64) and corner-bracket treatment so the eye reads
+           them as one visual system. 64px gives icons room to breathe
+           AND leaves a healthy 24px margin on each side of the 7-
+           position row in the 480px canvas (7*64 + 6*4 = 472, 4px
+           each side). The pool row widened to 200 to match the new
+           tile size: 3*64 + 2*4 = 200. The previous Phase 5 comment
+           about the 56→64 bump for mobile tap targets still applies. */
         .slot-pos, .slot-pool-item { width: 64px; height: 64px; flex-shrink: 0; box-sizing: border-box; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset; }
         .slot-pos { background: #1a1a2e; border: 2px dashed #555566; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
         .slot-pos::before { content: ''; position: absolute; top: 3px; left: 3px; width: 6px; height: 6px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; opacity: 0.55; }
@@ -319,27 +323,192 @@
         .slot-pos:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.3) inset, 0 0 10px rgba(0,255,242,0.3); }
         .slot-pos.occupied { border-style: solid; cursor: grab; }
         .slot-pos.highlight { border-color: #ffff00; background: rgba(255,255,0,0.1); transform: scale(1.1); }
-                /* Phase 5b: pool items + position slots both 64x64. Bumped
-           from 56 in Phase 5a to make them easier to tap on mobile
-           (the 56 was almost too small to hit reliably with a thumb).
-           The 7-position row needs the 4px gap (was 6) to fit in
-           the 480px canvas: 7*64 + 6*4 = 472, leaving 4px margin
-           each side. The pool row widened from 180 to 200 to match
-           the new tile size: 3*64 + 2*4 = 200. */
+        /* Phase 9: locked + unlockable-this-floor state. Solid cyan
+           border (vs the dashed default) + soft pulse animation that
+           draws the eye. Replaces the previous bright-pink
+           UI_UNLOCK / 0.2 magenta fill that dominated the screen
+           and clashed with the cyan section header. The 0.35 base
+           opacity keeps the box from looking heavier than the filled
+           slots next to it. */
+        .slot-pos.unlockable {
+            border-color: #00fff2;
+            border-style: solid;
+            background: rgba(0,255,242,0.08);
+            color: #00fff2;
+            animation: slot-pulse-unlockable 2.2s ease-in-out infinite;
+        }
+        /* Phase 9: locked + can't-unlock-anymore state. Grey
+           UI_LOCK padlock at 0.5 opacity, dimmed border. Reads as
+           "closed" at a glance and matches the disabled-grey
+           scheme the user asked for. Same 64x64 box as every other
+           state so the row stays uniform when canUnlockThisFloor
+           flips (was the source of the "size change" feel). */
+        .slot-pos.locked-disabled {
+            border-color: #555566;
+            border-style: dashed;
+            color: #8888aa;
+            opacity: 0.5;
+        }
+        /* Phase 9: unlocked + empty (yellow dashed). The action is
+           "drop a slot here to fill". Same UI_PLUS the previous
+           build used, but a more saturated yellow + solid border
+           so it doesn't look identical to a disabled slot. */
+        .slot-pos.unlocked-empty {
+            border-color: #ffff00;
+            border-style: dashed;
+            color: #ffff00;
+            background: rgba(255,255,0,0.06);
+        }
         .slot-pool-item { background: #2a2a3e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; cursor: grab; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
         .slot-pool-item::before { content: ''; position: absolute; top: 3px; left: 3px; width: 6px; height: 6px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; opacity: 0.55; }
         .slot-pool-item::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-bottom: 1.5px solid currentColor; border-right: 1.5px solid currentColor; opacity: 0.55; }
         .slot-pool-item:hover { border-color: #00fff2; box-shadow: 0 0 0 1px rgba(0,255,242,0.4) inset, 0 0 14px rgba(0,255,242,0.4); transform: scale(1.08); }
         .slot-pool-item.dragging { opacity: 0.5; }
-        .slot-arranging-section { margin: 15px 0; text-align: center; }
-        /* Phase 5: tap-to-select-tap-to-place feedback. The .selected
+        .slot-arranging-section { margin: 15px 0; text-align: center; position: relative; }
+        /* Phase 9: section label for "Target Positions" and
+           "Available Effects". Replaces the inline style that
+           was duplicated twice in the HTML. Centered uppercase
+           cyan, with a top accent stripe in the same family as
+           the menu stat rows. The ::before pseudo-element
+           gives a subtle thin cyan underline for visual
+           separation from the divider rule below. */
+        .section-label {
+            font-size: 11px;
+            color: #00fff2;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 0 8px rgba(0,255,242,0.35);
+        }
+        /* Phase 9: subtle section-divider rule that runs the full
+           480px width between the two slot-selector sections. Uses
+           the same cyan-transparent gradient as the menu's .menu-
+           divider, just stretched to row width, to tie the two
+           screens together visually. */
+        .slot-section-divider {
+            width: 240px;
+            height: 1px;
+            margin: 6px auto 8px;
+            background: linear-gradient(90deg, transparent, #00fff2 30%, #00fff2 70%, transparent);
+            opacity: 0.4;
+        }
+        /* Phase 9: unlock counter shown above the pool. Two states:
+           has (yellow, 0/1 used) and used (grey, 1/1 used). Replaces
+           the previous "Tap a slot, then tap a locked position to
+           unlock it" hint, which only told the player what to do
+           AFTER they'd already used the unlock. The counter is
+           visible at all times during the slot-selector open. */
+        .unlock-counter {
+            text-align: center;
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin: 8px 0 8px;
+            opacity: 0.9;
+        }
+        .unlock-counter .uc-num {
+            font-size: 13px;
+            font-weight: 900;
+            margin: 0 2px;
+        }
+        .unlock-counter.has  { color: #ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.4); }
+        .unlock-counter.used { color: #8888aa; }
+        /* Phase 9: tap-to-select-tap-to-place feedback. The .selected
            class is added to the picked element and stays until the
-           player either places it (re-render clears it) or taps
-           somewhere else to deselect. The :active pseudo-class
-           is the only feedback a real finger gets - :hover
-           never fires on touch. */
+           player either places it (re-render clears it), drags it
+           (drag flow takes over), or taps somewhere else to
+           deselect. The :active pseudo-class is the only feedback
+           a real finger gets - :hover never fires on touch. */
         .slot-pos.selected, .slot-pool-item.selected { border-color: #ffff00 !important; box-shadow: 0 0 0 2px rgba(255,255,0,0.6) inset, 0 0 24px rgba(255,255,0,0.7) !important; transform: scale(1.12); z-index: 2; }
         .slot-pos:active, .slot-pool-item:active { transform: scale(0.92); filter: brightness(1.4); }
+        /* Phase 9: drag-and-drop styles. The source tile dims to
+           35% opacity (the .dragging-source class), and the drop
+           target glows yellow (.drop-target). The ghost that
+           follows the cursor is a separate fixed-positioned div
+           appended to <body> (so it escapes the #scaler / #game-
+           container's transform-origin stacking). */
+        .slot-pos.dragging-source, .slot-pool-item.dragging-source {
+            opacity: 0.35 !important;
+            transform: scale(0.92) !important;
+            filter: saturate(0.6);
+        }
+        .slot-pos.drop-target {
+            border-color: #ffff00 !important;
+            border-style: solid !important;
+            background: rgba(255,255,0,0.18) !important;
+            transform: scale(1.18) !important;
+            box-shadow: 0 0 0 2px rgba(255,255,0,0.5) inset, 0 0 32px rgba(255,255,0,0.7) !important;
+            z-index: 3;
+        }
+        /* The ghost that follows the cursor / finger while dragging.
+           Fixed-positioned (appended to <body>) so it stays anchored
+           to the viewport and isn't clipped by the #game-container's
+           overflow:hidden. The `currentColor` border + drop-shadow
+           pick up the slot's type color set inline on the ghost
+           (matching getSlotColor). */
+        .slot-drag-ghost {
+            position: fixed;
+            width: 64px;
+            height: 64px;
+            pointer-events: none;
+            z-index: 250;
+            transform: translate(-50%, -50%) scale(1.05);
+            background: var(--ghost-bg, rgba(42,42,62,0.85));
+            border: 2px solid var(--ghost-border, #00fff2);
+            border-radius: 3px;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset, 0 0 18px var(--ghost-glow, rgba(0,255,242,0.6));
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--ghost-border, #00fff2);
+            will-change: left, top;
+            /* No transition on the position itself - the ghost has
+               to follow the finger 1:1, no lag. The transform is
+               a constant scale so the GPU compositing layer
+               doesn't get re-allocated. */
+        }
+        /* The two corner brackets that the .slot-pos / .slot-pool-
+           item tiles have. On the ghost they're static (not
+           absolute) so they sit inside the 64x64 box, and they
+           inherit color from .slot-drag-ghost. */
+        .slot-drag-ghost::before, .slot-drag-ghost::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            opacity: 0.7;
+        }
+        .slot-drag-ghost::before { top: 3px; left: 3px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; }
+        .slot-drag-ghost::after  { bottom: 3px; right: 3px; border-bottom: 1.5px solid currentColor; border-right: 1.5px solid currentColor; }
+        .slot-drag-ghost svg { width: 40px; height: 40px; }
+        /* Phase 9: unlock-burst animation. When a position
+           transitions from locked to unlocked, the .unlock-burst
+           class is added for 600ms and the keyframe plays once
+           (radial cyan flash that grows + fades). Gated on
+           prefers-reduced-motion (the @media block below). */
+        @keyframes slot-unlock-burst {
+            0%   { box-shadow: 0 0 0 0   rgba(0,255,242,0.8), 0 0 0 1px rgba(0,255,242,0.6) inset; }
+            60%  { box-shadow: 0 0 0 14px rgba(0,255,242,0.0), 0 0 0 1px rgba(0,255,242,0.6) inset; }
+            100% { box-shadow: 0 0 0 14px rgba(0,255,242,0.0), 0 0 0 1px rgba(0,255,242,0.0) inset; }
+        }
+        .slot-pos.unlock-burst { animation: slot-unlock-burst 0.65s ease-out 1; }
+        /* Phase 9: pulse on unlockable. Soft 2.2s breathe so the
+           cyan ring is the first thing the eye finds when the
+           slot-selector opens. 0.3 → 0.6 box-shadow alpha is
+           below the "looks frantic" threshold but still moves. */
+        @keyframes slot-pulse-unlockable {
+            0%, 100% { box-shadow: 0 0 0 1px rgba(0,255,242,0.25) inset, 0 0 6px  rgba(0,255,242,0.25); }
+            50%      { box-shadow: 0 0 0 1px rgba(0,255,242,0.6)  inset, 0 0 18px rgba(0,255,242,0.55); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .slot-pos.unlockable     { animation: none; }
+            .slot-pos.unlock-burst   { animation: none; }
+            .slot-drag-ghost         { transition: none; }
+        }
         /* Menu decorative styles */
         .menu-decorative { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px; }
         .menu-icon svg { display: block; }
@@ -766,21 +935,29 @@
         <!-- SLOT SELECTOR OVERLAY -->
         <div id="slot-selector" class="ov">
             <h2 style="color:#ffff00;">ARRANGE YOUR SLOTS</h2>
-            <p style="max-width:360px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:15px;letter-spacing:0.5px;">Tap a slot, then tap an unlocked position to place it. Tap onto a locked position to unlock it. 1 unlock per floor.</p>
-            
+            <!-- Phase 9: copy cleanup. The previous build told the
+                 player to "tap a slot, then tap a position" three
+                 times in a row; the new copy covers both gestures
+                 (drag and tap) in one sentence, and leads with the
+                 action verb so it reads faster. -->
+            <p style="max-width:380px;text-align:center;color:#8888aa;font-size:12px;margin-bottom:12px;letter-spacing:0.5px;line-height:1.5;">Drag or tap a slot effect onto a position. Locked positions unlock when you assign to them.</p>
+
             <div class="slot-arranging-section">
-                <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Target Positions</div>
-                <div id="position-slots" style="display:flex;gap:4px;justify-content:center;margin-bottom:15px;"></div>
+                <div class="section-label">Target Positions</div>
+                <div id="position-slots" style="display:flex;gap:4px;justify-content:center;margin-bottom:6px;"></div>
             </div>
-            
-            <div style="text-align:center;color:#8888aa;font-size:11px;letter-spacing:1px;margin:4px 0 6px;">↑ Tap a slot, then tap a position ↑</div>
-            
+
+            <div class="slot-section-divider"></div>
+            <div id="unlock-counter" class="unlock-counter has">
+                <span class="uc-num">1</span> UNLOCK REMAINING THIS FLOOR
+            </div>
+
             <div class="slot-arranging-section">
-                <div style="font-size:11px;color:#00fff2;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;">Available Effects</div>
+                <div class="section-label">Available Effects</div>
                 <div id="slot-info" style="color:#00fff2;font-size:10px;margin:0 0 6px;letter-spacing:1px;text-align:center;text-transform:uppercase;"></div>
                 <div id="slot-pool" style="display:flex;gap:4px;justify-content:center;flex-wrap:nowrap;width:200px;margin:0 auto;"></div>
             </div>
-            
+
             <div style="display:flex;gap:10px;justify-content:center;margin-top:15px;">
                 <button class="btn btn2" id="auto-arrange">AUTO-ARRANGE</button>
                 <button class="btn" id="confirm-slots">CONFIRM</button>
@@ -1441,7 +1618,12 @@
         // When set, the slot pool item or position the player tapped
         // is highlighted; the next tap on a position triggers the
         // same handleSlotDrop/handlePoolDrop path that DnD used to call.
-        selectedSlot: null
+        selectedSlot: null,
+        // Phase 9: set to the just-unlocked position index for one
+        // render pass so renderSlotSelector can apply the
+        // .unlock-burst animation class. -1 = no pending burst.
+        // Cleared by a 700ms setTimeout in unlockSlotPosition.
+        justUnlocked: -1
     };
 
     // ========== PERSIST ==========
@@ -3270,11 +3452,33 @@
         var posContainer = document.getElementById('position-slots');
         var poolContainer = document.getElementById('slot-pool');
 
-        // Build position slots (0-6). Phase 5: drag-and-drop wiring was
-        // removed; selection / placement is now driven by a single
-        // delegated pointerdown listener on #slot-selector (see
-        // selectOrPlace below). The .selected class on the picked element
-        // gives persistent visual feedback for the tap-to-select step.
+        // Phase 9: unlock counter. Three states:
+        //  - has: yellow "1 UNLOCK REMAINING" (player can still unlock one)
+        //  - used: grey "0 UNLOCKS REMAINING" (already used this floor)
+        //  - all-done: grey "ALL POSITIONS UNLOCKED" (7/7, nothing to do)
+        // The counter sits between the divider and the pool, so the
+        // player sees the constraint at all times during arrangement.
+        var counter = document.getElementById('unlock-counter');
+        if (counter) {
+            if (GS.unlockedSlots.length >= C.SC) {
+                counter.className = 'unlock-counter used';
+                counter.innerHTML = 'ALL POSITIONS UNLOCKED';
+            } else if (GS.canUnlockThisFloor) {
+                counter.className = 'unlock-counter has';
+                counter.innerHTML = '<span class="uc-num">1</span> UNLOCK REMAINING THIS FLOOR';
+            } else {
+                counter.className = 'unlock-counter used';
+                counter.innerHTML = '<span class="uc-num">0</span> UNLOCKS REMAINING THIS FLOOR';
+            }
+        }
+
+        // Build position slots (0-6).
+        // Phase 9: state is now communicated by a single class on
+        // `.slot-pos` (one of: .occupied / .unlocked-empty /
+        // .unlockable / .locked-disabled) instead of inline styles
+        // scattered across four branches. The CSS for each class
+        // (defined in the <style> block) owns the colors / borders /
+        // animation. The render is just data: which class, which icon.
         posContainer.innerHTML = '';
         for (let i = 0; i < C.SC; i++) {
             var isUnlocked = GS.unlockedSlots.indexOf(i) !== -1;
@@ -3282,19 +3486,30 @@
             var hasSlot = slotType !== undefined && slotType !== null;
 
             var div = document.createElement('div');
-            div.className = 'slot-pos' + (hasSlot ? ' occupied' : '');
+            div.className = 'slot-pos';
             div.dataset.pos = i;
+
             // Restore the .selected highlight after a re-render so the
             // "you picked this" feedback survives the re-render that
             // handleSlotDrop/handlePoolDrop trigger.
             if (GS.selectedSlot && GS.selectedSlot.source === 'pos' + i) {
                 div.classList.add('selected');
             }
+            // Phase 9: trigger the unlock-burst animation for 650ms on
+            // a position that just unlocked this render. The flag is
+            // set in unlockSlotPosition and cleared on a timer.
+            if (GS.justUnlocked === i) {
+                div.classList.add('unlock-burst');
+            }
 
             if (isUnlocked) {
-                // Position is unlocked
                 if (hasSlot) {
-                    // Has a slot assigned - tap to pick for swap
+                    // Occupied: type-colored tile, same as before but
+                    // the .occupied class is now in CSS (not just the
+                    // border-style). The color is set inline so each
+                    // slot type gets its own tint (CR green, JP
+                    // magenta, etc.) - CSS doesn't know the types.
+                    div.classList.add('occupied');
                     var col = getSlotColor(slotType);
                     var name = C.ST_NAMES[slotType];
                     var slotIconSvg = SVG_ICONS.getSlotIcon(slotType);
@@ -3302,35 +3517,32 @@
                     div.style.borderColor = col;
                     div.style.color = col;
                     div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + slotIconSvg + '</span>';
-                    div.setAttribute('aria-label', name + ' - Position ' + (i + 1) + ' (tap to swap)');
+                    div.setAttribute('aria-label', name + ' - Position ' + (i + 1) + ' (drag or tap to swap)');
                 } else {
-                    // Unlocked but no slot yet - tap target for new slot
-                    div.style.background = 'rgba(255,255,0,0.3)';
-                    div.style.borderColor = '#ffff00';
-                    div.style.borderStyle = 'dashed';
-                    div.style.color = '#ffff00';
+                    // Unlocked + empty: yellow dashed UI_PLUS. "Drop
+                    // or tap a slot here to fill this position."
+                    div.classList.add('unlocked-empty');
                     div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_PLUS + '</span>';
-                    div.setAttribute('aria-label', 'Tap a slot, then tap here to place it');
+                    div.setAttribute('aria-label', 'Drop or tap a slot here to fill this position');
                 }
             } else {
-                // Position is locked
                 if (GS.canUnlockThisFloor) {
-                    // Unlockable: tap a slot, then tap here to unlock + place
-                    div.style.background = 'rgba(255,0,255,0.2)';
-                    div.style.borderColor = '#ff00ff';
-                    div.style.borderStyle = 'dashed';
-                    div.style.color = '#ff00ff';
-                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_UNLOCK + '</span>';
-                    div.setAttribute('aria-label', 'Tap a slot, then tap here to UNLOCK (1 per floor)');
+                    // Locked + unlockable this floor: cyan UI_PLUS_CYAN
+                    // on a soft cyan-tinted background with a 2.2s
+                    // pulse. Replaces the previous bright pink
+                    // UI_UNLOCK; cyan is in-family with the section
+                    // header and reads as "ready to use".
+                    div.classList.add('unlockable');
+                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_PLUS_CYAN + '</span>';
+                    div.setAttribute('aria-label', 'Drop or tap a slot here to UNLOCK (1 per floor)');
                 } else {
-                    // All slots unlocked or can't unlock this floor.
-                    // Tap target for rearrangement (same affordance as the
-                    // yellow empty state, dimmer to signal "neutral").
-                    div.style.background = 'rgba(85,85,102,0.3)';
-                    div.style.borderColor = '#555566';
-                    div.style.color = '#555566';
-                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;opacity:0.6;">' + SVG_ICONS.UI_PLUS + '</span>';
-                    div.setAttribute('aria-label', 'Tap a slot, then tap here to rearrange');
+                    // Locked + can't unlock this floor: grey UI_LOCK
+                    // (solid padlock, closed shackle) at 0.5 opacity.
+                    // "Closed" reads instantly; the dim opacity keeps
+                    // the row uniform with the unlockable state.
+                    div.classList.add('locked-disabled');
+                    div.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + SVG_ICONS.UI_LOCK + '</span>';
+                    div.setAttribute('aria-label', 'Locked this floor - rearrange only');
                 }
             }
 
@@ -3340,25 +3552,17 @@
         // Build pool of available slots to choose from
         poolContainer.innerHTML = '';
 
-        // Show info about unlocking. Lives in its own #slot-info div (a
-        // sibling of #slot-pool) so the pool's flex layout doesn't fight
-        // the text's intrinsic width.
+        // Phase 9: the previous build had a dynamic "Tap a slot, then
+        // tap a locked position to unlock it" hint that lived in a
+        // #slot-info div above the pool. The unlock-counter now
+        // carries that information (and the visual cue is the cyan
+        // pulse on the unlockable positions), so #slot-info is
+        // always hidden. Kept the element in the DOM to avoid
+        // changing the HTML structure - the render just hides it.
         var infoContainer = document.getElementById('slot-info');
-        if (infoContainer) infoContainer.innerHTML = '';
-        var infoDiv = document.createElement('div');
-        // Show the "tap to unlock" hint on the first floor (where there
-        // are still locked positions to fill). Once a position is
-        // unlocked, the up-arrow + section labels already explain the
-        // rearrange mechanic.
-        if (GS.canUnlockThisFloor && GS.unlockedSlots.length < C.SC) {
-            infoDiv.textContent = 'Tap a slot, then tap a locked position to unlock it';
-        } else {
-            if (infoContainer) infoContainer.style.display = 'none';
-        }
-        if (infoContainer && infoContainer.style.display !== 'none') {
-            infoContainer.appendChild(infoDiv);
-        } else if (!infoContainer) {
-            poolContainer.appendChild(infoDiv);
+        if (infoContainer) {
+            infoContainer.style.display = 'none';
+            infoContainer.innerHTML = '';
         }
 
         for (let j = 0; j < GS.slotPool.length; j++) {
@@ -3373,7 +3577,7 @@
             poolDiv.style.borderColor = col;
             poolDiv.style.color = col;
             poolDiv.innerHTML = '<span class="svg-icon" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">' + poolIconSvg + '</span>';
-            poolDiv.setAttribute('aria-label', name + ' (tap to pick)');
+            poolDiv.setAttribute('aria-label', name + ' (drag or tap to pick)');
             poolDiv.dataset.poolIdx = j;
             poolDiv.dataset.slotType = poolSlotType;
             // Restore .selected highlight after re-render
@@ -3385,11 +3589,22 @@
         }
     }
 
-    // Phase 5: tap-to-select-tap-to-place. One delegated pointerdown
-    // listener on the overlay handles selection and placement for every
-    // .slot-pos and .slot-pool-item. Tapping outside the overlay (e.g.
-    // the AUTO-ARRANGE / CONFIRM buttons, or a click in the menu)
-    // clears the selection via a second delegated listener on document.
+    // Phase 9: tap-to-select-tap-to-place PLUS drag-and-drop. One
+    // delegated pointerdown listener on the overlay handles selection
+    // (pick / switch / cancel). The "place" action is moved off
+    // pointerdown to pointerup, where it can be triggered by either:
+    //  - a tap (pointerup with no movement) on a position with a
+    //    selection, OR
+    //  - a drag drop (pointerup after pointermove past the threshold)
+    //    on a position via document.elementFromPoint.
+    // Drag tracking: pointermove on the overlay checks the distance
+    // from pointerdown. Past the 6px threshold, a ghost element is
+    // appended to <body> (escapes the #scaler / #game-container
+    // transform-origin stack) and follows the cursor. The source
+    // tile dims to 35% via .dragging-source. A valid drop target
+    // (any .slot-pos) gets a yellow glow via .drop-target.
+    // setPointerCapture is used so the user can drag off the overlay
+    // and still release on a position without losing the gesture.
     (function() {
         var _slotSel = document.getElementById('slot-selector');
         if (!_slotSel) return;
@@ -3400,23 +3615,219 @@
             for (let k = 0; k < els.length; k++) els[k].classList.remove('selected');
         }
 
-        // Tapping the AUTO-ARRANGE / CONFIRM buttons should also clear
-        // any pending selection, otherwise the .selected highlight
-        // would survive across re-renders on a stale element.
+        // Drag state (Phase 9). Module-private; not exposed on GS.
+        var dragState = {
+            active: false,        // has pointer moved past threshold?
+            pointerId: null,      // the pointer we're tracking
+            startX: 0,
+            startY: 0,
+            threshold: 6,         // pixels of movement before drag kicks in
+        };
+
+        // Remove the drag ghost, un-dim the source, clear drop-target
+        // highlights. Called on drag end and on capture-phase button
+        // taps that interrupt a drag.
+        function cleanupDragVisuals() {
+            var ghost = document.querySelector('.slot-drag-ghost');
+            if (ghost) ghost.remove();
+            _slotSel.querySelectorAll('.slot-pos.dragging-source, .slot-pool-item.dragging-source, .slot-pos.drop-target').forEach(function(el) {
+                el.classList.remove('dragging-source', 'drop-target');
+            });
+        }
+
+        // The place / swap / unlock action. Extracted from the old
+        // pointerdown handler so it can be called from BOTH pointerup
+        // (for both tap-to-place and drag drop). The function itself
+        // doesn't care which gesture triggered it; GS.selectedSlot is
+        // the source of truth. Pool item taps with a selection are
+        // still handled in pointerdown (switch / cancel) since they
+        // don't need a "release on the same element" event.
+        function performPlace(targetPos) {
+            var sel = GS.selectedSlot;
+            if (!sel) return;
+            var isTargetUnlocked = GS.unlockedSlots.indexOf(targetPos) !== -1;
+            var targetHasSlot = GS.slotArrangement[targetPos] !== undefined && GS.slotArrangement[targetPos] !== null;
+
+            if (!isTargetUnlocked) {
+                // Locked position: only valid target if the player is
+                // placing a pool item AND can unlock this floor.
+                // Tapping / dropping a locked position with a position-
+                // sourced selection is a no-op (no swap into a locked
+                // slot). The selection is preserved so the player can
+                // try a different target.
+                if (sel.source !== 'pool' || !GS.canUnlockThisFloor) {
+                    return;
+                }
+            }
+
+            if (sel.source === 'pool') {
+                // Two cases:
+                //  - target is empty (unlocked-empty or locked with
+                //    canUnlockThisFloor): use handlePoolDrop, which
+                //    places the item and (for locked targets) also
+                //    unlocks the position. The pool loses the placed
+                //    item; the other pool items are preserved.
+                //  - target is occupied + unlocked: use handleSlotDrop
+                //    with fromPos=-1, which is the "pool replaces
+                //    existing slot" branch - it adds the existing
+                //    slot back to the pool AND places the new one.
+                if (isTargetUnlocked && targetHasSlot) {
+                    GS.isDraggingSlot = true;
+                    GS.draggingFromPos = -1;
+                    GS.draggingSlotType = sel.slotType;
+                    GS.draggingPoolIdx = sel.poolIdx;
+                    handleSlotDrop(targetPos);
+                } else {
+                    GS.isDraggingSlot = true;
+                    GS.draggingFromPos = -1;
+                    GS.draggingSlotType = sel.slotType;
+                    GS.draggingPoolIdx = sel.poolIdx;
+                    handlePoolDrop(targetPos);
+                }
+                // handlePoolDrop / handleSlotDrop call renderSlotSelector
+                // which re-renders and clears .selected via the restore
+                // pass. Also clear the tap-selection explicitly.
+                GS.selectedSlot = null;
+            } else if (sel.source && sel.source.indexOf('pos') === 0) {
+                // Position-sourced selection: swap only (don't overwrite
+                // a position with a pool item - that's a no-op to avoid
+                // accidental overwrites).
+                if (sel.fromPos === targetPos) {
+                    // Tapped / dropped on the same position - cancel.
+                    GS.selectedSlot = null;
+                    clearSelectedHighlight();
+                    return;
+                }
+                if (!isTargetUnlocked) return;
+                if (!targetHasSlot) return;
+                GS.isDraggingSlot = true;
+                GS.draggingFromPos = sel.fromPos;
+                GS.draggingSlotType = GS.slotArrangement[sel.fromPos];
+                GS.draggingPoolIdx = -1;
+                handleSlotDrop(targetPos);
+                GS.selectedSlot = null;
+            }
+        }
+
+        // Create the ghost element that follows the cursor during a
+        // drag. Appended to <body> (NOT the #scaler / #game-container)
+        // so its position:fixed anchors to the viewport, not the
+        // scaler's transform. The CSS custom properties
+        // (--ghost-border / --ghost-glow / --ghost-bg) take the slot
+        // type's color so each slot's ghost is tinted to match.
+        function createDragGhost(sel) {
+            var slotType = sel.slotType;
+            var col = getSlotColor(slotType);
+            var iconSvg = SVG_ICONS.getSlotIcon(slotType);
+            var ghost = document.createElement('div');
+            ghost.className = 'slot-drag-ghost';
+            ghost.style.setProperty('--ghost-border', col);
+            ghost.style.setProperty('--ghost-glow', col + '99');
+            ghost.style.setProperty('--ghost-bg', col + '40');
+            ghost.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">' + iconSvg + '</span>';
+            document.body.appendChild(ghost);
+            return ghost;
+        }
+
+        // Begin a drag: create the ghost, dim the source, set state.
+        function startDrag(sel) {
+            dragState.active = true;
+            var ghost = createDragGhost(sel);
+            ghost.style.left = dragState.startX + 'px';
+            ghost.style.top = dragState.startY + 'px';
+            if (sel.source === 'pool') {
+                var poolItem = _slotSel.querySelector('.slot-pool-item[data-pool-idx="' + sel.poolIdx + '"]');
+                if (poolItem) poolItem.classList.add('dragging-source');
+            } else {
+                var fromPos = sel.fromPos;
+                var posEl = _slotSel.querySelector('.slot-pos[data-pos="' + fromPos + '"]');
+                if (posEl) posEl.classList.add('dragging-source');
+            }
+        }
+
+        // Update the ghost position and the .drop-target highlight as
+        // the pointer moves. The ghost has pointer-events:none (set
+        // in CSS) so document.elementFromPoint passes through to the
+        // element behind it, which is what we want for the drop
+        // target highlight.
+        function updateDrag(e) {
+            var ghost = document.querySelector('.slot-drag-ghost');
+            if (ghost) {
+                ghost.style.left = e.clientX + 'px';
+                ghost.style.top = e.clientY + 'px';
+            }
+            _slotSel.querySelectorAll('.slot-pos.drop-target').forEach(function(el) {
+                el.classList.remove('drop-target');
+            });
+            var target = document.elementFromPoint(e.clientX, e.clientY);
+            if (target) {
+                var slotPos = target.closest && target.closest('.slot-pos');
+                if (slotPos) slotPos.classList.add('drop-target');
+            }
+        }
+
+        // End a drag: find the position under the pointer, perform the
+        // place (or cancel if released over empty space), clean up
+        // the visuals. performPlace will leave GS.selectedSlot alone
+        // if the drop is invalid (the source is still highlighted and
+        // the user can try again).
+        function endDrag(e) {
+            var target = document.elementFromPoint(e.clientX, e.clientY);
+            var slotPos = target && target.closest && target.closest('.slot-pos');
+            if (slotPos) {
+                var pos = parseInt(slotPos.dataset.pos);
+                performPlace(pos);
+            } else {
+                // Dropped on empty - cancel selection.
+                GS.selectedSlot = null;
+                clearSelectedHighlight();
+            }
+            cleanupDragVisuals();
+        }
+
+        // Capture-phase: button taps clear selection AND cancel any
+        // in-progress drag. This fires before the bubble-phase slot
+        // handler, so the bubble handler sees the cleared state and
+        // early-returns. Phase 9 also cleans up the drag visuals
+        // (ghost, .dragging-source) if a drag was in progress.
         _slotSel.addEventListener('pointerdown', function(e) {
             var btn = e.target.closest && e.target.closest('.btn');
             if (btn) {
                 GS.selectedSlot = null;
                 clearSelectedHighlight();
+                if (dragState.active) {
+                    cleanupDragVisuals();
+                    dragState.active = false;
+                    dragState.pointerId = null;
+                }
             }
-        }, true); // capture phase so it fires before selectOrPlace
+        }, true);
 
+        // Bubble-phase: pick / switch / cancel. No "place" action
+        // here - the place is on pointerup so drag and tap can share
+        // the same drop target. setPointerCapture is called here so
+        // the user can drag off the overlay and still get a clean
+        // pointerup on _slotSel (with target = whatever's under the
+        // cursor at release time).
         _slotSel.addEventListener('pointerdown', function(e) {
-            // Find the closest slot position or pool item. closest() works
-            // for both desktop clicks and touch taps (both fire pointerdown).
+            if (dragState.active) return; // mid-drag, ignore new taps
+
             var slotPos = e.target.closest && e.target.closest('.slot-pos');
             var poolItem = e.target.closest && e.target.closest('.slot-pool-item');
             if (!slotPos && !poolItem) return;
+
+            // Capture the pointer so subsequent pointermove/pointerup
+            // fire on _slotSel regardless of cursor position. This
+            // is what makes "drag off the overlay, release on a
+            // position" work - the release is still dispatched to
+            // _slotSel, not the element underneath.
+            try { _slotSel.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+
+            // Record drag start (used by pointermove to detect drag).
+            dragState.pointerId = e.pointerId;
+            dragState.startX = e.clientX;
+            dragState.startY = e.clientY;
+            dragState.active = false;
 
             var pos = slotPos ? parseInt(slotPos.dataset.pos) : -1;
             var poolIdx = poolItem ? parseInt(poolItem.dataset.poolIdx) : -1;
@@ -3463,80 +3874,63 @@
                 }
                 return;
             }
+            // Position taps with a selection are intentionally NOT
+            // handled here in Phase 9 - they go to pointerup. This is
+            // what makes drag-and-drop work: if the user is in the
+            // middle of dragging (or about to start), we don't want
+            // to commit the place on pointerdown. The pointerup
+            // handler will check whether a drag happened and either
+            // drop on a target or just perform the place for a tap.
+        });
 
-            // Tap on a position with a selection -> place / swap / unlock.
-            if (slotPos) {
-                var targetPos = pos;
-                var isTargetUnlocked = GS.unlockedSlots.indexOf(targetPos) !== -1;
-                var targetHasSlot = GS.slotArrangement[targetPos] !== undefined && GS.slotArrangement[targetPos] !== null;
+        // pointermove: if past threshold, start the drag.
+        _slotSel.addEventListener('pointermove', function(e) {
+            if (!GS.selectedSlot) return;
+            if (dragState.pointerId !== e.pointerId) return;
+            if (dragState.active) {
+                updateDrag(e);
+                return;
+            }
+            var dx = e.clientX - dragState.startX;
+            var dy = e.clientY - dragState.startY;
+            if (dx*dx + dy*dy < dragState.threshold * dragState.threshold) return;
+            // Start drag.
+            startDrag(GS.selectedSlot);
+            updateDrag(e);
+        });
 
-                if (!isTargetUnlocked) {
-                    // Locked position: only valid target if the player is
-                    // placing a pool item AND can unlock this floor.
-                    // Tapping a locked position with a position-sourced
-                    // selection is a no-op (no swap into a locked slot).
-                    if (sel.source !== 'pool' || !GS.canUnlockThisFloor) {
-                        return;
-                    }
-                }
-
-                if (sel.source === 'pool') {
-                    // Place the pool item. Two cases:
-                    //  - target is empty (unlocked-empty or locked with
-                    //    canUnlockThisFloor): use handlePoolDrop, which
-                    //    places the item and (for locked targets) also
-                    //    unlocks the position. The pool loses the placed
-                    //    item; the other pool items are preserved.
-                    //  - target is occupied + unlocked: use handleSlotDrop
-                    //    with fromPos=-1, which is the "pool replaces
-                    //    existing slot" branch - it adds the existing
-                    //    slot back to the pool AND places the new one.
-                    //    This is the only way the player can move a pool
-                    //    item into an occupied position without losing
-                    //    the slot that was there. handlePoolDrop on an
-                    //    occupied position would just overwrite and drop
-                    //    the existing slot on the floor (a real bug
-                    //    that the previous implementation had).
-                    if (isTargetUnlocked && targetHasSlot) {
-                        // Pool-to-occupied: swap with pool
-                        GS.isDraggingSlot = true;
-                        GS.draggingFromPos = -1;
-                        GS.draggingSlotType = sel.slotType;
-                        GS.draggingPoolIdx = sel.poolIdx;
-                        handleSlotDrop(targetPos);
-                    } else {
-                        // Pool-to-empty (or pool-to-locked-unlockable):
-                        // standard place, optional unlock.
-                        GS.isDraggingSlot = true;
-                        GS.draggingFromPos = -1;
-                        GS.draggingSlotType = sel.slotType;
-                        GS.draggingPoolIdx = sel.poolIdx;
-                        handlePoolDrop(targetPos);
-                    }
-                    // handlePoolDrop / handleSlotDrop both call
-                    // renderSlotSelector() and reset the dragging
-                    // fields. Clear the tap-selection too.
-                    GS.selectedSlot = null;
-                } else if (sel.source && sel.source.indexOf('pos') === 0) {
-                    // Position-sourced selection: swap only (don't overwrite
-                    // a position with a pool item - that's a no-op to avoid
-                    // accidental overwrites). Same shape as handleSlotDrop.
-                    if (sel.fromPos === targetPos) {
-                        // Tapped the same position - cancel selection.
-                        GS.selectedSlot = null;
-                        clearSelectedHighlight();
-                        return;
-                    }
-                    if (!isTargetUnlocked) return;
-                    if (!targetHasSlot) return;
-                    GS.isDraggingSlot = true;
-                    GS.draggingFromPos = sel.fromPos;
-                    GS.draggingSlotType = GS.slotArrangement[sel.fromPos];
-                    GS.draggingPoolIdx = -1;
-                    handleSlotDrop(targetPos);
-                    GS.selectedSlot = null;
+        // pointerup: end the gesture. If a drag is active, perform
+        // the drop (or cancel). If no drag (just a tap), and the
+        // release is on a position with a selection, perform the
+        // place. Pool item taps with a selection are handled in
+        // pointerdown (switch / cancel), not here.
+        _slotSel.addEventListener('pointerup', function(e) {
+            if (dragState.pointerId !== e.pointerId) return;
+            if (dragState.active) {
+                endDrag(e);
+            } else {
+                // Tap (no drag). Check if released on a position with
+                // a selection - that's the tap-to-place flow.
+                var slotPos = e.target.closest && e.target.closest('.slot-pos');
+                if (slotPos && GS.selectedSlot) {
+                    var pos = parseInt(slotPos.dataset.pos);
+                    performPlace(pos);
                 }
             }
+            dragState.pointerId = null;
+            dragState.active = false;
+        });
+
+        // pointercancel: system-interrupted gesture (e.g. touch
+        // hijacked by a swipe-back). Clean up the drag visuals
+        // without committing a place.
+        _slotSel.addEventListener('pointercancel', function(e) {
+            if (dragState.pointerId !== e.pointerId) return;
+            GS.selectedSlot = null;
+            clearSelectedHighlight();
+            cleanupDragVisuals();
+            dragState.pointerId = null;
+            dragState.active = false;
         });
 
         // Tapping anywhere outside the overlay (menu, canvas, etc.)
@@ -3643,7 +4037,17 @@
         // After unlocking, prevent any more unlocks this floor
         GS.canUnlockThisFloor = false;
 
+        // Phase 9: trigger the cyan unlock-burst animation on the
+        // position that just unlocked. renderSlotSelector reads
+        // GS.justUnlocked and adds the .unlock-burst class for one
+        // frame. The setTimeout clears the flag after the 650ms
+        // animation completes so a follow-up re-render (e.g. from
+        // a pool refill on the next floor) doesn't replay the burst.
+        GS.justUnlocked = pos;
         renderSlotSelector();
+        setTimeout(function() {
+            if (GS.justUnlocked === pos) GS.justUnlocked = -1;
+        }, 700);
     }
 
     function autoArrangeSlots() {
@@ -6523,6 +6927,8 @@
         genSlots: genSlots, checkSlot: checkSlot,
         getSlotForX: getSlotForX, getSlotX: getSlotX,
         isSlotUnlocked: isSlotUnlocked, unlockSlotPosition: unlockSlotPosition,
+        renderSlotSelector: renderSlotSelector,
+        getSlotColor: getSlotColor,
         checkAchievements: checkAchievements,
         modActive: modActive, getDailySeed: getDailySeed,
         seededRandom: seededRandom, getDailyModifiers: getDailyModifiers,

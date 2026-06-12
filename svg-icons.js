@@ -145,8 +145,11 @@ var SVG_ICONS = {
     // Plus - "drop a slot here" affordance on unlocked-empty positions.
     UI_PLUS: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ffff00" stroke-width="1.75" stroke-dasharray="3 2"/><path d="M12 8V16M8 12H16" stroke="#ffff00" stroke-width="1.75" stroke-linecap="round"/></svg>',
 
-    // Unlock - magenta variant, used on locked-but-unlockable slot positions.
-    UI_UNLOCK: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="10" rx="1.5" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-dasharray="3 2"/><path d="M8 11V7C8 5 10 3 12 3C13.5 3 15 4 15.5 5.5" fill="none" stroke="#ff00ff" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="16" r="1.5" fill="#ff00ff"/></svg>',
+    // Plus (cyan variant) - "locked position you can unlock this floor".
+    // Phase 9: replaces the magenta UI_UNLOCK on locked-but-unlockable
+    // positions. Solid stroke (not dashed) so the affordance reads as
+    // 'ready', not 'pending'.
+    UI_PLUS_CYAN: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" fill="none" stroke="#00fff2" stroke-width="1.75"/><path d="M12 8V16M8 12H16" stroke="#00fff2" stroke-width="2" stroke-linecap="round"/></svg>',
 
     // Gear - settings. Slightly stylized with 6 teeth.
     UI_GEAR: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" fill="none" stroke="#ffffff" stroke-width="1.75"/><path d="M12 2V4M12 20V22M2 12H4M20 12H22M5 5L6.5 6.5M17.5 17.5L19 19M5 19L6.5 17.5M17.5 6.5L19 5" stroke="#ffffff" stroke-width="1.75" stroke-linecap="round"/></svg>',
