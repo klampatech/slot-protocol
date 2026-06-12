@@ -42,6 +42,27 @@ function record(name, file, must) {
         await page.waitForTimeout(600);
     }
 
+    // Drop a ball via a real pointerdown+pointerup at the canvas
+    // center. The previous build used `document.querySelector('#gc').click()`,
+    // but .click() only dispatches a `click` event - not pointerdown /
+    // pointerup - so the canvas's dropBall handler never fired and the
+    // mid-gameplay screenshots were always the empty board (a pre-
+    // existing bug, not related to any specific feature work). The
+    // mouse API fires the pointer events the game actually listens to.
+    // The canvas is 480x700 inside the 960x800 viewport; getBoundingClientRect
+    // returns the post-transform position so we aim at the actual
+    // rendered center regardless of the CSS scale-to-fit factor.
+    async function dropBallAtCanvas() {
+        const box = await page.evaluate(() => {
+            const c = document.getElementById('gc');
+            const r = c.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        await page.mouse.move(box.x, box.y);
+        await page.mouse.down();
+        await page.mouse.up();
+    }
+
     // ========== Visual assertions ==========
     // Each must[] entry is { label, fn(canvas, ctx) -> {ok, detail} }.
     // The fn receives the canvas element and its 2D context; it returns
@@ -258,13 +279,13 @@ function record(name, file, must) {
 
     // 8. Drop balls by clicking
     console.log('Dropping balls...');
-    await page.evaluate(() => document.querySelector('#gc').click());
+    await dropBallAtCanvas();
     await page.waitForTimeout(4000);
 
-    await page.evaluate(() => document.querySelector('#gc').click());
+    await dropBallAtCanvas();
     await page.waitForTimeout(4000);
 
-    await page.evaluate(() => document.querySelector('#gc').click());
+    await dropBallAtCanvas();
     await page.waitForTimeout(4000);
 
     await page.screenshot({ path: path.join(screenshotDir, '08-mid-gameplay.png') });
@@ -274,7 +295,7 @@ function record(name, file, must) {
 
     // Keep dropping balls until game state changes
     for (let i = 0; i < 10; i++) {
-        await page.evaluate(() => document.querySelector('#gc').click());
+        await dropBallAtCanvas();
         await page.waitForTimeout(2500);
 
         // Check for overlays
@@ -333,7 +354,7 @@ function record(name, file, must) {
     // Continue gameplay
     console.log('Continuing gameplay...');
     for (let i = 0; i < 15; i++) {
-        await page.evaluate(() => document.querySelector('#gc').click());
+        await dropBallAtCanvas();
         await page.waitForTimeout(2000);
 
         const reVisible = await page.evaluate(() => document.querySelector('#re').classList.contains('on'));
