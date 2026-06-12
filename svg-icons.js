@@ -175,6 +175,21 @@ var SVG_ICONS = {
     // Coin - for total runs stat.
     UI_RUNS: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#ff00ff" stroke-width="1.75"/><path d="M12 6L18 12L12 18L6 12Z" fill="none" stroke="#ff00ff" stroke-width="1.5"/></svg>',
 
+    // Speaker (on) - speaker body with two arcs representing sound waves.
+    // Used in the settings volume row when the channel is non-zero.
+    // The two arcs at decreasing opacity read as "sound radiating out"
+    // without literal sine-wave curves. The two-tone stroke (cyan body,
+    // lighter wave) matches the rest of the icon set.
+    UI_SOUND_ON: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11 5L6 9H2V15H6L11 19V5Z" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linejoin="round"/><path d="M15.54 8.46C16.4774 9.39764 17.0039 10.6696 17.0039 11.995C17.0039 13.3204 16.4774 14.5924 15.54 15.53" fill="none" stroke="#88eeff" stroke-width="1.5" stroke-linecap="round" opacity="0.85"/><path d="M19.07 4.93C20.9447 6.80317 21.9979 9.3233 21.9979 11.995C21.9979 14.6667 20.9447 17.1868 19.07 19.06" fill="none" stroke="#88eeff" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>',
+
+    // Speaker (off) - speaker body with a red X over the wave area.
+    // Used in the settings volume row when the channel is at 0 (muted).
+    // The X is in #ff2244 (the same red as the explosive peg) so the
+    // muted state is instantly readable - matches the rest of the icon
+    // set's "danger means red" convention. The speaker body stays cyan
+    // so the control's identity is preserved when toggling on/off.
+    UI_SOUND_OFF: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11 5L6 9H2V15H6L11 19V5Z" fill="none" stroke="#00fff2" stroke-width="1.75" stroke-linejoin="round"/><line x1="16" y1="9" x2="22" y2="15" stroke="#ff2244" stroke-width="2" stroke-linecap="round"/><line x1="22" y1="9" x2="16" y2="15" stroke="#ff2244" stroke-width="2" stroke-linecap="round"/></svg>',
+
     // ========== HELPER FUNCTIONS ==========
     // Lookup by enum index. Returns an SVG string suitable for innerHTML.
     getPegIcon: function(type) {

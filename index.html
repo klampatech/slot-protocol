@@ -185,6 +185,83 @@
         .toggle.on { background: #00fff2; }
         .toggle::after { content: ''; width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
         .toggle.on::after { left: 22px; }
+        /* ========== PHASE 10: VOLUME SLIDERS ==========
+           Replaces the SOUND EFFECTS / MUSIC toggles with per-channel
+           sliders (sfxvolume 0..100, bgmvolume 0..100). Each row has:
+           label + speaker icon (cyan when on, red X when muted) + slider
+           + percentage display. The slider's track is split into a cyan
+           "filled" portion (left of thumb) and a dim grey "empty" portion
+           (right of thumb) via a CSS custom property --vol-pct that the
+           input handler updates on every change. WebKit uses a linear-
+           gradient on ::-webkit-slider-runnable-track; Firefox uses
+           ::-moz-range-progress (a real second pseudo-element). Touch
+           action: manipulation on the slider removes the 300ms tap delay
+           on mobile so dragging feels native. The .toggle rules above
+           remain in place for the CONTRAST MODE and MULTIBALL MODE
+           toggles, which keep the on/off pill switch (binary state).
+           Only the audio toggles are replaced. */
+        .volume-row { display: flex; align-items: center; justify-content: center; margin: 10px 0; gap: 8px; font-size: 12px; min-width: 280px; }
+        .volume-label { color: #8888aa; letter-spacing: 1.5px; text-transform: uppercase; font-size: 11px; }
+        .volume-icon { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+        .volume-icon svg { width: 100%; height: 100%; }
+        .volume-slider {
+            --vol-pct: 40%;
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            height: 16px;
+            flex: 1;
+            max-width: 150px;
+            cursor: pointer;
+            /* Phase 5: removes the 300ms tap delay so dragging feels
+               native on mobile (touch-action: manipulation) and
+               suppresses the iOS long-press caret + blue tap glow on
+               the thumb. */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .volume-slider::-webkit-slider-runnable-track {
+            height: 4px;
+            background: linear-gradient(to right, #00fff2 0%, #00fff2 var(--vol-pct), #333 var(--vol-pct), #333 100%);
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(0,255,242,0.15) inset;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #00fff2;
+            border: 2px solid #0a0a12;
+            border-radius: 50%;
+            margin-top: -5px;
+            box-shadow: 0 0 8px #00fff2;
+            cursor: pointer;
+        }
+        .volume-slider::-moz-range-track {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(0,255,242,0.15) inset;
+        }
+        .volume-slider::-moz-range-progress {
+            height: 4px;
+            background: #00fff2;
+            border-radius: 2px;
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #00fff2;
+            border: 2px solid #0a0a12;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00fff2;
+            cursor: pointer;
+        }
+        .volume-slider:focus { outline: none; }
+        .volume-slider:focus::-webkit-slider-thumb { box-shadow: 0 0 12px #00fff2, 0 0 0 2px rgba(0,255,242,0.3); }
+        .volume-slider:focus::-moz-range-thumb { box-shadow: 0 0 12px #00fff2, 0 0 0 2px rgba(0,255,242,0.3); }
+        .volume-value { font-family: 'Orbitron', monospace; font-size: 10px; color: #00fff2; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
         /* Jackpot slot machine styles */
         .jdiv { display: flex; gap: 8px; margin: 15px 0; justify-content: center; }
         .jr { width: 50px; height: 50px; background: #1a1a2e; border: 2px solid #555566; display: flex; justify-content: center; align-items: center; font-size: 24px; color: #ffff00; position: relative; overflow: hidden; }
@@ -872,13 +949,17 @@
                 <span>MULTIBALL MODE</span>
                 <div class="toggle" id="multiballtoggle"></div>
             </div>
-            <div class="toggle-row">
-                <span>SOUND EFFECTS</span>
-                <div class="toggle" id="soundtoggle"></div>
+            <div class="volume-row">
+                <span class="volume-label">SOUND EFFECTS</span>
+                <span class="volume-icon" id="sfx-icon"></span>
+                <input type="range" class="volume-slider" id="sfxvolume" min="0" max="100" step="1" value="40" aria-label="Sound effects volume">
+                <span class="volume-value" id="sfxvolume-value">40%</span>
             </div>
-            <div class="toggle-row">
-                <span>MUSIC</span>
-                <div class="toggle" id="musictoggle"></div>
+            <div class="volume-row">
+                <span class="volume-label">MUSIC</span>
+                <span class="volume-icon" id="bgm-icon"></span>
+                <input type="range" class="volume-slider" id="bgmvolume" min="0" max="100" step="1" value="30" aria-label="Music volume">
+                <span class="volume-value" id="bgmvolume-value">30%</span>
             </div>
             <div style="margin-top:8px;font-size:12px;color:#8888aa;text-align:center;">
                 <div>BALL SKIN:</div>
@@ -1176,6 +1257,13 @@
         masterGain: null,
         initialized: false,
         muted: false,
+        // Phase 10: per-channel SFX volume (0..1). The `muted` flag above
+        // is now derived state (true when sfxVolume === 0); it's checked
+        // as a fast early-out in `_tone` and `_noise`. The volume setter
+        // updates the masterGain node in addition to flipping the flag.
+        // Default 0.4 - the same value the hardcoded masterGain.gain.value
+        // was using pre-Phase 10, so existing playtest balance is preserved.
+        sfxVolume: 0.4,
         lastPegSound: 0, // throttle peg sounds to prevent flooding
         lastCriticalSound: 0, // throttle critical combo sound
 
@@ -1201,15 +1289,47 @@
             }
         },
 
-        setMuted: function(muted) {
-            this.muted = muted;
+        // ========== PHASE 10: VOLUME CONTROL ==========
+        // setSfxVolume / setBgmVolume are the new source-of-truth setters
+        // for the per-channel volume. The old `setMuted` / `setBgmMuted`
+        // / `toggleMute` / `toggleBgmMute` methods are kept as thin
+        // delegates so any external caller (or test) still works, but
+        // the UI and the persistence layer route through the new
+        // volume-based setters. The `muted` / `bgmMuted` flags become
+        // derived state (true when the corresponding volume is 0) and
+        // are used as fast early-outs in the per-sound helpers
+        // (`_tone` / `_noise` for SFX, the deferred-play path in
+        // `playBgm` for BGM). Setting volume to 0 sets muted=true;
+        // setting volume > 0 sets muted=false and (for BGM) restarts
+        // any deferred track that was staged by an earlier playBgm
+        // call when the channel was muted.
+        setSfxVolume: function(vol) {
+            vol = Math.max(0, Math.min(1, vol));
+            this.sfxVolume = vol;
+            this.muted = vol === 0;
             if (this.masterGain) {
-                this.masterGain.gain.value = muted ? 0 : 0.4;
+                this.masterGain.gain.value = vol;
+            }
+        },
+
+        // Legacy entry point - still callable for backwards compat. Maps
+        // the boolean back onto setSfxVolume. Note: setMuted(false) does
+        // NOT auto-restore to a previous non-zero volume (the slider
+        // tracks the user's chosen level in PERSIST and applies it via
+        // setSfxVolume on init). If the only persistence available is
+        // the old audioMuted boolean, this restores to the 0.4 default.
+        setMuted: function(muted) {
+            if (muted) {
+                this.setSfxVolume(0);
+            } else if (this.sfxVolume === 0 || this.sfxVolume === undefined) {
+                this.setSfxVolume(0.4);
+            } else {
+                this.setSfxVolume(this.sfxVolume);
             }
         },
 
         toggleMute: function() {
-            this.setMuted(!this.muted);
+            this.setSfxVolume(this.muted ? (this.sfxVolume > 0 ? this.sfxVolume : 0.4) : 0);
             return this.muted;
         },
 
@@ -1458,7 +1578,7 @@
                 var id = ids[i];
                 var el = document.getElementById('bgm-' + id);
                 if (!el) continue;
-                el.volume = this.bgmMuted ? 0 : this.bgmVolume;
+                el.volume = this.bgmVolume;
                 this.bgmTracks[id] = el;
             }
         },
@@ -1470,7 +1590,12 @@
             // Always make sure the elements are wired up (idempotent).
             if (!this.bgmTracks.title) this.initBgm();
             if (this.bgmMuted) {
-                // Still record what should be playing so unmute resumes correctly
+                // Phase 10: still record what should be playing so that
+                // an unmute via setBgmVolume(>0) can resume the track
+                // that was staged here. The old behavior deferred until
+                // the user toggled the on/off pill; with the volume
+                // slider, the user can flip muted -> unmuted via the
+                // slider going from 0% to any positive value.
                 this.currentBgmId = trackId;
                 return;
             }
@@ -1503,25 +1628,36 @@
             this.currentBgmId = null;
         },
 
-        setBgmMuted: function(muted) {
-            this.bgmMuted = muted;
-            if (muted) {
-                if (this.currentBgmEl) this.currentBgmEl.volume = 0;
-            } else {
-                if (this.currentBgmEl) this.currentBgmEl.volume = this.bgmVolume;
+        // Phase 10: per-channel volume. Source of truth for BGM loudness.
+        // 0 means muted; >0 starts the deferred track (if any) so the
+        // slider can flip muted -> unmuted without a manual playBgm
+        // call from the UI layer. Existing setBgmMuted and toggleBgmMute
+        // are kept as thin delegates (below) for backwards compat with
+        // any external caller.
+        setBgmVolume: function(vol) {
+            vol = Math.max(0, Math.min(1, vol));
+            var wasMuted = this.bgmMuted;
+            this.bgmVolume = vol;
+            this.bgmMuted = vol === 0;
+            if (this.currentBgmEl) {
+                this.currentBgmEl.volume = vol;
             }
+            // Unmuting from a previously-muted state: start the track
+            // that playBgm staged while we were muted. Without this,
+            // dragging the slider from 0 to 30% mid-game would not
+            // resume the BGM until the next screen transition.
+            if (wasMuted && !this.bgmMuted && this.currentBgmId) {
+                this.playBgm(this.currentBgmId);
+            }
+        },
+
+        setBgmMuted: function(muted) {
+            this.setBgmVolume(muted ? 0 : (this.bgmVolume > 0 ? this.bgmVolume : 0.3));
         },
 
         toggleBgmMute: function() {
-            this.setBgmMuted(!this.bgmMuted);
+            this.setBgmVolume(this.bgmMuted ? (this.bgmVolume > 0 ? this.bgmVolume : 0.3) : 0);
             return this.bgmMuted;
-        },
-
-        setBgmVolume: function(vol) {
-            this.bgmVolume = Math.max(0, Math.min(1, vol));
-            if (!this.bgmMuted && this.currentBgmEl) {
-                this.currentBgmEl.volume = this.bgmVolume;
-            }
         },
 
         // Map a UI screen id to the BGM track that should play while it is shown.
@@ -1643,7 +1779,18 @@
         currentBallSkin: '#00fff2',
         // Phase 4 Music Port: SFX and BGM are independently mutable
         audioMuted: false,
-        bgmMuted: false
+        bgmMuted: false,
+        // Phase 10: per-channel volume (0..1). The old audioMuted/bgmMuted
+        // booleans are kept as legacy fields so existing localStorage
+        // payloads don't break - loadPersist() does a one-time migration
+        // (audioMuted=true -> sfxVolume=0, audioMuted=false/undefined ->
+        // sfxVolume=0.4 default) and then deletes the legacy field. New
+        // writes go to sfxVolume / bgmVolume. Defaults match the
+        // hardcoded masterGain (0.4) and bgmVolume (0.3) values the
+        // Audio object used pre-Phase 10, so playtest balance is
+        // preserved for first-time players.
+        sfxVolume: 0.4,
+        bgmVolume: 0.3
     };
     
     // ========== ACHIEVEMENTS ==========
@@ -6435,7 +6582,7 @@
             hasTut: false, daily: {}, streak: 0, lastDay: '', tr: 0,
             leaderboard: [], contrastMode: false, totalPegsHit: 0, ballSaverCount: 0,
             multiballEnabled: false, currentBallSkin: '#00fff2', currentBoardTheme: 'default',
-            audioMuted: false, bgmMuted: false };
+            sfxVolume: 0.4, bgmVolume: 0.3 };
         // Reload page to reset everything
         window.location.reload();
     });
@@ -6535,20 +6682,41 @@
         // Apply multiball toggle state
         document.getElementById('multiballtoggle').classList.toggle('on', PERSIST.multiballEnabled);
 
-        // Apply sound toggle state (on = sound on)
-        document.getElementById('soundtoggle').classList.toggle('on', !PERSIST.audioMuted);
-
-        // Apply music toggle state (on = music on)
-        document.getElementById('musictoggle').classList.toggle('on', !PERSIST.bgmMuted);
+        // Phase 10: apply the persisted volume levels to the new sliders.
+        // PERSIST.sfxVolume / bgmVolume are 0..1 floats (defaults 0.4 / 0.3);
+        // the slider value is the integer percent (0..100) and the CSS
+        // custom property --vol-pct drives the filled-track gradient.
+        // The icon switches between UI_SOUND_ON (>0) and UI_SOUND_OFF (===0).
+        applyVolumeSlider('sfx', PERSIST.sfxVolume);
+        applyVolumeSlider('bgm', PERSIST.bgmVolume);
 
         // Apply ball skin display
         updateBallSkinDisplay();
-        
+
         // Apply board theme display
         updateThemeDisplay();
-        
+
         // Populate peg type legend
         updatePegTypeLegend();
+    }
+
+    // Phase 10: bind a PERSIST volume (0..1) to its slider row. Sets
+    // the slider value, the percentage display, the CSS --vol-pct
+    // (which drives the cyan-filled portion of the track gradient),
+    // and swaps the speaker icon between UI_SOUND_ON / UI_SOUND_OFF
+    // based on whether the level is 0. Called from initSettings() at
+    // load time and from the slider's input handler on every change.
+    function applyVolumeSlider(channel, vol) {
+        var pct = Math.round(Math.max(0, Math.min(1, vol)) * 100);
+        var slider = document.getElementById(channel + 'volume');
+        var valueEl = document.getElementById(channel + 'volume-value');
+        var icon = document.getElementById(channel + '-icon');
+        if (slider) {
+            slider.value = pct;
+            slider.style.setProperty('--vol-pct', pct + '%');
+        }
+        if (valueEl) valueEl.textContent = pct + '%';
+        if (icon) icon.innerHTML = pct === 0 ? SVG_ICONS.UI_SOUND_OFF : SVG_ICONS.UI_SOUND_ON;
     }
     
     function updatePegTypeLegend() {
@@ -6605,44 +6773,49 @@
         savePersist();
     }
 
-    function soundToggle() {
-        // Make sure audio is initialized before toggling
+    // Phase 10: per-channel volume slider input handlers. The 'input'
+    // event fires on every drag tick (not just on release) so the UI
+    // stays in sync with the user's finger, and the persistence write
+    // is the lightweight `localStorage.setItem` on each tick. The
+    // handler does five things in order: (1) compute the new percent,
+    // (2) update the CSS --vol-pct custom property so the filled
+    // portion of the track gradient re-flows, (3) update the percent
+    // text, (4) swap the speaker icon, (5) push the new volume into
+    // Audio and PERSIST. The Audio.setSfxVolume / setBgmVolume calls
+    // also flip the Audio.muted / Audio.bgmMuted flags as a side
+    // effect, so the SFX _tone/_noise early-outs and the playBgm
+    // deferred-track logic stay consistent.
+    function sfxVolumeInput() {
+        var pct = parseInt(this.value, 10);
+        var vol = pct / 100;
+        this.style.setProperty('--vol-pct', pct + '%');
+        document.getElementById('sfxvolume-value').textContent = pct + '%';
+        var icon = document.getElementById('sfx-icon');
+        if (icon) icon.innerHTML = pct === 0 ? SVG_ICONS.UI_SOUND_OFF : SVG_ICONS.UI_SOUND_ON;
         Audio.init();
-        Audio.resume();
-        var muted = Audio.toggleMute();
-        PERSIST.audioMuted = muted;
-        document.getElementById('soundtoggle').classList.toggle('on', !muted);
+        Audio.setSfxVolume(vol);
+        PERSIST.sfxVolume = vol;
         savePersist();
-        // Play a confirmation sound when unmuting
-        if (!muted) Audio.playButtonClick();
     }
-
-    function musicToggle() {
-        // Make sure audio + BGM are initialized before toggling
+    function bgmVolumeInput() {
+        var pct = parseInt(this.value, 10);
+        var vol = pct / 100;
+        this.style.setProperty('--vol-pct', pct + '%');
+        document.getElementById('bgmvolume-value').textContent = pct + '%';
+        var icon = document.getElementById('bgm-icon');
+        if (icon) icon.innerHTML = pct === 0 ? SVG_ICONS.UI_SOUND_OFF : SVG_ICONS.UI_SOUND_ON;
         Audio.init();
         Audio.resume();
         if (!Audio.bgmTracks.title) Audio.initBgm();
-        var wasMuted = Audio.bgmMuted;
-        var muted = Audio.toggleBgmMute();
-        PERSIST.bgmMuted = muted;
-        document.getElementById('musictoggle').classList.toggle('on', !muted);
-        // If we just unmuted, resume playback of the track appropriate to
-        // the current screen (or the one playBgm had staged while muted).
-        if (wasMuted && !muted) {
-            if (Audio.currentBgmId) {
-                Audio.playBgm(Audio.currentBgmId);
-            } else {
-                var menuEl = document.getElementById('menu');
-                var isMenu = menuEl && menuEl.classList.contains('on');
-                Audio.applyBgmForScreen(isMenu ? 'menu' : GS.scr === C.SCR.P ? 'slot-selector' : 'menu');
-            }
-        }
+        Audio.setBgmVolume(vol);
+        PERSIST.bgmVolume = vol;
         savePersist();
     }
-
+    var _sfxVolumeEl = document.getElementById('sfxvolume');
+    if (_sfxVolumeEl) _sfxVolumeEl.addEventListener('input', sfxVolumeInput);
+    var _bgmVolumeEl = document.getElementById('bgmvolume');
+    if (_bgmVolumeEl) _bgmVolumeEl.addEventListener('input', bgmVolumeInput);
     document.getElementById('multiballtoggle').addEventListener('click', multiballToggle);
-    document.getElementById('soundtoggle').addEventListener('click', soundToggle);
-    document.getElementById('musictoggle').addEventListener('click', musicToggle);
     
     // Ball skin buttons
     document.querySelectorAll('.skin-btn').forEach(function(btn) {
@@ -6706,8 +6879,27 @@
         PERSIST.multiballEnabled = PERSIST.multiballEnabled || false;
         PERSIST.currentBallSkin = PERSIST.currentBallSkin || '#00fff2';
         PERSIST.currentBoardTheme = PERSIST.currentBoardTheme || 'default';
-        PERSIST.audioMuted = PERSIST.audioMuted || false;
-        PERSIST.bgmMuted = PERSIST.bgmMuted || false;
+        // Phase 10: one-time migration from the old audioMuted/bgmMuted
+        // boolean pair to the new per-channel sfxVolume/bgmVolume floats.
+        // If the user has stored a boolean AND no volume yet, derive the
+        // volume: muted=true -> 0, muted=false (or undefined) -> 0.4/0.3
+        // default. Then delete the legacy fields so we never write them
+        // back. After this block runs, all PERSIST reads should use
+        // sfxVolume / bgmVolume; the boolean fields are only here for
+        // the migration itself.
+        if (PERSIST.sfxVolume === undefined || PERSIST.sfxVolume === null) {
+            PERSIST.sfxVolume = PERSIST.audioMuted ? 0 : 0.4;
+        }
+        if (PERSIST.bgmVolume === undefined || PERSIST.bgmVolume === null) {
+            PERSIST.bgmVolume = PERSIST.bgmMuted ? 0 : 0.3;
+        }
+        delete PERSIST.audioMuted;
+        delete PERSIST.bgmMuted;
+        // Clamp persisted values to the legal [0, 1] range in case a
+        // future write goes out of bounds (defensive - the slider
+        // already clamps via its max/min attributes).
+        PERSIST.sfxVolume = Math.max(0, Math.min(1, PERSIST.sfxVolume));
+        PERSIST.bgmVolume = Math.max(0, Math.min(1, PERSIST.bgmVolume));
         applyContrastMode();
         initSettings();
     }
@@ -6860,7 +7052,12 @@
     function audioInitOnce() {
         Audio.init();
         Audio.resume();
-        if (PERSIST.audioMuted) Audio.setMuted(true);
+        // Phase 10: apply the persisted SFX volume now that the master
+        // gain node exists. Audio.init() hardcodes masterGain.gain.value
+        // to the 0.4 default, so we override with the user's stored
+        // level. setSfxVolume also flips Audio.muted to (vol === 0) so
+        // the SFX helpers' early-out checks stay in sync.
+        Audio.setSfxVolume(PERSIST.sfxVolume);
         // Remove listeners after first interaction
         document.removeEventListener('click', audioInitOnce);
         document.removeEventListener('keydown', audioInitOnce);
@@ -6871,9 +7068,13 @@
     document.addEventListener('touchstart', audioInitOnce);
 
     // ========== PHASE 4 MUSIC PORT: INIT BGM ==========
-    // Wire up the <audio> elements and apply persisted mute state.
+    // Wire up the <audio> elements and apply the persisted BGM volume.
+    // Phase 10: the new setBgmVolume handles the mute transition (sets
+    // bgmMuted=true if vol=0, and resumes any deferred track on
+    // unmute). The old PERSIST.bgmMuted boolean is gone (loadPersist
+    // migrated it to PERSIST.bgmVolume).
     Audio.initBgm();
-    if (PERSIST.bgmMuted) Audio.setBgmMuted(true);
+    Audio.setBgmVolume(PERSIST.bgmVolume);
 
     // First-load title-screen music trigger.
     // Browsers block HTML5 audio.play() until a user gesture, and the menu
@@ -6919,6 +7120,17 @@
     // Only exposed in development/testing. Remove for production if needed.
     window.__TEST__ = {
         GS: GS, PERSIST: PERSIST, C: C, Audio: Audio,
+        // Phase 10: per-channel volume control. The setters are exposed
+        // so the unit suite can drive volume changes directly without
+        // having to simulate slider input events. The volume field
+        // accessors (sfxVolume, bgmVolume) are already reachable via
+        // the Audio object above. applyVolumeSlider is the row-binding
+        // helper used by initSettings() - exposed so the unit suite
+        // can verify the percent / icon / CSS custom property all
+        // stay in sync after a programmatic volume change.
+        setSfxVolume: function(vol) { Audio.setSfxVolume(vol); },
+        setBgmVolume: function(vol) { Audio.setBgmVolume(vol); },
+        applyVolumeSlider: applyVolumeSlider,
         slots: slots, ACHIEVEMENTS: ACHIEVEMENTS,
         pegBasePoints: pegBasePoints,
         maxPayloads: maxPayloads,
