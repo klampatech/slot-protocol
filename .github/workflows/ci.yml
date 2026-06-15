@@ -33,6 +33,10 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+      - name: Run mobile tests
+        run: npm run test:mobile
+        if: success() || failure()  # Run even if previous tests failed
+
       - name: Run screenshot tests
         run: npm run test:screenshot
         if: success() || failure()  # Run even if previous tests failed

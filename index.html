@@ -11,20 +11,35 @@
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a12; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Share Tech Mono', 'Courier New', monospace; color: #e0e0ff; overflow: hidden; padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); box-sizing: border-box; }
-        /* ========== PHASE 5: MOBILE COMPATIBILITY ==========
-           The board is designed at a fixed 480x700. On phones we wrap the
-           #game-container in a #scaler block whose intrinsic size is the
-           same 480x700 (so the body flex centering still works unchanged)
-           and apply a CSS transform: scale() to visually fit the viewport.
-           The transform is the cheapest way to get pixel-perfect mobile
-           scaling without rewriting every render position. The pointer
-           event math uses getBoundingClientRect() so it auto-corrects for
-           the visual scale - the player always aims at the visible peg. */
-        #scaler { width: 480px; height: 700px; flex-shrink: 0; transform-origin: top center; transition: transform 0.15s ease-out; }
+        /* ========== PHASE 11: LAYOUT-VS-VISUAL FIX ==========
+           Phase 5 used a single #scaler element with intrinsic 480x700
+           and a transform: scale() applied to it. The body flex-centered
+           the 480x700 layout box, but on viewports narrower than 480
+           (most phones) the layout box overflowed the body on both
+           sides — `overflow: hidden` then clipped the visual, leaving
+           the user seeing only the middle ~70% of the board with the
+           left and right edges cut off.
+
+           Fix: #scaler is now the VISUAL-size box (480*s x 700*s), and
+           #game-container is the 480x700 design box with
+           transform: scale(s) and transform-origin: top left. The body
+           centers #scaler (which is now visual-size, so it fits), and
+           the transformed #game-container visually fills #scaler
+           exactly. `getBoundingClientRect()` on the canvas returns the
+           visual size, so the existing pointer-event math
+           (clientX/Y -> design coords via rect ratio) is unchanged.
+
+           The --scale custom property is set by JS (scaleToFit). The
+           default 1.0 keeps the layout stable before JS runs. */
+        #scaler { width: calc(480px * var(--scale, 1)); height: calc(700px * var(--scale, 1)); flex-shrink: 0; }
         /* Tabular numerals for HUD digits so the score/jackpot/balls do not
            jitter as they tick up */
         .hs, .hss, .hsj, .hsb, #mv, .jp-amount { font-variant-numeric: tabular-nums; }
-        #game-container { position: relative; width: 480px; height: 700px; margin: 0 auto; flex-shrink: 0; }
+        /* Phase 11: the 480x700 design box lives here, scaled to fit #scaler.
+           transform-origin: top left keeps the coordinate system aligned
+           (design 0,0 maps to visual 0,0). The transition animates the
+           scale on resize. */
+        #game-container { position: relative; width: 480px; height: 700px; margin: 0 auto; flex-shrink: 0; transform: scale(var(--scale, 1)); transform-origin: top left; transition: transform 0.15s ease-out; }
         #gc { display: block; background: #12121f; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
         /* Game board glow border - drawn via box-shadow so it doesn't shrink
            the inner 480x700 area (a real border would, breaking the canvas
@@ -3762,14 +3777,49 @@
             for (let k = 0; k < els.length; k++) els[k].classList.remove('selected');
         }
 
-        // Drag state (Phase 9). Module-private; not exposed on GS.
+        // Drag state (Phase 9 + 11). Module-private; not exposed on GS.
+        // Phase 11: threshold bumped from 6 to 10 viewport px. 6 was
+        // fine on desktop mouse but tight on touch — at the typical
+        // 0.86x scale on a 412-wide phone, 6 design px ≈ 7 visual px,
+        // which is below natural finger jitter. 10 viewport px gives
+        // ~12 design px headroom so a deliberate drag is reliably
+        // distinguished from a tap-with-jitter. The drag-vs-tap
+        // classifier uses viewport (clientX/Y) coords, not design
+        // coords, so the threshold is scale-invariant.
         var dragState = {
             active: false,        // has pointer moved past threshold?
             pointerId: null,      // the pointer we're tracking
             startX: 0,
             startY: 0,
-            threshold: 6,         // pixels of movement before drag kicks in
+            threshold: 10,        // pixels of movement before drag kicks in
         };
+        // Phase 11: fallback window-level listeners installed when
+        // setPointerCapture fails (some iOS Safari versions silently
+        // no-op capture for touch). When set, the window listener
+        // routes pointermove/pointerup to the same handlers as the
+        // slot-selector's own listeners, so the gesture is never
+        // lost even if the finger drags off the overlay. Cleared on
+        // pointerup / pointercancel.
+        var fallbackHandlers = null;
+        // Phase 11: the tap-to-swap flow needs to distinguish
+        // "first tap (select)" from "second tap on the same
+        // position (deselect)" / "second tap on a different
+        // position (swap)". Without this flag, the first tap's
+        // pointerup calls performPlace(sourcePos), which sees
+        // sel.fromPos === targetPos and cancels the selection it
+        // just made — the player taps pos A, sees the highlight
+        // flash on and off, then taps pos B with no selection
+        // active and nothing swaps.
+        //
+        // The flag is set by pointerdown whenever a fresh
+        // GS.selectedSlot is assigned (the three branches: pool
+        // item, position, switch-to-different-pool). It is
+        // cleared by pointerup (after deciding whether to
+        // performPlace) and by pointercancel. The fallback
+        // pointerup also reads/clears it — the fallback is a
+        // closure inside the IIFE so the module-private flag
+        // is in scope.
+        var justSelected = false;
 
         // Remove the drag ghost, un-dim the source, clear drop-target
         // highlights. Called on drag end and on capture-phase button
@@ -3968,7 +4018,22 @@
             // is what makes "drag off the overlay, release on a
             // position" work - the release is still dispatched to
             // _slotSel, not the element underneath.
-            try { _slotSel.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+            //
+            // Phase 11: setPointerCapture can silently no-op on
+            // some iOS Safari / Android Chrome versions for touch
+            // (no throw, just no effect). Detect the failure via
+            // hasPointerCapture and install window-level fallback
+            // listeners that mirror the slot-selector handlers, so
+            // the gesture is never lost. The fallback listeners
+            // are torn down on pointerup/pointercancel.
+            var captured = false;
+            try {
+                _slotSel.setPointerCapture(e.pointerId);
+                captured = _slotSel.hasPointerCapture
+                    ? _slotSel.hasPointerCapture(e.pointerId)
+                    : true;
+            } catch (err) { captured = false; }
+            if (!captured) installFallback(e.pointerId);
 
             // Record drag start (used by pointermove to detect drag).
             dragState.pointerId = e.pointerId;
@@ -3988,6 +4053,7 @@
                     GS.selectedSlot = { source: 'pool', slotType: poolSlotType, poolIdx: poolIdx, fromPos: -1 };
                     poolItem.classList.add('selected');
                     Audio.playDragPickup();
+                    justSelected = true;
                 } else if (slotPos) {
                     // Occupied + unlocked position: select it for swap.
                     // (Empty / locked positions are no-ops on the first
@@ -3999,6 +4065,7 @@
                         GS.selectedSlot = { source: 'pos' + pos, slotType: slotType, poolIdx: -1, fromPos: pos };
                         slotPos.classList.add('selected');
                         Audio.playDragPickup();
+                        justSelected = true;
                     }
                 }
                 return;
@@ -4018,6 +4085,7 @@
                     GS.selectedSlot = { source: 'pool', slotType: newPoolSlotType, poolIdx: poolIdx, fromPos: -1 };
                     poolItem.classList.add('selected');
                     Audio.playDragPickup();
+                    justSelected = true;
                 }
                 return;
             }
@@ -4051,19 +4119,46 @@
         // release is on a position with a selection, perform the
         // place. Pool item taps with a selection are handled in
         // pointerdown (switch / cancel), not here.
+        //
+        // Phase 11: the tap-path target lookup uses
+        // document.elementFromPoint(e.clientX, e.clientY) instead
+        // of e.target.closest('.slot-pos'). With setPointerCapture,
+        // e.target on pointerup is frozen to the pointerdown's
+        // original target — so a tap on pos 3 (select) followed by
+        // a tap on pos 5 (swap) ended up with target = pos 3 and
+        // the swap never fired. elementFromPoint returns the
+        // element at the current pointer position, which is the
+        // position the user is actually releasing on. Falls back
+        // to e.target if elementFromPoint returns null.
+        //
+        // Phase 11 (cont): the justSelected short-circuit prevents
+        // the "first tap cancels its own selection" bug. When
+        // pointerdown freshly sets GS.selectedSlot, justSelected
+        // is true. The pointerup in that case is a no-op — the
+        // user is just selecting, not placing. A subsequent tap
+        // on a different position (or a second tap on the same
+        // position to deselect) then has justSelected=false and
+        // runs the normal performPlace path.
         _slotSel.addEventListener('pointerup', function(e) {
             if (dragState.pointerId !== e.pointerId) return;
             if (dragState.active) {
                 endDrag(e);
             } else {
-                // Tap (no drag). Check if released on a position with
-                // a selection - that's the tap-to-place flow.
-                var slotPos = e.target.closest && e.target.closest('.slot-pos');
-                if (slotPos && GS.selectedSlot) {
-                    var pos = parseInt(slotPos.dataset.pos);
-                    performPlace(pos);
+                if (justSelected) {
+                    // Fresh selection made by the matching pointerdown
+                    // — the release is just the user lifting their
+                    // finger after selecting. No place action.
+                    justSelected = false;
+                } else {
+                    var target = document.elementFromPoint(e.clientX, e.clientY) || e.target;
+                    var slotPos = target && target.closest && target.closest('.slot-pos');
+                    if (slotPos && GS.selectedSlot) {
+                        var pos = parseInt(slotPos.dataset.pos);
+                        performPlace(pos);
+                    }
                 }
             }
+            teardownFallback();
             dragState.pointerId = null;
             dragState.active = false;
         });
@@ -4076,9 +4171,75 @@
             GS.selectedSlot = null;
             clearSelectedHighlight();
             cleanupDragVisuals();
+            teardownFallback();
+            justSelected = false;
             dragState.pointerId = null;
             dragState.active = false;
         });
+
+        // Phase 11: window-level fallback listeners, installed when
+        // setPointerCapture failed (see pointerdown). They mirror
+        // the slot-selector's pointermove/pointerup/pointercancel
+        // handlers so the gesture isn't lost when capture no-ops.
+        // Gated on dragState.pointerId so they only fire for the
+        // active gesture, not for unrelated pointer activity on
+        // the page. Torn down on pointerup/pointercancel.
+        function installFallback(pointerId) {
+            if (fallbackHandlers) return; // already installed
+            var onMove = function(e) {
+                if (dragState.pointerId !== e.pointerId) return;
+                if (!GS.selectedSlot) return;
+                if (dragState.active) { updateDrag(e); return; }
+                var dx = e.clientX - dragState.startX;
+                var dy = e.clientY - dragState.startY;
+                if (dx*dx + dy*dy < dragState.threshold * dragState.threshold) return;
+                startDrag(GS.selectedSlot);
+                updateDrag(e);
+            };
+            var onUp = function(e) {
+                if (dragState.pointerId !== e.pointerId) return;
+                if (dragState.active) {
+                    endDrag(e);
+                } else {
+                    if (justSelected) {
+                        // Same short-circuit as the slot-selector's
+                        // own pointerup — see the comment there.
+                        justSelected = false;
+                    } else {
+                        var target = document.elementFromPoint(e.clientX, e.clientY) || e.target;
+                        var slotPos = target && target.closest && target.closest('.slot-pos');
+                        if (slotPos && GS.selectedSlot) {
+                            var pos = parseInt(slotPos.dataset.pos);
+                            performPlace(pos);
+                        }
+                    }
+                }
+                teardownFallback();
+                dragState.pointerId = null;
+                dragState.active = false;
+            };
+            var onCancel = function(e) {
+                if (dragState.pointerId !== e.pointerId) return;
+                GS.selectedSlot = null;
+                clearSelectedHighlight();
+                cleanupDragVisuals();
+                teardownFallback();
+                justSelected = false;
+                dragState.pointerId = null;
+                dragState.active = false;
+            };
+            window.addEventListener('pointermove', onMove, true);
+            window.addEventListener('pointerup', onUp, true);
+            window.addEventListener('pointercancel', onCancel, true);
+            fallbackHandlers = { onMove: onMove, onUp: onUp, onCancel: onCancel };
+        }
+        function teardownFallback() {
+            if (!fallbackHandlers) return;
+            window.removeEventListener('pointermove', fallbackHandlers.onMove, true);
+            window.removeEventListener('pointerup', fallbackHandlers.onUp, true);
+            window.removeEventListener('pointercancel', fallbackHandlers.onCancel, true);
+            fallbackHandlers = null;
+        }
 
         // Tapping anywhere outside the overlay (menu, canvas, etc.)
         // clears any pending selection. Re-renders triggered by
@@ -6918,32 +7079,38 @@
     loadPersist();
     cacheHudElements();
 
-    // ========== PHASE 5: MOBILE SCALE-TO-FIT + ORIENTATION LOCK ==========
+    // ========== PHASE 11: SCALE-TO-FIT (revised) ==========
     // Compute the CSS scale that fits the 480x700 design into the
-    // current viewport, then apply it on every resize/orientation
-    // change. The body's flex centering still works because the
-    // #scaler wrapper keeps the same intrinsic 480x700 footprint;
-    // only the visual transform changes.
+    // current viewport, then set the --scale custom property on the
+    // document root. #scaler reads calc(480px * var(--scale)) for
+    // its layout size and #game-container reads scale(var(--scale))
+    // for its visual transform - see the CSS comments in the style
+    // block for why this is split.
     //
-    // Phase 5b: lowered the minimum from 0.55 to 0.40. On a 320x568
-    // viewport (older/smaller Android), the old clamp left the board
-    // at 264x385 - still wider than the 320px viewport, so the user
-    // could not see the whole board. 0.40 floor keeps the 7-position
-    // row visible (32x32 tiles at 0.4x = 12.8px, still legible for
-    // the icons, and the user can scroll the overlay content within
-    // the 700px design space if they want to see more).
+    // visualViewport preferred over window.innerWidth/Height: on iOS
+    // Safari, innerHeight is the layout viewport (includes the URL
+    // bar area even when collapsed), while visualViewport.height is
+    // the actually-visible area. Reading visualViewport first and
+    // falling back to innerWidth/Height keeps the scale correct
+    // during the URL-bar transition.
     //
-    // The body's min-height is 100svh (smallest viewport height, with
-    // the iOS URL bar showing) plus env(safe-area-inset) padding, so
-    // the board is always sized to the visible viewport - the URL
-    // bar never covers the top of the board.
+    // visualViewport.resize fires when the URL bar collapses/expands
+    // on iOS (the resize event does NOT), so we listen to it for
+    // live updates. resize + orientationchange are kept as a safety
+    // net for browsers where visualViewport is missing.
+    //
+    // The 0.40 floor matches Phase 5b - on a 320x568 viewport the
+    // board is 128x227, which keeps the 7-position row tappable
+    // (64*0.4=25.6 visual px per tile, above the 24px iOS HIG
+    // minimum for a touch target).
     function scaleToFit() {
-        var s = Math.min(window.innerWidth / 480, window.innerHeight / 700);
+        var w = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+        var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        var s = Math.min(w / 480, h / 700);
         s = Math.max(0.40, Math.min(1.0, s));
-        var el = document.getElementById('scaler');
-        if (el) el.style.transform = 'scale(' + s + ')';
-        // Stash the active scale for any future code that needs
-        // to compensate (none today, but it's the right hook).
+        document.documentElement.style.setProperty('--scale', s);
+        // Stash the active scale for any code that needs to compensate
+        // (drag threshold in the slot-selector, future callers).
         window.__slotScale = s;
     }
     function tryLockPortrait() {
@@ -6967,6 +7134,13 @@
         setTimeout(scaleToFit, 50);
         tryLockPortrait();
     });
+    // Phase 11: live updates while the iOS URL bar collapses/expands.
+    // The 'resize' event does not fire on that transition, but
+    // visualViewport.resize does. Skip the listener on browsers
+    // without visualViewport (the fallback 'resize' covers them).
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', scaleToFit);
+    }
 
     // Pre-load the 8 slot-type SVG icons as cached Image objects so the
     // canvas render can draw them synchronously inside the per-frame slot
