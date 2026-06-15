@@ -1293,25 +1293,58 @@
         }
     }
 
-    // ========== AUDIO ENGINE (Phase 4) ==========
-    // Procedural sound synthesis using Web Audio API
-    // No external assets - all sounds generated from oscillators
+    // ========== AUDIO ENGINE (Phase 12: SFX OVERHAUL) ==========
+    // Procedural Web Audio synthesis. The engine is layered:
+    //
+    //   ┌──────────── master gain (per-channel volume) ────────────┐
+    //   │                                                            │
+    //   │   ┌── compressor (peak limiter, -10dB / 12:1) ──┐         │
+    //   │   │   prevents clipping when 3+ events overlap  │         │
+    //   │   └──────────────────────────────────────────────┘         │
+    //   │                                                            │
+    //   │   ┌── feedback delay (180ms, 25% feedback) ────┐          │
+    //   │   │   shared "space" tail for bells, sweeps,    │          │
+    //   │   │   jackpot. Per-peg-type hits bypass it.    │          │
+    //   │   └─────────────────────────────────────────────┘          │
+    //   └────────────────────────────────────────────────────────────┘
+    //
+    // Each public play method composes 1-4 internal synthesis helpers
+    // (_tone, _noise, _sub, _bell, _coin, _kick, _snare, _glitch,
+    // _sweep) to build a signature sound. The 11 peg types and 9
+    // payloads each have their own play method so the player can
+    // *hear* which peg was hit and which payload just activated.
+    // Combo/frenzy adds escalation layers (sub-bass, brighter
+    // sound) so a 7-combo frenzy hit hits HARDER than a 1-combo
+    // node hit. The slot machine is now mechanically layered
+    // (clack + spring + pitch variation) and the jackpot has a
+    // 3-stage arc (chime -> drop -> sparkle) instead of one fanfare.
+    //
+    // All of this is procedural - no audio assets - so the build
+    // stays a single file and the audio is reproducible across
+    // browsers without decode-on-load concerns.
     var Audio = {
         ctx: null,
         masterGain: null,
+        compressor: null,
+        delayNode: null,
+        delayFeedback: null,
+        delayGain: null,
         initialized: false,
         muted: false,
-        // Phase 10: per-channel SFX volume (0..1). The `muted` flag above
-        // is now derived state (true when sfxVolume === 0); it's checked
-        // as a fast early-out in `_tone` and `_noise`. The volume setter
-        // updates the masterGain node in addition to flipping the flag.
-        // Default 0.4 - the same value the hardcoded masterGain.gain.value
-        // was using pre-Phase 10, so existing playtest balance is preserved.
+        // Phase 10: per-channel SFX volume (0..1). The `muted` flag is
+        // derived state (true when sfxVolume === 0) used as a fast
+        // early-out in every play method.
         sfxVolume: 0.4,
-        lastPegSound: 0, // throttle peg sounds to prevent flooding
-        lastCriticalSound: 0, // throttle critical combo sound
+        // Throttles
+        lastPegSound: 0,
+        lastCriticalSound: 0,
+        lastReelTick: 0,
 
-        // Initialize on first user gesture (browsers require this)
+        // Initialize on first user gesture (browsers require this).
+        // Sets up the master gain, the shared feedback delay (used
+        // as a reverb tail for bells/sweeps/jackpot), and a peak
+        // compressor (prevents clipping when 3+ events fire on the
+        // same frame, common during high-combo frenzy bursts).
         init: function() {
             if (this.initialized) return;
             try {
@@ -1319,8 +1352,35 @@
                 if (!AudioCtx) return;
                 this.ctx = new AudioCtx();
                 this.masterGain = this.ctx.createGain();
-                this.masterGain.gain.value = 0.4; // overall volume
-                this.masterGain.connect(this.ctx.destination);
+                this.masterGain.gain.value = this.sfxVolume;
+                // Peak limiter - keeps the loud casino-style mix from
+                // clipping when several per-peg-type layers stack on
+                // top of the combo escalation layer + frenzy layer.
+                // threshold -10dB, 12:1 ratio, 3ms attack (catches
+                // transients), 100ms release (smooth recovery).
+                this.compressor = this.ctx.createDynamicsCompressor();
+                this.compressor.threshold.value = -10;
+                this.compressor.knee.value = 8;
+                this.compressor.ratio.value = 12;
+                this.compressor.attack.value = 0.003;
+                this.compressor.release.value = 0.1;
+                this.masterGain.connect(this.compressor);
+                this.compressor.connect(this.ctx.destination);
+                // Shared feedback delay (180ms delay, 25% feedback,
+                // 30% wet). Big sounds route their tail through it
+                // via _connect(gain, true) for a "space" quality.
+                // Per-peg-type hits bypass it - they're too frequent
+                // for a tail to read clearly.
+                this.delayNode = this.ctx.createDelay(1.0);
+                this.delayNode.delayTime.value = 0.18;
+                this.delayFeedback = this.ctx.createGain();
+                this.delayFeedback.gain.value = 0.25;
+                this.delayGain = this.ctx.createGain();
+                this.delayGain.gain.value = 0.3;
+                this.delayNode.connect(this.delayFeedback);
+                this.delayFeedback.connect(this.delayNode);
+                this.delayNode.connect(this.delayGain);
+                this.delayGain.connect(this.masterGain);
                 this.initialized = true;
             } catch (e) {
                 console.warn('Audio init failed:', e.message);
@@ -1333,20 +1393,20 @@
             }
         },
 
+        // Connect a finished gain node to the master bus, optionally
+        // also tapping into the shared feedback delay for a "tail".
+        // `_connect(gain, true)` -> goes dry + wet (for bells, sweeps,
+        // jackpot); `_connect(gain, false)` or `_connect(gain)` ->
+        // goes dry only (for per-peg-type hits, kick, snare).
+        _connect: function(node, useDelay) {
+            if (!node) return;
+            node.connect(this.masterGain);
+            if (useDelay && this.delayNode) {
+                node.connect(this.delayNode);
+            }
+        },
+
         // ========== PHASE 10: VOLUME CONTROL ==========
-        // setSfxVolume / setBgmVolume are the new source-of-truth setters
-        // for the per-channel volume. The old `setMuted` / `setBgmMuted`
-        // / `toggleMute` / `toggleBgmMute` methods are kept as thin
-        // delegates so any external caller (or test) still works, but
-        // the UI and the persistence layer route through the new
-        // volume-based setters. The `muted` / `bgmMuted` flags become
-        // derived state (true when the corresponding volume is 0) and
-        // are used as fast early-outs in the per-sound helpers
-        // (`_tone` / `_noise` for SFX, the deferred-play path in
-        // `playBgm` for BGM). Setting volume to 0 sets muted=true;
-        // setting volume > 0 sets muted=false and (for BGM) restarts
-        // any deferred track that was staged by an earlier playBgm
-        // call when the channel was muted.
         setSfxVolume: function(vol) {
             vol = Math.max(0, Math.min(1, vol));
             this.sfxVolume = vol;
@@ -1356,12 +1416,7 @@
             }
         },
 
-        // Legacy entry point - still callable for backwards compat. Maps
-        // the boolean back onto setSfxVolume. Note: setMuted(false) does
-        // NOT auto-restore to a previous non-zero volume (the slider
-        // tracks the user's chosen level in PERSIST and applies it via
-        // setSfxVolume on init). If the only persistence available is
-        // the old audioMuted boolean, this restores to the 0.4 default.
+        // Legacy entry point - still callable for backwards compat.
         setMuted: function(muted) {
             if (muted) {
                 this.setSfxVolume(0);
@@ -1377,8 +1432,12 @@
             return this.muted;
         },
 
-        // Internal helper - create oscillator with envelope
-        _tone: function(freq, dur, type, vol, freqEnd) {
+        // ========== INTERNAL SYNTHESIS HELPERS ==========
+
+        // Oscillator with envelope. Optionally pitch-bends to freqEnd
+        // over the duration. The "workhorse" - every play method
+        // routes through here for the tonal layer.
+        _tone: function(freq, dur, type, vol, freqEnd, useDelay) {
             if (!this.initialized || this.muted) return;
             var t = this.ctx.currentTime;
             var osc = this.ctx.createOscillator();
@@ -1392,13 +1451,36 @@
             gain.gain.linearRampToValueAtTime(vol || 0.3, t + 0.005);
             gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
             osc.connect(gain);
+            this._connect(gain, useDelay);
+            osc.start(t);
+            osc.stop(t + dur + 0.05);
+        },
+
+        // Sub-bass thump. Sine wave with a fast pitch drop - the
+        // "thump" you feel more than hear. Used by kick, explosion,
+        // seismic, and the combo escalation layer.
+        _sub: function(freq, dur, vol, freqEnd) {
+            if (!this.initialized || this.muted) return;
+            var t = this.ctx.currentTime;
+            var osc = this.ctx.createOscillator();
+            var gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+            if (freqEnd !== undefined) {
+                osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t + dur);
+            }
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(vol || 0.4, t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+            osc.connect(gain);
             gain.connect(this.masterGain);
             osc.start(t);
             osc.stop(t + dur + 0.05);
         },
 
-        // Internal helper - create noise burst (for explosions/overload)
-        _noise: function(dur, vol, filterFreq) {
+        // Filtered noise burst. The "crack/sizzle" layer - explosions,
+        // overloads, shield clangs, reel clacks all use this.
+        _noise: function(dur, vol, filterFreq, filterQ, useDelay) {
             if (!this.initialized || this.muted) return;
             var t = this.ctx.currentTime;
             var bufferSize = Math.floor(this.ctx.sampleRate * dur);
@@ -1413,195 +1495,800 @@
             var filter = this.ctx.createBiquadFilter();
             filter.type = 'lowpass';
             filter.frequency.value = filterFreq || 1000;
+            filter.Q.value = filterQ || 1;
             gain.gain.setValueAtTime(vol || 0.3, t);
             gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
             source.connect(filter);
             filter.connect(gain);
-            gain.connect(this.masterGain);
+            this._connect(gain, useDelay);
             source.start(t);
             source.stop(t + dur);
         },
 
-        // Peg hit - short blip, pitch varies by combo
-        playPegHit: function(comboLevel) {
+        // Kick drum: sub-bass body + click transient. The body is
+        // a 150Hz -> 40Hz pitch-swept sine, the click is a 10ms
+        // highpass-filtered noise burst. Used by explosive, seismic,
+        // jackpot, and as a transition accent.
+        _kick: function(dur, vol) {
             if (!this.initialized || this.muted) return;
-            // Throttle to prevent flooding
+            var t = this.ctx.currentTime;
+            // Body
+            var body = this.ctx.createOscillator();
+            var bodyGain = this.ctx.createGain();
+            body.type = 'sine';
+            body.frequency.setValueAtTime(150, t);
+            body.frequency.exponentialRampToValueAtTime(40, t + dur);
+            bodyGain.gain.setValueAtTime(0, t);
+            bodyGain.gain.linearRampToValueAtTime(vol || 0.5, t + 0.005);
+            bodyGain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+            body.connect(bodyGain);
+            bodyGain.connect(this.masterGain);
+            body.start(t);
+            body.stop(t + dur + 0.05);
+            // Click transient
+            var clickSize = Math.floor(this.ctx.sampleRate * 0.01);
+            var clickBuf = this.ctx.createBuffer(1, clickSize, this.ctx.sampleRate);
+            var clickData = clickBuf.getChannelData(0);
+            for (let i = 0; i < clickSize; i++) {
+                clickData[i] = (Math.random() * 2 - 1) * (1 - i / clickSize);
+            }
+            var click = this.ctx.createBufferSource();
+            click.buffer = clickBuf;
+            var clickGain = this.ctx.createGain();
+            var clickFilter = this.ctx.createBiquadFilter();
+            clickFilter.type = 'highpass';
+            clickFilter.frequency.value = 2000;
+            clickGain.gain.setValueAtTime((vol || 0.5) * 0.4, t);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.01);
+            click.connect(clickFilter);
+            clickFilter.connect(clickGain);
+            clickGain.connect(this.masterGain);
+            click.start(t);
+            click.stop(t + 0.02);
+        },
+
+        // Bell: 5 inharmonic sine partials with bell-like decay.
+        // The harmonic ratios (1, 2.0, 3.0, 4.2, 5.4) are tuned to
+        // produce the metallic "ting" that pure-sine bells lack.
+        // Routed through the shared feedback delay (useDelay=true)
+        // so the bell ring sustains and decays naturally.
+        _bell: function(fundamental, dur, vol) {
+            if (!this.initialized || this.muted) return;
+            var t = this.ctx.currentTime;
+            var harmonics = [1, 2.0, 3.0, 4.2, 5.4];
+            var amps = [1.0, 0.5, 0.3, 0.15, 0.08];
+            for (let h = 0; h < harmonics.length; h++) {
+                var osc = this.ctx.createOscillator();
+                var gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(fundamental * harmonics[h], t);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime((vol || 0.3) * amps[h], t + 0.005);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+                osc.connect(gain);
+                this._connect(gain, true);
+                osc.start(t);
+                osc.stop(t + dur + 0.1);
+            }
+        },
+
+        // Coin clink: 3 bell hits staggered + slightly detuned. The
+        // classic "cha-ching" of a slot machine, but synthesized.
+        // Used by CREDITS slot collect and as part of the jackpot
+        // celebration rain.
+        _coin: function(dur, vol) {
+            if (!this.initialized || this.muted) return;
+            this._bell(1800, dur || 0.2, (vol || 0.2) * 0.8);
+            var self = this;
+            setTimeout(function() { self._bell(2400, 0.15, 0.15); }, 30);
+            setTimeout(function() { self._bell(1600, 0.12, 0.1); }, 60);
+        },
+
+        // Pitch sweep with optional bandpass filter. The "whoosh"
+        // primitive - rises or falls across the duration. Used by
+        // teleport, payload activations, shield activation, etc.
+        _sweep: function(freqStart, freqEnd, dur, vol, type, filterFreq) {
+            if (!this.initialized || this.muted) return;
+            var t = this.ctx.currentTime;
+            var osc = this.ctx.createOscillator();
+            var gain = this.ctx.createGain();
+            osc.type = type || 'sawtooth';
+            osc.frequency.setValueAtTime(freqStart, t);
+            osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t + dur);
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(vol || 0.2, t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+            if (filterFreq) {
+                var filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = filterFreq;
+                filter.Q.value = 2;
+                osc.connect(filter);
+                filter.connect(gain);
+            } else {
+                osc.connect(gain);
+            }
+            this._connect(gain, true);
+            osc.start(t);
+            osc.stop(t + dur + 0.05);
+        },
+
+        // Digital glitch: 4 detuned short squares, staggered by 5ms.
+        // The "data corruption" sound. Used by scrambler payload
+        // activation (it reverses ball direction) and ghost payload
+        // activation (it phases through pegs).
+        _glitch: function(dur, vol) {
+            if (!this.initialized || this.muted) return;
+            var t = this.ctx.currentTime;
+            var freqs = [800, 1200, 1800, 2400];
+            var self = this;
+            for (let i = 0; i < freqs.length; i++) {
+                (function(freq, idx) {
+                    var osc = self.ctx.createOscillator();
+                    var gain = self.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(freq * (0.9 + Math.random() * 0.2), t);
+                    gain.gain.setValueAtTime(0, t + idx * 0.005);
+                    gain.gain.linearRampToValueAtTime((vol || 0.2) * 0.3, t + idx * 0.005 + 0.002);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+                    osc.connect(gain);
+                    gain.connect(self.masterGain);
+                    osc.start(t + idx * 0.005);
+                    osc.stop(t + dur + 0.05);
+                })(freqs[i], i);
+            }
+        },
+
+        // ========== PER-PEG-TYPE HIT SOUNDS (Phase 12) ==========
+        // Each peg type has a distinct sonic identity that matches
+        // its visual + behavior. Per-type volume scales with the
+        // combo/frenzy state passed in (combo escalation + frenzy
+        // layer are added separately in playPegHitByType so every
+        // type benefits, not just one).
+
+        // NODE: clean triangle ping. The "default" sound - what
+        // every other peg type is contrasted against.
+        // Phase 12 tuning pass: volumes bumped ~40-60% so each
+        // peg type is clearly audible during play. The compressor
+        // handles the louder mix without clipping. Combo pitch
+        // scaling added to the dispatcher (not per-type) so every
+        // type benefits from the rising-tension effect.
+        playPegNode: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.3 : 0.25;
+            var freq = 440 + Math.min(combo || 0, 7) * 80;
+            this._tone(freq, 0.08, 'triangle', vol, freq * 0.6);
+        },
+
+        // CACHE: bright "ka-ching" - two-note bell + brighter than
+        // NODE. The higher value should sound "valuable".
+        playPegCache: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.38 : 0.34;
+            this._bell(1320, 0.2, vol);
+            var self = this;
+            setTimeout(function() { self._bell(1760, 0.18, vol * 0.7); }, 25);
+        },
+
+        // TELEPORT: rising-then-falling bandpass sweep. Reads as
+        // "something moved through space". Routed through the
+        // shared delay so the portal-closing sound sustains.
+        playPegTeleport: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.35 : 0.3;
+            this._sweep(200, 1500, 0.15, vol, 'sawtooth', 1000);
+            var self = this;
+            setTimeout(function() { self._sweep(1500, 400, 0.12, 0.28, 'sawtooth', 800); }, 30);
+        },
+
+        // SEISMIC: deep boom. Kick + filtered noise + sub-bass
+        // thump. The screen-shake should be FELT.
+        playPegSeismic: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            this._kick(0.4, frenzy ? 0.6 : 0.55);
+            this._noise(0.3, frenzy ? 0.42 : 0.38, 400);
+            this._sub(80, 0.35, frenzy ? 0.5 : 0.45, 40);
+        },
+
+        // EXPLOSIVE: the biggest non-jackpot hit. Multi-band noise
+        // (mid body + high crack + high sizzle tail) + kick + sub.
+        playPegExplosive: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            this._kick(0.5, frenzy ? 0.65 : 0.6);
+            this._noise(0.5, frenzy ? 0.55 : 0.5, 800);
+            this._noise(0.4, frenzy ? 0.45 : 0.4, 4000);
+            this._noise(0.7, frenzy ? 0.3 : 0.25, 12000);
+            this._sub(60, 0.5, frenzy ? 0.55 : 0.5, 25);
+        },
+
+        // DORMANT: low hum awakening - rising sine sweep.
+        playPegDormant: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            this._sweep(100, 400, 0.2, frenzy ? 0.32 : 0.28, 'sine');
+        },
+
+        // ICE: crystalline shatter. High triangle + tiny noise crack
+        // + bell ring.
+        playPegIce: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.35 : 0.3;
+            this._tone(2400, 0.15, 'triangle', vol);
+            this._noise(0.05, vol * 0.5, 5000);
+            var self = this;
+            setTimeout(function() { self._bell(3200, 0.3, vol * 0.5); }, 50);
+        },
+
+        // FIBER: building tone - pitch increases with hit count.
+        playPegFiber: function(combo, frenzy, fiberHits) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.32 : 0.28;
+            var baseFreq = 300 + (fiberHits || 1) * 150;
+            this._tone(baseFreq, 0.1, 'square', vol, baseFreq * 0.5);
+            if ((fiberHits || 1) >= 3) {
+                this._noise(0.4, 0.5, 2000);
+                this._sub(80, 0.3, 0.5, 30);
+            }
+        },
+
+        // MIRROR: sharp ping + metallic ring.
+        playPegMirror: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.35 : 0.3;
+            this._tone(1800, 0.06, 'square', vol, 1200);
+            this._bell(2400, 0.25, vol * 0.5);
+        },
+
+        // HONEYCOMB: charging sound - pitch rises with hit count.
+        // 5th hit is a MASSIVE gold explosion.
+        playPegHoneycomb: function(combo, frenzy, attractCount) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.35 : 0.3;
+            var baseFreq = 400 + (attractCount || 1) * 120;
+            this._tone(baseFreq, 0.12, 'triangle', vol);
+            if ((attractCount || 1) >= 5) {
+                this._bell(660, 0.5, 0.5);
+                this._bell(1320, 0.5, 0.4);
+                this._kick(0.4, 0.55);
+                this._noise(0.5, 0.5, 2000);
+                this._sub(80, 0.4, 0.55, 30);
+            }
+        },
+
+        // OVERLOAD: alarming buzz.
+        playPegOverload: function(combo, frenzy) {
+            if (!this.initialized || this.muted) return;
+            var vol = frenzy ? 0.38 : 0.35;
+            this._sweep(200, 80, 0.3, vol, 'sawtooth');
+            this._noise(0.2, vol * 0.6, 3000);
+            this._sub(60, 0.25, vol * 0.6, 30);
+        },
+
+        // Dispatcher: routes to the per-type method based on the
+        // peg type enum. Adds combo escalation + frenzy layers
+        // before the per-type call so every type benefits from
+        // the high-combo intensity bump.
+        //
+        // Phase 12 tuning: the combo escalation layers are now
+        // proportional to combo level, not just on/off. At cc=1
+        // there's no extra layer (clean hit). At cc=3 a sub-bass
+        // thump fades in. At cc=5 it's louder. At cc=7 a bell
+        // ping adds the "you're on fire" cue. The combo pitch
+        // bonus (80Hz per combo step, applied via the per-type
+        // methods' `combo` parameter) makes each successive hit
+        // sound HIGHER, building tension like a slot machine reel
+        // accelerating. The frenzy stab gets louder proportional
+        // to combo (0.08 + combo * 0.02, capped at 0.2).
+        //
+        // Throttle: 8ms.
+        playPegHitByType: function(pegType, combo, frenzy, extraData) {
+            if (!this.initialized || this.muted) return;
             var now = performance.now();
-            if (now - this.lastPegSound < 30) return;
+            if (now - this.lastPegSound < 8) return;
             this.lastPegSound = now;
 
-            // Higher combo = higher pitch
-            var baseFreq = 220 + Math.min(comboLevel || 0, 7) * 80;
-            this._tone(baseFreq, 0.06, 'square', 0.15, baseFreq * 0.5);
-            // Add a subtle sub-tone
-            this._tone(baseFreq * 0.5, 0.05, 'sine', 0.08);
+            // Combo escalation sub-bass layer. Proportional to
+            // combo level: cc=1-2 = nothing, cc=3 = soft thump,
+            // cc=4 = louder, cc=5 = full thump, cc=6 = strong,
+            // cc=7 = max. This makes high combos FEEL heavier.
+            var cc = combo || 0;
+            if (cc >= 3) {
+                var subVol = Math.min(0.15 + (cc - 3) * 0.06, 0.45);
+                var subFreq = cc >= 5 ? 50 : 70;
+                this._sub(subFreq, 0.1, subVol, 25);
+            }
+            // Frenzy stab layer. Louder at higher combos so the
+            // stab is barely audible at cc=1 but prominent at cc=7.
+            if (frenzy) {
+                var stabVol = Math.min(0.08 + cc * 0.02, 0.2);
+                this._tone(200 + Math.random() * 100, 0.05, 'square', stabVol);
+            }
+            // Max combo celebration bell
+            if (cc >= 7) {
+                this._bell(1320, 0.3, 0.25);
+            }
+
+            // Per-type dispatch
+            switch (pegType) {
+                case 0: this.playPegNode(combo, frenzy); break;
+                case 1: this.playPegCache(combo, frenzy); break;
+                case 2: this.playPegTeleport(combo, frenzy); break;
+                case 3: this.playPegSeismic(combo, frenzy); break;
+                case 4: this.playPegExplosive(combo, frenzy); break;
+                case 5: this.playPegDormant(combo, frenzy); break;
+                case 6: this.playPegIce(combo, frenzy); break;
+                case 7: this.playPegFiber(combo, frenzy, extraData && extraData.fiberHits); break;
+                case 8: this.playPegMirror(combo, frenzy); break;
+                case 9: this.playPegHoneycomb(combo, frenzy, extraData && extraData.attractCount); break;
+                case 10: this.playPegOverload(combo, frenzy); break;
+                default: this.playPegNode(combo, frenzy); break;
+            }
         },
 
-        // Bonus sound - rising chime
-        playBonus: function() {
+        // Backward compat - the old playPegHit was a single sound
+        // for all peg types. New code should call playPegHitByType,
+        // but we keep this entry point as a thin delegate so any
+        // legacy caller (or test) still works.
+        playPegHit: function(comboLevel) {
+            this.playPegNode(comboLevel || 0, false);
+        },
+
+        // ========== PER-PAYLOAD SOUNDS (Phase 12) ==========
+        // Each payload has TWO audio events:
+        //   1. playPayloadDrop(name)  - called once when the ball
+        //      is launched with the payload queued. Short signature
+        //      sting identifying the payload type.
+        //   2. playPayloadActivate(name)  - called when the payload
+        //      fires its one-shot effect (on the ball's first peg
+        //      hit for scrambler/trojan/worm/logicbomb/explosive/
+        //      cluster, on drop for daemon, sustained for ghost/
+        //      slowmo). Longer + more dramatic than the drop sting.
+
+        playPayloadDrop: function(payloadType) {
             if (!this.initialized || this.muted) return;
-            this._tone(440, 0.1, 'sine', 0.2);
-            setTimeout(function() { Audio._tone(660, 0.1, 'sine', 0.2); }, 60);
-            setTimeout(function() { Audio._tone(880, 0.15, 'sine', 0.2); }, 120);
+            var self = this;
+            switch (payloadType) {
+                case 'scrambler':
+                    // Sharp electronic "select" - square + noise click
+                    this._tone(1200, 0.06, 'square', 0.15);
+                    this._noise(0.04, 0.12, 3000);
+                    break;
+                case 'trojan':
+                    // Descending digital chirp
+                    this._sweep(800, 200, 0.18, 0.18, 'square', 1500);
+                    break;
+                case 'worm':
+                    // Deep sustained hum that tails off
+                    this._sub(100, 0.4, 0.2);
+                    this._tone(50, 0.5, 'sine', 0.1);
+                    break;
+                case 'logicbomb':
+                    // Rising arpeggio C-E-G + electric crackle
+                    this._tone(523, 0.08, 'square', 0.18);
+                    setTimeout(function() { self._tone(659, 0.08, 'square', 0.18); }, 60);
+                    setTimeout(function() { self._tone(784, 0.08, 'square', 0.18); }, 120);
+                    this._noise(0.08, 0.15, 4000);
+                    break;
+                case 'daemon':
+                    this.playShield();
+                    break;
+                case 'ghost':
+                    // Ghostly whoosh + reverse cymbal
+                    this._sweep(200, 1200, 0.2, 0.18, 'sine', 600);
+                    this._noise(0.15, 0.12, 2000);
+                    break;
+                case 'cluster':
+                    // 3 quick "pew" sounds in rapid succession
+                    for (let i = 0; i < 3; i++) {
+                        (function(idx) {
+                            setTimeout(function() {
+                                self._tone(800 + idx * 200, 0.05, 'square', 0.18, 400);
+                            }, idx * 50);
+                        })(i);
+                    }
+                    break;
+                case 'explosive':
+                    // Rising bomb-tick + preview of the explosion
+                    this._sweep(100, 800, 0.25, 0.2, 'sawtooth');
+                    setTimeout(function() { self.playExplosion(); }, 200);
+                    break;
+                case 'slowmo':
+                    // Time-warp stab + descending pitch
+                    this._sweep(800, 200, 0.3, 0.2, 'sawtooth', 800);
+                    this._sub(60, 0.3, 0.2, 30);
+                    break;
+            }
         },
 
-        // Slot collection - varies by slot type
+        playPayloadActivate: function(payloadType) {
+            if (!this.initialized || this.muted) return;
+            var self = this;
+            switch (payloadType) {
+                case 'scrambler':
+                    // WHOOP + reverse noise (ball reverses direction)
+                    this._sweep(1500, 400, 0.15, 0.25, 'sawtooth', 1200);
+                    this._noise(0.12, 0.2, 2000);
+                    this._glitch(0.1, 0.15);
+                    break;
+                case 'trojan':
+                    // 2 staggered "ping" sounds + bonus chime
+                    this._bell(880, 0.15, 0.25);
+                    setTimeout(function() { self._bell(1320, 0.15, 0.22); }, 60);
+                    setTimeout(function() { self.playBonus(); }, 120);
+                    break;
+                case 'worm':
+                    // Phase-shift whoosh on first hit
+                    this._sweep(200, 1800, 0.2, 0.22, 'sawtooth', 800);
+                    this._noise(0.15, 0.18, 3000);
+                    break;
+                case 'logicbomb':
+                    // MASSIVE boom + bonus chime + sub-bass drop
+                    this._kick(0.4, 0.6);
+                    this._bell(523, 0.3, 0.35);
+                    this._sub(50, 0.4, 0.5, 25);
+                    setTimeout(function() { self.playBonus(); }, 100);
+                    break;
+                case 'daemon':
+                    // Low hum on first peg hit (shield already
+                    // sound-tracked at drop time)
+                    this._sub(120, 0.3, 0.2);
+                    break;
+                case 'ghost':
+                    // Subtle "phasing" tick
+                    this._tone(1200, 0.04, 'sine', 0.18);
+                    this._glitch(0.08, 0.12);
+                    break;
+                case 'cluster':
+                    // Tri-tone arpeggio when the ball splits
+                    this._tone(440, 0.08, 'sine', 0.2);
+                    setTimeout(function() { self._tone(660, 0.08, 'sine', 0.2); }, 50);
+                    setTimeout(function() { self._tone(880, 0.08, 'sine', 0.2); }, 100);
+                    break;
+                case 'explosive':
+                    this.playExplosion();
+                    break;
+                case 'slowmo':
+                    // Time-warp sound (rising then falling)
+                    this._sweep(400, 1200, 0.15, 0.2, 'sine', 1000);
+                    setTimeout(function() { self._sweep(1200, 400, 0.2, 0.18, 'sine', 1000); }, 150);
+                    break;
+            }
+        },
+
+        // ========== SLOT MACHINE LAYERED (Phase 12) ==========
+        // The old reel tick was a 30ms 1000Hz square. The new
+        // version is a 2-layer mechanical clack: a short noise
+        // transient (the "metal-on-metal" crack) + a sine tick
+        // (the "spring" resonance). The tick pitch varies by
+        // reel index (reel 0 = 800, 1 = 880, 2 = 960) so the
+        // player can *hear* the reels spinning at different
+        // rates. Throttled at 16ms (the spin cycle is 50ms, so
+        // every cycle passes).
+
+        playReelTick: function(reelIdx) {
+            if (!this.initialized || this.muted) return;
+            var now = performance.now();
+            if (now - this.lastReelTick < 16) return;
+            this.lastReelTick = now;
+            // Noise transient - the "clack"
+            this._noise(0.02, 0.18, 4000);
+            // Sine tick - the "spring". Per-reel pitch variation
+            // so the three reels sound distinct.
+            var freq = 800 + (reelIdx || 0) * 80;
+            this._tone(freq, 0.025, 'square', 0.12, freq * 0.5);
+        },
+
+        // Reel stop sound - a thunk when the reel locks. Matched
+        // reels (where the symbol matches the first reel) get a
+        // bell-like "ding" cue; unmatched reels get a dull thud.
+        // The player can hear the build of tension as each reel
+        // lands - bell if the lock helped, thud if it broke.
+        playReelStop: function(reelIdx, matched) {
+            if (!this.initialized || this.muted) return;
+            if (matched) {
+                this._bell(880 + (reelIdx || 0) * 110, 0.15, 0.25);
+            } else {
+                this._noise(0.05, 0.15, 1500);
+                this._tone(200, 0.05, 'triangle', 0.12);
+            }
+        },
+
+        // ========== JACKPOT MULTI-STAGE (Phase 12) ==========
+        // The old jackpot was a 4-note arpeggio + sparkle overlay.
+        // The new jackpot is a 3-stage arc that mirrors the visual
+        // celebration:
+        //
+        //   1. playJackpotChime()  - rising arpeggio (C-E-G-C-E-G)
+        //      as the third reel approaches, building tension.
+        //   2. playJackpotDrop()   - the BIG moment. Sub-bass + kick
+        //      + bell + 5 staggered coin clinks. The "drop".
+        //   3. playJackpotSparkle() - 8 high-frequency twinkles for
+        //      the celebration tail.
+        //
+        // playJackpot() (the single-call entry) plays all 3 in
+        // sequence. spinJackpot() can call them individually at
+        // the right moments to sync with the reels (chime during
+        // the spin build, drop on the result, sparkle after).
+
+        playJackpotChime: function() {
+            if (!this.initialized || this.muted) return;
+            var notes = [523, 659, 784, 1047, 1319, 1568];
+            var self = this;
+            for (let i = 0; i < notes.length; i++) {
+                (function(note, idx) {
+                    setTimeout(function() { self._bell(note, 0.15, 0.25); }, idx * 60);
+                })(notes[i], i);
+            }
+        },
+
+        playJackpotDrop: function() {
+            if (!this.initialized || this.muted) return;
+            var self = this;
+            this._sub(80, 0.5, 0.5, 25);
+            this._kick(0.4, 0.55);
+            this._bell(523, 0.4, 0.35);
+            this._bell(1047, 0.4, 0.3);
+            // Coin clinks staggered (the "coin rain" of a real
+            // slot machine jackpot). 5 clinks over 300ms builds
+            // the celebration while the sub-bass + bells anchor it.
+            for (let i = 0; i < 5; i++) {
+                (function(idx) {
+                    setTimeout(function() { self._coin(0.15, 0.2); }, 100 + idx * 60);
+                })(i);
+            }
+        },
+
+        playJackpotSparkle: function() {
+            if (!this.initialized || this.muted) return;
+            var self = this;
+            for (let i = 0; i < 8; i++) {
+                (function(idx) {
+                    setTimeout(function() {
+                        var f = 2000 + Math.random() * 2000;
+                        self._tone(f, 0.1, 'sine', 0.18, f * 1.5);
+                    }, idx * 80);
+                })(i);
+            }
+        },
+
+        // Full jackpot sequence (chime -> drop -> sparkle).
+        // The total arc is ~1 second. Kept as the default
+        // playJackpot() entry for backward compat (any caller
+        // that just wants "the jackpot sound" gets the full arc).
+        playJackpot: function() {
+            if (!this.initialized || this.muted) return;
+            this.playJackpotChime();
+            var self = this;
+            setTimeout(function() { self.playJackpotDrop(); }, 320);
+            setTimeout(function() { self.playJackpotSparkle(); }, 600);
+        },
+
+        // Near-miss (2/3 match) sound. The "so close" feeling -
+        // two quick bell hits (matched reels) + a sad-trombone
+        // descending sawtooth. Reads as "you almost had it".
+        playNearMiss: function() {
+            if (!this.initialized || this.muted) return;
+            var self = this;
+            this._bell(880, 0.12, 0.22);
+            setTimeout(function() { self._bell(660, 0.12, 0.2); }, 80);
+            setTimeout(function() { self._sweep(440, 110, 0.4, 0.2, 'sawtooth', 600); }, 200);
+        },
+
+        // ========== SLOT SELECTOR FEEDBACK (Phase 12) ==========
+        // The previous selector only had playDragPickup + playDragDrop.
+        // The new selector has 5 distinct sounds so the player can
+        // hear what just happened: select (light tap), deselect
+        // (reverse tap), place (thunk + tick), unlock (cyan chime +
+        // sparkle - special because unlocking a position is a
+        // meaningful state change), swap (crossfade).
+
+        playSelect: function() {
+            if (!this.initialized || this.muted) return;
+            this._tone(880, 0.04, 'sine', 0.15);
+        },
+
+        playDeselect: function() {
+            if (!this.initialized || this.muted) return;
+            this._tone(440, 0.04, 'sine', 0.15, 220);
+        },
+
+        playPlace: function() {
+            if (!this.initialized || this.muted) return;
+            this._noise(0.04, 0.18, 1500);
+            this._tone(200, 0.06, 'square', 0.15, 100);
+        },
+
+        playUnlock: function() {
+            if (!this.initialized || this.muted) return;
+            this._bell(1047, 0.2, 0.25);
+            this._bell(1568, 0.15, 0.2);
+            this._noise(0.1, 0.12, 6000);
+        },
+
+        playSwap: function() {
+            if (!this.initialized || this.muted) return;
+            var self = this;
+            this._tone(660, 0.05, 'sine', 0.18);
+            setTimeout(function() { self._tone(880, 0.05, 'sine', 0.18); }, 40);
+        },
+
+        // ========== COMBO TIER STING (Phase 12) ==========
+        // Called when the player hits combo 7 (max). Distinct from
+        // the in-flight max-combo layer in playPegHitByType (which
+        // pings a bell on every cc=7 hit) - this is a one-shot
+        // sting that plays the FIRST time the player reaches max
+        // combo in a run, for the achievement-style celebration.
+        playMaxCombo: function() {
+            if (!this.initialized || this.muted) return;
+            var self = this;
+            this._bell(1320, 0.3, 0.3);
+            this._bell(1760, 0.3, 0.25);
+            this._sub(80, 0.3, 0.3, 30);
+            setTimeout(function() { self.playBonus(); }, 100);
+        },
+
+        // ========== SLOT COLLECT (Phase 12 enhanced) ==========
+        // Per-slot-type signature sound. Was a basic 1-2 oscillator
+        // hit per slot; now composes the right primitive for the
+        // slot's character: CREDITS = coin clinks, AMPLIFY = power
+        // sweep, PAYLOAD = mystery reveal, CRUMBLE = low rumble +
+        // crack, SHIELD = metallic clang, OVERCLOCK = high energy
+        // sweep, JACKPOT = the full jackpot arc, EMPTY = dull thud.
         playSlotCollect: function(slotType) {
             if (!this.initialized || this.muted) return;
+            var self = this;
             switch (slotType) {
-                case 1: // CREDITS - coin sound
-                    this._tone(1200, 0.08, 'square', 0.2);
-                    setTimeout(function() { Audio._tone(1500, 0.1, 'square', 0.2); }, 50);
+                case 1: // CREDITS - coin clinks
+                    this._coin(0.2, 0.25);
                     break;
-                case 2: // AMPLIFY - power up sweep
-                    this._tone(300, 0.2, 'sine', 0.2, 900);
+                case 2: // AMPLIFY - power up sweep + bell ping
+                    this._sweep(300, 900, 0.2, 0.25, 'sine');
+                    setTimeout(function() { self._tone(900, 0.1, 'sine', 0.2); }, 100);
                     break;
-                case 3: // PAYLOAD - mystery reveal
-                    this._tone(200, 0.15, 'triangle', 0.2);
-                    setTimeout(function() { Audio._tone(400, 0.15, 'triangle', 0.2); }, 100);
-                    setTimeout(function() { Audio._tone(800, 0.2, 'sine', 0.2); }, 200);
+                case 3: // PAYLOAD - mystery reveal (3-step)
+                    this._tone(200, 0.15, 'triangle', 0.25);
+                    setTimeout(function() { self._tone(400, 0.15, 'triangle', 0.25); }, 100);
+                    setTimeout(function() { self._bell(800, 0.2, 0.25); }, 200);
                     break;
-                case 4: // CRUMBLE - low rumble
-                    this._tone(80, 0.3, 'sawtooth', 0.25, 40);
-                    this._noise(0.2, 0.15, 400);
+                case 4: // CRUMBLE - sub rumble + crack
+                    this._sub(80, 0.3, 0.4, 30);
+                    this._noise(0.25, 0.25, 500);
+                    setTimeout(function() { self._noise(0.2, 0.3, 2000); }, 80);
                     break;
-                case 5: // SHIELD - metallic clang
-                    this._tone(800, 0.05, 'square', 0.3);
-                    this._tone(1200, 0.08, 'square', 0.2);
-                    setTimeout(function() { Audio._tone(600, 0.15, 'sine', 0.15, 1200); }, 80);
+                case 5: // SHIELD - metallic clang + bell ring
+                    this._noise(0.05, 0.2, 6000);
+                    this._tone(1200, 0.08, 'square', 0.25);
+                    this._bell(800, 0.2, 0.2);
                     break;
-                case 6: // OVERCLOCK - high energy
-                    this._tone(500, 0.2, 'sawtooth', 0.2, 1500);
-                    this._noise(0.1, 0.1, 2000);
+                case 6: // OVERCLOCK - high energy sweep + noise
+                    this._sweep(500, 1500, 0.2, 0.25, 'sawtooth');
+                    this._noise(0.1, 0.18, 2000);
                     break;
-                case 7: // JACKPOT - fanfare (full version)
+                case 7: // JACKPOT - full 3-stage arc
                     this.playJackpot();
                     break;
                 default: // EMPTY - dull thud
-                    this._tone(150, 0.1, 'sine', 0.15, 100);
+                    this._noise(0.05, 0.1, 500);
+                    this._tone(120, 0.05, 'sine', 0.1);
                     break;
             }
         },
 
-        // Jackpot win - triumphant fanfare
-        playJackpot: function() {
+        // ========== MISC SFX (Phase 12 enhanced) ==========
+
+        // Bonus chime (used by activate-payload handlers + elsewhere)
+        playBonus: function() {
             if (!this.initialized || this.muted) return;
-            var notes = [523, 659, 784, 1047]; // C E G C (major chord arpeggio)
-            for (let i = 0; i < notes.length; i++) {
-                (function(note, idx) {
-                    setTimeout(function() { Audio._tone(note, 0.3, 'square', 0.25); }, idx * 80);
-                })(notes[i], i);
-            }
-            // Sparkle overlay
-            setTimeout(function() {
-                Audio._tone(1568, 0.4, 'sine', 0.15);
-                Audio._tone(2093, 0.4, 'sine', 0.1);
-            }, 350);
+            var self = this;
+            this._bell(440, 0.1, 0.25);
+            setTimeout(function() { self._bell(660, 0.1, 0.25); }, 60);
+            setTimeout(function() { self._bell(880, 0.15, 0.25); }, 120);
         },
 
-        // Overload - alarming buzz
+        // Overload (peg type 10 already does its own sound; this
+        // is the standalone alarm used for the OVERFLOW penalty)
         playOverload: function() {
             if (!this.initialized || this.muted) return;
-            this._tone(120, 0.3, 'sawtooth', 0.3, 80);
-            this._noise(0.25, 0.2, 600);
+            this._sweep(120, 80, 0.3, 0.3, 'sawtooth', 600);
+            this._noise(0.25, 0.25, 600);
+            this._sub(50, 0.25, 0.3, 25);
         },
 
-        // Button click - soft click
+        // Button click (was a 50ms square; now a cleaner tick)
         playButtonClick: function() {
             if (!this.initialized || this.muted) return;
-            this._tone(600, 0.05, 'square', 0.15, 400);
+            this._tone(800, 0.03, 'sine', 0.12);
         },
 
-        // Drop ball - whoosh/launch
+        // Drop ball - the launch whoosh
         playDrop: function() {
             if (!this.initialized || this.muted) return;
-            this._tone(150, 0.15, 'sawtooth', 0.2, 400);
-            this._noise(0.1, 0.1, 1500);
+            this._sweep(150, 400, 0.15, 0.2, 'sawtooth', 1500);
+            this._noise(0.1, 0.15, 1500);
         },
 
-        // Achievement unlock - success melody
+        // Achievement unlock - success melody (C E G C E)
         playAchievement: function() {
             if (!this.initialized || this.muted) return;
-            var notes = [523, 659, 784, 1047, 1319]; // ascending major
+            var self = this;
+            var notes = [523, 659, 784, 1047, 1319];
             for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
                     setTimeout(function() {
-                        Audio._tone(note, 0.2, 'sine', 0.2);
-                        Audio._tone(note / 2, 0.2, 'sine', 0.1);
+                        self._bell(note, 0.2, 0.25);
+                        self._bell(note / 2, 0.2, 0.15);
                     }, idx * 70);
                 })(notes[i], i);
             }
         },
 
-        // Shield activation - power up
+        // Shield activation (called on drop for daemon + on slot
+        // collect for SHIELD) - rising sweep + bell ring
         playShield: function() {
             if (!this.initialized || this.muted) return;
-            this._tone(400, 0.15, 'sine', 0.2, 800);
-            this._tone(800, 0.2, 'sine', 0.15, 1200);
+            this._sweep(400, 800, 0.15, 0.25, 'sine');
+            this._bell(800, 0.2, 0.2);
+            this._bell(1200, 0.2, 0.15);
         },
 
-        // Explosion - noise burst
+        // Explosion (used by EXPLOSIVE peg, EXPLOSIVE payload,
+        // and as a sub-event of HONEYCOMB 5th hit + JACKPOT drop)
         playExplosion: function() {
             if (!this.initialized || this.muted) return;
-            this._noise(0.4, 0.4, 800);
-            this._tone(60, 0.3, 'sawtooth', 0.3, 30);
+            this._noise(0.4, 0.45, 800);
+            this._sub(60, 0.3, 0.4, 25);
+            this._kick(0.3, 0.4);
         },
 
-        // Critical combo warning (low time)
+        // Critical combo warning (low chain timer)
         playCritical: function() {
             if (!this.initialized || this.muted) return;
             var now = performance.now();
             if (now - this.lastCriticalSound < 400) return;
             this.lastCriticalSound = now;
-            this._tone(800, 0.1, 'square', 0.25);
+            this._tone(800, 0.1, 'square', 0.3);
         },
 
-        // Floor complete - victory sting
+        // Floor complete - victory sting (G B D G)
         playFloorComplete: function() {
             if (!this.initialized || this.muted) return;
-            var notes = [392, 494, 587, 784]; // G B D G
+            var self = this;
+            var notes = [392, 494, 587, 784];
             for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
-                    setTimeout(function() { Audio._tone(note, 0.25, 'square', 0.2); }, idx * 100);
+                    setTimeout(function() { self._bell(note, 0.25, 0.25); }, idx * 100);
                 })(notes[i], i);
             }
         },
 
-        // Game over - descending tones
+        // Game over - descending tones (sad)
         playGameOver: function() {
             if (!this.initialized || this.muted) return;
+            var self = this;
             var notes = [392, 330, 262, 196];
             for (let i = 0; i < notes.length; i++) {
                 (function(note, idx) {
-                    setTimeout(function() { Audio._tone(note, 0.3, 'sawtooth', 0.2); }, idx * 150);
+                    setTimeout(function() { self._tone(note, 0.3, 'sawtooth', 0.25, 98); }, idx * 150);
                 })(notes[i], i);
             }
         },
 
-        // Drag pickup - short pop
+        // Drag pickup (backward compat - aliased to playSelect)
         playDragPickup: function() {
-            if (!this.initialized || this.muted) return;
-            this._tone(500, 0.06, 'sine', 0.2, 800);
+            this.playSelect();
         },
 
-        // Drag drop - thunk
+        // Drag drop (backward compat - aliased to playPlace)
         playDragDrop: function() {
-            if (!this.initialized || this.muted) return;
-            this._tone(300, 0.08, 'sine', 0.2, 200);
-            this._noise(0.05, 0.1, 800);
+            this.playPlace();
         },
 
-        // Teleport sound
+        // Teleport sound (called by PT.T per-type; the per-type
+        // method does its own layered version, this is the
+        // backward-compat entry for direct callers)
         playTeleport: function() {
             if (!this.initialized || this.muted) return;
-            this._tone(800, 0.15, 'sine', 0.25, 200);
-            this._tone(200, 0.15, 'sine', 0.2, 800);
-        },
-
-        // Reel tick during jackpot spin
-        playReelTick: function() {
-            if (!this.initialized || this.muted) return;
-            this._tone(1000, 0.03, 'square', 0.15);
+            this._sweep(800, 200, 0.15, 0.25, 'sine', 800);
+            this._sweep(200, 800, 0.15, 0.2, 'sine', 800);
         },
 
         // ========== BGM (Phase 4 Music Port) ==========
@@ -1763,7 +2450,7 @@
     // ========== GS (GameState) ==========
     const GS = {
         scr: C.SCR.M, fl: 1, sc: 0, bl: 5, mx: 1, bd: [], obj: {},
-        jp: 500, fa: false, ft: 0, pl: [], cc: 0, ct: 0,
+        jp: 500, fa: false, ft: 0, pl: [], cc: 0, ct: 0, ctMax: 0,
         pegsHit: 0, floorScore: 0, jackpotWon: 0, bestCombo: 0, maxComboHits: 0, floorBallsLeft: 5,
         lbHandled: false, // leaderboard entry for this run has been prompted (set in retb, reset in startGame)
         canDrop: true, mouseX: 240, ball: null,
@@ -2117,10 +2804,10 @@
             var el = document.getElementById('jreel' + reelIdx);
             el.classList.add('sp');
             var count = 0;
-            
+
             // Create visual blur effect during spin
             el.style.textShadow = '0 0 20px #00fff2';
-            
+
             var interval = setInterval(function() {
                 // Rapid symbol cycling
                 jackpotReels[reelIdx] = reelSymbols[Math.floor(Math.random() * reelSymbols.length)];
@@ -2129,11 +2816,15 @@
                 // Add slight movement effect
                 el.style.transform = 'translateY(' + (Math.sin(count * 0.5) * 2) + 'px)';
 
-                // Audio: reel tick on every other cycle. At 40ms/cycle the
-                // 30ms tone would be a 75% duty cycle buzz; throttling to
-                // every other cycle gives distinct clicks at ~12.5Hz which
-                // is a much nicer slot-machine sound.
-                if (count % 2 === 0) Audio.playReelTick();
+                // Phase 12: layered reel tick. The new playReelTick
+                // takes a reelIdx so each reel has a distinct pitch
+                // (reel 0 = 800Hz, 1 = 880Hz, 2 = 960Hz) - the player
+                // can hear the three reels spinning at slightly
+                // different rates. The internal throttle is 16ms so
+                // calls faster than that coalesce; at 50ms/cycle the
+                // previous throttling (every other cycle) is no longer
+                // needed - the throttle inside the method handles it.
+                Audio.playReelTick(reelIdx);
 
                 count++;
 
@@ -2141,18 +2832,18 @@
                 if (count % 3 === 0) {
                     el.style.textShadow = '0 0 ' + (15 + Math.random() * 15) + 'px #00fff2';
                 }
-                
+
                 if (count >= totalSpins) {
                     clearInterval(interval);
                     el.classList.remove('sp');
                     el.style.textShadow = '';
                     el.style.transform = '';
-                    
+
                     // Final stopping effect
                     el.style.animation = 'none';
                     el.offsetHeight; // Force reflow
                     el.style.animation = 'reel-stop 0.3s ease-out';
-                    
+
                     setTimeout(function() {
                         el.style.animation = '';
                         if (finalCallback) finalCallback();
@@ -2219,13 +2910,26 @@
                             triggerWhiteFlash();
                             triggerWhiteFlash(); // Double flash!
 
-                            // Spawn coin bursts
+                            // Phase 12: more coin bursts (3 -> 6) for a
+                            // longer, more celebratory coin rain. The
+                            // 6-burst pattern is staggered over 1.5s so
+                            // the celebration visibly extends rather
+                            // than peaking and fading. Combined with
+                            // the multi-stage jackpot audio arc (the
+                            // new playJackpot() does chime -> drop ->
+                            // sparkle over ~1s), the celebration is
+                            // 2-3x longer than pre-Phase 12.
                             var fcEl = document.getElementById('fc');
                             var rect = fcEl.getBoundingClientRect();
-                            for (let burst = 0; burst < 3; burst++) {
-                                setTimeout(function() {
-                                    spawnCoinBurst(200 + Math.random() * 80, 250);
-                                }, burst * 200);
+                            for (let burst = 0; burst < 6; burst++) {
+                                (function(idx) {
+                                    setTimeout(function() {
+                                        spawnCoinBurst(200 + Math.random() * 80, 250);
+                                        if (idx >= 3) {
+                                            spawnCoinBurst(180 + Math.random() * 120, 230);
+                                        }
+                                    }, idx * 200);
+                                })(burst);
                             }
 
                             // Flash the prize amount
@@ -2243,14 +2947,26 @@
                             var jackpotWonAmount = GS.jp;
                             GS.jp = Math.floor(500 * GS.fl); // Reset jackpot
 
-                            createFloat(C.W / 2, C.H / 2 - 50, '★ JACKPOT! ★', '#ff00ff');
-                            createFloat(C.W / 2, C.H / 2, '+' + jackpotWonAmount, '#ffff00');
+                            // Phase 12: 3 float texts instead of 2, with
+                            // a more prominent "JACKPOT!" headline + a
+                            // "MEGA WIN" middle line + the amount.
+                            createFloat(C.W / 2, C.H / 2 - 60, '★ JACKPOT! ★', '#ffcc00');
+                            createFloat(C.W / 2, C.H / 2 - 25, 'MEGA WIN', '#ff00ff');
+                            createFloat(C.W / 2, C.H / 2 + 10, '+' + jackpotWonAmount, '#ffff00');
 
                             // Phase 4.5-N: persistent result banner so the
                             // player can clearly see they hit the jackpot and
                             // how many points it was worth. Replaces the
                             // small floating '+X' which was easy to miss.
                             showJackpotResult('jackpot', jackpotWonAmount, GS.jp);
+
+                            // Phase 12: the multi-stage jackpot audio arc.
+                            // The new playJackpot() does chime -> drop ->
+                            // sparkle over ~1 second. Synchronized with
+                            // the visual celebration (the coin bursts
+                            // above spread over 1.5s, so the audio
+                            // peak lands during the peak burst).
+                            Audio.playJackpot();
 
                             checkAchievements();
 
@@ -2292,9 +3008,14 @@
                                     setTimeout(function() { el.classList.remove('lose'); }, 500);
                                 }
                             });
-                            // Audio: small bonus chime (not the full jackpot
-                            // fanfare - that's reserved for 3/3).
-                            Audio.playBonus();
+                            // Audio: Phase 12 near-miss sound - 2 quick
+                            // bell pings (the matched reels) + a sad-
+                            // trombone descending sawtooth (the "so
+                            // close" feeling). Replaces the old plain
+                            // playBonus() which was the same as 2 of
+                            // the 3 jackpot notes and didn't convey
+                            // the emotional arc of "almost had it".
+                            Audio.playNearMiss();
                             createFloat(C.W / 2, C.H / 2 - 30, '2 OF 3!', '#ffff00');
                             createFloat(C.W / 2, C.H / 2, '+' + partialAmount, '#ffaa00');
 
@@ -2494,6 +3215,11 @@
         this.slowmoMode = false; // for slowmo payload
         this.slotChecked = false; // track if slot has been triggered for this ball
         this.shieldedSlot = -1;  // slot index that the ball is currently bouncing out of after a shield (-1 = no shield context)
+        // Phase 12: one-shot activation sound flags. These fire once
+        // per ball so the audio doesn't spam on every peg hit. Set
+        // to true on first peg contact in Peg.hit for worm/ghost.
+        this.wormActivated = false;
+        this.ghostActivated = false;
     }
 
     Ball.prototype.update = function(dt) {
@@ -2577,6 +3303,14 @@
                 b.r = this.r * 0.6;
                 this.mb.push(b);
             }
+            // Phase 12: tri-tone arpeggio + magenta ring when the
+            // ball splits into 3 mini-balls. Paired with the
+            // existing 3-burst particle effect from the ball's
+            // spawn origin. The split is the "moment" that cluster
+            // is all about, so it deserves its own signature sound.
+            Audio.playPayloadActivate('cluster');
+            spawnPayloadRing(this.x, this.y, '#ff00ff', 120);
+            createFloat(this.x, this.y, 'SPLIT!', '#ff00ff');
         }
         for (let i = 0; i < this.mb.length; i++) {
             this.mb[i].update(dt);
@@ -2637,17 +3371,21 @@
 
         // Logicbomb payload: triple current score on the ball's first peg hit (one-shot).
         // Applied before per-type branches so the x3 stacks on top of any per-type bonus.
+        // Phase 12: audio is the new layered "logic bomb boom" (kick + bell + sub +
+        // bonus chime tail) and a signature gold ring at the activation point.
         if (b && b.lbActive) {
             GS.sc *= 3;
             b.lbActive = false;
             createFloat(b.x, b.y, 'x3', '#ffff00');
-            Audio.playBonus();
+            Audio.playPayloadActivate('logicbomb');
+            spawnPayloadRing(b.x, b.y, '#ffff00', 130);
         }
 
         // Explosive payload: on the ball's first peg hit, chain-destroy all non-Explosive
         // pegs within 80px of the ball's position (one-shot per ball). We do the destruction
         // inline rather than calling triggerExplosion() because the latter only spawns
         // fragments without actually removing the pegs — too weak for a 85cr payload.
+        // Phase 12: audio is the layered explosion (kick + multi-band noise + sub).
         if (b && b.explosive) {
             b.explosive = false;
             for (let i = GS.bd.length - 1; i >= 0; i--) {
@@ -2662,26 +3400,32 @@
             }
             triggerScreenShake(4);
             triggerWhiteFlash();
-            Audio.playExplosion();
+            Audio.playPayloadActivate('explosive');
             createFloat(b.x, b.y, 'BOOM', '#ff2244');
+            spawnPayloadRing(b.x, b.y, '#ff2244', 110);
         }
 
         // Scrambler payload: on the ball's first peg hit, reverse the ball's velocity
         // so it bounces back the way it came (one-shot per ball). Applied before the
         // per-type branches so the per-peg bounce reflection in checkCols is skipped
         // (Peg.hit runs before the bounce in checkCols only in terms of state, not order).
+        // Phase 12: audio is the "WHOOP" + reverse noise + glitch, more dramatic than
+        // the old simple playTeleport(). The visual ring is a signature orange.
         if (b && b.scrambled === false) {
             b.scrambled = true;
             b.vx = -b.vx;
             b.vy = -b.vy;
             createFloat(b.x, b.y, 'SCRAM!', '#ff8844');
-            Audio.playTeleport();
+            Audio.playPayloadActivate('scrambler');
+            spawnPayloadRing(b.x, b.y, '#ff8844', 90);
         }
 
         // Trojan payload: on the ball's first peg hit, spawn 2 mini-balls with random
         // velocities at the ball's position. Mirrors cluster's pattern (3 mini-balls)
         // but with 2. One-shot per ball. The clones share the ball's mb array so
         // they update independently via Ball.update (and can trigger overflow on exit).
+        // Phase 12: audio is 2 staggered bells + bonus chime, more distinctive than
+        // the old plain playBonus().
         if (b && b.trojanActive) {
             b.trojanActive = false;
             for (let i = 0; i < 2; i++) {
@@ -2690,7 +3434,29 @@
                 b.mb.push(clone);
             }
             createFloat(b.x, b.y, 'TROJAN!', '#ff2244');
-            Audio.playBonus();
+            Audio.playPayloadActivate('trojan');
+            spawnPayloadRing(b.x, b.y, '#ff2244', 100);
+        }
+
+        // Worm activation: one-shot per ball. The ball is in worm
+        // mode and passes straight through pegs without bouncing,
+        // but the hit still registers here (combos work, Peg.hit
+        // runs). Fire the activation sound once on the first peg
+        // contact so the player hears "worm engaged" exactly once.
+        if (b && b.worm && !b.wormActivated) {
+            b.wormActivated = true;
+            Audio.playPayloadActivate('worm');
+            spawnPayloadRing(b.x, b.y, '#00ff88', 100);
+        }
+
+        // Ghost activation: one-shot per ball. Ghost balls phase
+        // through pegs (checkCols is skipped entirely in updateBalls
+        // when ghostMode is true), but Peg.hit still runs. Fire
+        // the activation sound once on the first peg contact.
+        if (b && b.ghostMode && !b.ghostActivated) {
+            b.ghostActivated = true;
+            Audio.playPayloadActivate('ghost');
+            spawnPayloadRing(b.x, b.y, '#88ddff', 100);
         }
 
         // Track peg types hit for achievements
@@ -2698,16 +3464,42 @@
             GS.pegTypesHit.push(this.t);
         }
 
-        // Audio: play peg hit sound, varied by peg type
-        Audio.playPegHit(GS.cc);
-        if (this.t === C.PT.T) Audio.playTeleport();
+        // Phase 12: per-peg-type dispatcher. Replaces the old
+        // single-sound playPegHit(combo) with a per-type method
+        // call (NODE ping, CACHE ka-ching, EXPLOSIVE boom, etc.)
+        // plus a combo escalation layer (sub-bass at cc>=3,
+        // brighter at cc>=5, max combo bell at cc=7) and a
+        // frenzy synth stab on every hit. The per-type extraData
+        // carries fiberHits/attractCount so FIBER and HONEYCOMB
+        // can build their pitch as the player charges them up.
+        Audio.playPegHitByType(this.t, GS.cc, GS.fa, {
+            fiberHits: this.fiberHits,
+            attractCount: this.attractCount
+        });
 
         // Spawn peg hit ripple effect
         spawnPegRipple(this.x, this.y, C.PC[this.t] || '#00fff2', this.hc > 1 ? 1.5 : 1);
-        
+
         // Spawn collision flash for all peg hits
         spawnCollisionFlash(this.x, this.y, C.PC[this.t] || '#00fff2', 1);
-        
+
+        // Phase 12: per-peg-type signature particle burst. Each of
+        // the 11 peg types gets a distinct particle color + count
+        // + secondary color so a hit visually "announces" which
+        // type was hit. Composes on top of the existing per-type
+        // effects (PT.E explosion, PT.S shockwave, PT.H honeycomb
+        // frags, etc.) so a hit on a special peg now feels even
+        // MORE dramatic. Throttled by the per-peg hitCount > 1
+        // check (the first hit gets the full burst; subsequent
+        // hits on the same peg get a smaller ripple to avoid
+        // drowning the player in particles during a frenzy).
+        if (this.hc === 1) {
+            spawnPegBurstByType(this.t, this.x, this.y);
+        } else {
+            // Reduced burst for repeat hits
+            spawnParticles(C.PC[this.t] || '#00fff2', this.x, this.y, 4, 2);
+        }
+
         // Update combo indicator
         comboIndicator.timer = 30;
         comboIndicator.scale = 1.3;
@@ -3159,6 +3951,19 @@
                     GS.maxComboHits++;
                     spawnFloatText(b.x, b.y - 20, 'MAX COMBO!', '#ffff00');
                     triggerWhiteFlash();
+                    // Phase 12: combo 7 celebration sting on the FIRST
+                    // hit of a max combo (not on every cc=7 hit - that
+                    // would spam the sting). The per-hit layer in
+                    // playPegHitByType already adds a small bell ping
+                    // on every cc=7 hit, but this is the bigger
+                    // "achievement reached" sting that fires once
+                    // per combo-7 reached (not per max combo hit).
+                    // Guarded on maxComboHits to fire only the first
+                    // time this run the player reaches cc=7.
+                    if (GS.maxComboHits === 1) {
+                        Audio.playMaxCombo();
+                        spawnPayloadRing(b.x, b.y, '#ffcc00', 150);
+                    }
                 }
                 if (GS.cc > GS.bestCombo) GS.bestCombo = GS.cc;
                 createPart(b.x, b.y, C.PC[p.t] || '#00fff2');
@@ -3253,6 +4058,7 @@
                     // Reset multiplier / gravity on mini-ball exit
                     GS.cc = 0;
                     GS.ct = 0;
+                    GS.ctMax = 0;
                     GS.fa = false;
                     GS.gravityMult = 1;
                 }
@@ -3308,8 +4114,9 @@
         // Reset multiplier on ball exit (cascade)
         GS.cc = 0;
         GS.ct = 0;
+        GS.ctMax = 0;
         GS.fa = false;
-        
+
         // Reset gravity modifier
         GS.gravityMult = 1;
     }
@@ -3464,7 +4271,8 @@
         // Reset multiplier
         GS.cc = 0;
         GS.ct = 0;
-        
+        GS.ctMax = 0;
+
         createFloat(ballX, C.SY - 20, 'OVERFLOW -' + penalty, '#ff2244');
         triggerScreenShake(3);
         
@@ -4107,6 +4915,10 @@
                     // Tapped the same item - cancel selection.
                     GS.selectedSlot = null;
                     clearSelectedHighlight();
+                    // Phase 12: descending sine "deselect" cue so the
+                    // player hears the cancel as a different event
+                    // from the ascending "select" cue.
+                    Audio.playDeselect();
                 } else {
                     // Tapped a different pool item - switch selection to it.
                     clearSelectedHighlight();
@@ -4326,6 +5138,9 @@
         GS.slotArrangement[targetPos] = GS.slotArrangement[fromPos];
         GS.slotArrangement[fromPos] = temp;
 
+        // Phase 12: swap sound (quick crossfade of two pitches)
+        Audio.playSwap();
+
         renderSlotSelector();
     }
 
@@ -4373,6 +5188,13 @@
 
         // After unlocking, prevent any more unlocks this floor
         GS.canUnlockThisFloor = false;
+
+        // Phase 12: cyan chime + sparkle (matches the cyan unlock
+        // burst visual). Played in addition to the place sound
+        // (the pool-item drop also fires playPlace via handlePoolDrop,
+        // so the player hears the thunk + the cyan chime in
+        // sequence: "drop" + "unlock success").
+        Audio.playUnlock();
 
         // Phase 9: trigger the cyan unlock-burst animation on the
         // position that just unlocked. renderSlotSelector reads
@@ -4520,7 +5342,84 @@
     function spawnShockwave(x, y) {
         waves.push({x: x, y: y, r: 0, m: 60, c: '#ff6600'});
     }
-    
+
+    // Phase 12: payload activation ring/halo. When a payload
+    // fires its one-shot effect (logicbomb boom, scrambler whoop,
+    // worm phase-shift, etc.), a signature colored ring expands
+    // from the activation point so the sound has a visual hook.
+    // Built on the existing waves system (rendered as expanding
+    // ring with alpha-fade) so we don't add a new render path.
+    // Capped at 30 simultaneous waves (oldest first) to prevent
+    // unbounded growth during multi-payload chaos.
+    function spawnPayloadRing(x, y, color, maxR) {
+        if (waves.length >= 30) waves.shift();
+        waves.push({x: x, y: y, r: 0, m: maxR || 100, c: color || '#00fff2'});
+    }
+
+    // Phase 12: peg-type signature particle burst. Each peg type
+    // gets a distinct particle color/behavior on hit (CACHE emits
+    // gold sparkles, MIRROR emits white sparkles, OVERLOAD emits
+    // pink electric arcs, etc.). Composes the existing
+    // spawnParticles helper with a type-specific count/spread and
+    // a sub-call to the lighter-weight spawnCollisionFlash for
+    // the initial impact. Used by the per-type branch in render()'s
+    // peg loop to add the signature burst on top of the basic
+    // peg-hit visuals.
+    function spawnPegBurstByType(type, x, y) {
+        var col = C.PC[type] || '#00fff2';
+        var burstCount, burstSpread, secondColor;
+        switch (type) {
+            case 0: // NODE - subtle cyan particles
+                burstCount = 6; burstSpread = 2;
+                break;
+            case 1: // CACHE - gold coin-burst sparkles
+                burstCount = 14; burstSpread = 4;
+                secondColor = '#ffff00';
+                break;
+            case 2: // TELEPORT - purple ring + sparkles
+                burstCount = 10; burstSpread = 3;
+                secondColor = '#ffffff';
+                break;
+            case 3: // SEISMIC - orange shockwave dust
+                burstCount = 16; burstSpread = 5;
+                secondColor = '#ffcc00';
+                break;
+            case 4: // EXPLOSIVE - red explosion fragments
+                burstCount = 24; burstSpread = 6;
+                secondColor = '#ff6666';
+                break;
+            case 5: // DORMANT - green reveal dust
+                burstCount = 12; burstSpread = 3;
+                secondColor = '#00ff88';
+                break;
+            case 6: // ICE - white/blue crystal shards
+                burstCount = 10; burstSpread = 2;
+                secondColor = '#aaeeff';
+                break;
+            case 7: // FIBER - orange-red strand particles
+                burstCount = 8; burstSpread = 3;
+                secondColor = '#ffaa66';
+                break;
+            case 8: // MIRROR - white sparkle burst
+                burstCount = 12; burstSpread = 4;
+                secondColor = '#ffffff';
+                break;
+            case 9: // HONEYCOMB - gold hex particles
+                burstCount = 14; burstSpread = 4;
+                secondColor = '#ffee88';
+                break;
+            case 10: // OVERLOAD - pink electric arcs
+                burstCount = 10; burstSpread = 3;
+                secondColor = '#ff88aa';
+                break;
+            default:
+                burstCount = 6; burstSpread = 2;
+        }
+        spawnParticles(col, x, y, burstCount, burstSpread);
+        if (secondColor) {
+            spawnParticles(secondColor, x, y, Math.floor(burstCount / 2), burstSpread * 0.6);
+        }
+    }
     function spawnFloatText(x, y, text, color) {
         // Safety cap: prevent unbounded growth (max 200 float texts)
         var maxFloats = 200;
@@ -5095,8 +5994,20 @@
             mv.classList.remove('combo-urgent', 'combo-critical');
         }
 
-        // Animated chain timer bar with gradient fill
-        var chainProgress = Math.max(0, (GS.ct / C.CHAIN_T * 100));
+        // Animated chain timer bar with gradient fill.
+        // The bar represents GS.ct as a fraction of the chain timer's
+        // *current max* (not just C.CHAIN_T). AMPLIFY sets GS.ct to
+        // C.CHAIN_T + 180 (= 216 frames), so dividing by just
+        // C.CHAIN_T (36) would give 600% width, visually extending
+        // the bar way off screen. The fix tracks GS.ctMax (the
+        // highest GS.ct value seen this combo cycle) and uses it
+        // as the denominator, capped at 100% so the bar never
+        // overflows. GS.ctMax is reset in checkCols on every new
+        // peg hit (when GS.ct is set to C.CHAIN_T or C.CHAIN_T+180)
+        // and in updateBalls on ball exit (when the combo resets).
+        var chainMax = Math.max(GS.ct, C.CHAIN_T); // never below base
+        if (GS.ct > (GS.ctMax || 0)) GS.ctMax = GS.ct;
+        var chainProgress = Math.max(0, Math.min(100, (GS.ct / (GS.ctMax || C.CHAIN_T) * 100)));
         var cf = _hud.cf;
         cf.style.width = chainProgress + '%';
 
@@ -6205,14 +7116,49 @@
         }
         ctx.globalAlpha = 1;
         
-        // Frenzy indicator
+        // Phase 12: combo escalation screen-edge glow. At higher
+        // combos, a subtle colored glow appears along all 4 edges
+        // of the canvas. At cc=3 (gold) the glow is barely visible;
+        // at cc=5 (magenta) it's more prominent; at cc=7 (white)
+        // the full-screen flash already fires from the max combo
+        // celebration. The glow is 8px wide on all sides and fades
+        // with alpha proportional to the combo tier. Uses the same
+        // ctx.fillRect approach as the overload indicator but with
+        // a narrow rect along each edge instead of the full canvas.
+        if (GS.scr === C.SCR.P && GS.cc >= 3) {
+            var edgeAlpha, edgeColor;
+            if (GS.cc >= 7) {
+                edgeAlpha = 0.25; edgeColor = '255,255,255';
+            } else if (GS.cc >= 5) {
+                edgeAlpha = 0.15; edgeColor = '255,0,255';
+            } else {
+                edgeAlpha = 0.08; edgeColor = '255,255,0';
+            }
+            ctx.fillStyle = 'rgba(' + edgeColor + ',' + edgeAlpha + ')';
+            ctx.fillRect(0, 0, C.W, 8); // top edge
+            ctx.fillRect(0, C.H - 8, C.W, 8); // bottom edge
+            ctx.fillRect(0, 0, 8, C.H); // left edge
+            ctx.fillRect(C.W - 8, 0, 8, C.H); // right edge
+        }
+
+        // Frenzy indicator: screen-edge glow + pulsing "FRENZY x3!"
+        // text + a full-screen magenta tint so the player feels the
+        // excitement. The pulse is driven by a sine on the animation
+        // timestamp, modulated by the frenzy timer (GS.ft).
         if (GS.fa) {
+            // Full-screen magenta tint (pulsing intensity)
+            var frenzyPulse = Math.sin(ts / 200) * 0.08 + 0.08;
+            ctx.fillStyle = 'rgba(255,0,255,' + frenzyPulse + ')';
+            ctx.fillRect(0, 0, C.W, C.H);
+            // "FRENZY x3!" text with pulse
             ctx.font = '16px Courier New';
             ctx.fillStyle = '#ff00ff';
             ctx.textAlign = 'center';
+            ctx.globalAlpha = 0.8 + Math.sin(ts / 300) * 0.2;
             ctx.fillText('FRENZY x3!', C.W / 2, C.H - 20);
+            ctx.globalAlpha = 1;
         }
-        
+
         // Overload indicator
         if (GS.overload) {
             ctx.fillStyle = 'rgba(255,34,68,0.2)';
@@ -6240,7 +7186,7 @@
             // Chain timer
             if (GS.ct > 0) {
                 GS.ct -= dt * 60;
-                if (GS.ct <= 0) GS.cc = 0;
+                if (GS.ct <= 0) { GS.cc = 0; GS.ctMax = 0; }
             }
             // Frenzy timer
             if (GS.ft > 0) {
@@ -6325,6 +7271,7 @@
         GS.bl = 5;
         GS.cc = 0;
         GS.ct = 0;
+        GS.ctMax = 0;
         GS.fa = false;
         GS.ft = 0;
         GS.pegsHit = 0;
@@ -6432,45 +7379,83 @@
         if (pl.indexOf('ghost') !== -1) {
             newBall.ghostMode = true;
             GS.ghostEffect = true;
+            // Phase 12: ghost drop sound + signature light-blue
+            // activation ring at the ball's launch point. The ball
+            // will phase through pegs and the ring serves as the
+            // visual cue that ghost is engaged.
+            Audio.playPayloadDrop('ghost');
+            spawnPayloadRing(newBall.x, newBall.y, '#88ddff', 90);
         }
         if (pl.indexOf('slowmo') !== -1) {
             newBall.slowmoMode = true;
             GS.slowmoEffect = true;
+            // Phase 12: slowmo drop sound (stab + descending pitch)
+            // + signature cyan ring. Paired with the existing
+            // GS.slowmoEffect blue octagonal overlay that the render
+            // loop draws while the flag is true.
+            Audio.playPayloadDrop('slowmo');
+            spawnPayloadRing(newBall.x, newBall.y, '#00fff2', 90);
         }
         if (pl.indexOf('daemon') !== -1) {
             // Daemon: shield this ball from overflow exit (one-shot per ball).
             // The sh field is already checked in Ball.update; the shield ring
             // render also keys on it, so a green ring appears on drop.
             newBall.sh = true;
-            Audio.playShield();
+            // Phase 12: playShield() IS the drop sound for daemon
+            // (no separate drop/activation split for shield-style
+            // payloads - the shield goes up immediately on launch).
+            Audio.playPayloadDrop('daemon');
+            spawnPayloadRing(newBall.x, newBall.y, '#00ff88', 90);
         }
         if (pl.indexOf('logicbomb') !== -1) {
             // Logicbomb: triple the current score on the ball's first peg hit (one-shot).
             // Peg.hit() checks b.lbActive and applies GS.sc *= 3, then clears the flag.
             newBall.lbActive = true;
+            // Phase 12: rising arpeggio C-E-G on drop (the "arming"
+            // sound) + small gold ring. The dramatic boom fires on
+            // activation (in Peg.hit when the flag clears).
+            Audio.playPayloadDrop('logicbomb');
+            spawnPayloadRing(newBall.x, newBall.y, '#ffff00', 70);
         }
         if (pl.indexOf('explosive') !== -1) {
             // Explosive: on the ball's first peg hit, trigger a chain explosion
             // at the ball's position. Peg.hit() detects b.explosive and calls
             // triggerExplosion(b.x, b.y) plus the standard explosion FX.
             newBall.explosive = true;
+            // Phase 12: bomb-tick + preview explosion on drop. The
+            // peg-side explosion (more dramatic) fires on activation.
+            Audio.playPayloadDrop('explosive');
+            spawnPayloadRing(newBall.x, newBall.y, '#ff2244', 70);
         }
         if (pl.indexOf('scrambler') !== -1) {
             // Scrambler: on the ball's first peg hit, reverse the ball's velocity
             // (b.vx *= -1, b.vy *= -1) so it bounces back the way it came.
             // b.scrambled starts false; Peg.hit() checks and flips it to true.
             newBall.scrambled = false;
+            // Phase 12: sharp electronic "select" + small orange ring.
+            // The dramatic "WHOOP" + reverse fires on activation.
+            Audio.playPayloadDrop('scrambler');
+            spawnPayloadRing(newBall.x, newBall.y, '#ff8844', 70);
         }
         if (pl.indexOf('worm') !== -1) {
             // Worm: ball passes through pegs without bouncing. checkCols() still
             // registers the hit (so combos and peg progression work) but skips
             // the position correction and velocity reflection.
             newBall.worm = true;
+            // Phase 12: deep sustained hum on drop + green ring.
+            // The phase-shift whoosh fires on activation (in checkCols
+            // when the ball first passes through a peg).
+            Audio.playPayloadDrop('worm');
+            spawnPayloadRing(newBall.x, newBall.y, '#00ff88', 90);
         }
         if (pl.indexOf('trojan') !== -1) {
             // Trojan: on the ball's first peg hit, spawn 2 mini-balls (mirror of
             // cluster's pattern but with 2 instead of 3). One-shot per ball.
             newBall.trojanActive = true;
+            // Phase 12: descending digital chirp on drop + red ring.
+            // The 2-bell staggered pings + bonus chime fire on activation.
+            Audio.playPayloadDrop('trojan');
+            spawnPayloadRing(newBall.x, newBall.y, '#ff2244', 70);
         }
         if (pl.indexOf('cluster') !== -1) {
             // Cluster: ball sets the cl flag at drop so Ball.update splits it
@@ -6478,6 +7463,11 @@
             // (tr.length < 5). The split logic and mini-ball render are already
             // in place - only the dropBall wiring was missing.
             newBall.cl = true;
+            // Phase 12: 3 quick "pew" sounds in rapid succession on
+            // drop + magenta ring. The tri-tone arpeggio fires on
+            // activation (when the ball actually splits).
+            Audio.playPayloadDrop('cluster');
+            spawnPayloadRing(newBall.x, newBall.y, '#ff00ff', 90);
         }
         
         if (PERSIST.multiballEnabled && GS.ball) {
@@ -6671,6 +7661,7 @@
         GS.shielded = false;
         GS.cc = 0;
         GS.ct = 0;
+        GS.ctMax = 0;
         GS.fa = false;
         GS.maxComboHits = 0;
         // Reset jackpot spins for new floor
@@ -7377,7 +8368,15 @@
         rollPegType: rollPegType, cellToPos: cellToPos,
         triggerSlotCollected: triggerSlotCollected,
         savePersist: savePersist, loadPersist: loadPersist,
-        applyContrastMode: applyContrastMode
+        applyContrastMode: applyContrastMode,
+        // Phase 12: SFX overhaul helpers exposed for testing.
+        // spawnPayloadRing creates the expanding colored ring at
+        // the activation point; spawnPegBurstByType creates the
+        // per-type signature particle burst. Both use the existing
+        // parts/waves arrays so they're safe to call in a headless
+        // context (the render loop is not running during unit tests).
+        spawnPayloadRing: spawnPayloadRing,
+        spawnPegBurstByType: spawnPegBurstByType
     };
 })();
     </script>
