@@ -1304,6 +1304,324 @@ function section(title) {
     assert(renderCheck.pegCount > 0, 'Board has pegs (sanity check)');
     assert(renderCheck.cyan > 500, 'Peg-field band has visible cyan content (board is rendering)', 'only ' + renderCheck.cyan + ' cyan pixels in 480x450 peg-field band');
 
+    // ========== PHASE 12: SFX SYSTEM ==========
+    // Per-peg-type hit sounds, per-payload drop + activation sounds,
+    // combo escalation layers, slot machine layered, multi-stage
+    // jackpot, near-miss, slot selector feedback. All methods must
+    // exist, all methods must call without throwing, the dispatcher
+    // must route to the correct per-type method, and the backward
+    // compat entries must still work.
+    section('Phase 12: SFX System');
+
+    // --- New DSP infrastructure ---
+    let dspMethods = await inGame(() => ({
+        hasCompressor: Audio.compressor !== null && Audio.compressor !== undefined,
+        hasDelayNode: Audio.delayNode !== null && Audio.delayNode !== undefined,
+        hasConnect: typeof Audio._connect === 'function',
+        hasSub: typeof Audio._sub === 'function',
+        hasBell: typeof Audio._bell === 'function',
+        hasCoin: typeof Audio._coin === 'function',
+        hasKick: typeof Audio._kick === 'function',
+        hasGlitch: typeof Audio._glitch === 'function',
+        hasSweep: typeof Audio._sweep === 'function',
+    }));
+    assert(dspMethods.hasCompressor, 'Audio.compressor (peak limiter) exists');
+    assert(dspMethods.hasDelayNode, 'Audio.delayNode (shared feedback delay) exists');
+    assert(dspMethods.hasConnect, 'Audio._connect helper exists');
+    assert(dspMethods.hasSub, 'Audio._sub (sub-bass thump) exists');
+    assert(dspMethods.hasBell, 'Audio._bell (inharmonic bell) exists');
+    assert(dspMethods.hasCoin, 'Audio._coin (coin clink) exists');
+    assert(dspMethods.hasKick, 'Audio._kick (kick drum) exists');
+    assert(dspMethods.hasGlitch, 'Audio._glitch (digital glitch) exists');
+    assert(dspMethods.hasSweep, 'Audio._sweep (pitch sweep) exists');
+
+    // --- Per-peg-type hit methods (11 types) ---
+    let pegMethods = await inGame(() => {
+        var methods = [
+            'playPegNode', 'playPegCache', 'playPegTeleport',
+            'playPegSeismic', 'playPegExplosive', 'playPegDormant',
+            'playPegIce', 'playPegFiber', 'playPegMirror',
+            'playPegHoneycomb', 'playPegOverload',
+            'playPegHitByType'
+        ];
+        var result = {};
+        methods.forEach(function(m) { result[m] = typeof Audio[m] === 'function'; });
+        return result;
+    });
+    assert(pegMethods.playPegNode, 'playPegNode exists (NODE type)');
+    assert(pegMethods.playPegCache, 'playPegCache exists (CACHE type)');
+    assert(pegMethods.playPegTeleport, 'playPegTeleport exists (TELEPORT type)');
+    assert(pegMethods.playPegSeismic, 'playPegSeismic exists (SEISMIC type)');
+    assert(pegMethods.playPegExplosive, 'playPegExplosive exists (EXPLOSIVE type)');
+    assert(pegMethods.playPegDormant, 'playPegDormant exists (DORMANT type)');
+    assert(pegMethods.playPegIce, 'playPegIce exists (ICE type)');
+    assert(pegMethods.playPegFiber, 'playPegFiber exists (FIBER type)');
+    assert(pegMethods.playPegMirror, 'playPegMirror exists (MIRROR type)');
+    assert(pegMethods.playPegHoneycomb, 'playPegHoneycomb exists (HONEYCOMB type)');
+    assert(pegMethods.playPegOverload, 'playPegOverload exists (OVERLOAD type)');
+    assert(pegMethods.playPegHitByType, 'playPegHitByType exists (dispatcher)');
+
+    // --- Per-payload methods (9 types × 2) ---
+    let payloadMethods = await inGame(() => {
+        var drops = ['scrambler','trojan','worm','logicbomb','daemon','ghost','cluster','explosive','slowmo'];
+        var result = {};
+        result.hasDrop = typeof Audio.playPayloadDrop === 'function';
+        result.hasActivate = typeof Audio.playPayloadActivate === 'function';
+        return result;
+    });
+    assert(payloadMethods.hasDrop, 'playPayloadDrop exists');
+    assert(payloadMethods.hasActivate, 'playPayloadActivate exists');
+
+    // --- Slot machine layered ---
+    let slotMethods = await inGame(() => ({
+        hasReelTick: typeof Audio.playReelTick === 'function',
+        hasReelStop: typeof Audio.playReelStop === 'function',
+    }));
+    assert(slotMethods.hasReelTick, 'playReelTick exists (layered clack + tick)');
+    assert(slotMethods.hasReelStop, 'playReelStop exists (matched/unmatched variants)');
+
+    // --- Multi-stage jackpot ---
+    let jackpotMethods = await inGame(() => ({
+        hasChime: typeof Audio.playJackpotChime === 'function',
+        hasDrop: typeof Audio.playJackpotDrop === 'function',
+        hasSparkle: typeof Audio.playJackpotSparkle === 'function',
+        hasNearMiss: typeof Audio.playNearMiss === 'function',
+    }));
+    assert(jackpotMethods.hasChime, 'playJackpotChime exists (rising arpeggio)');
+    assert(jackpotMethods.hasDrop, 'playJackpotDrop exists (sub + kick + coin rain)');
+    assert(jackpotMethods.hasSparkle, 'playJackpotSparkle exists (high-freq twinkle tail)');
+    assert(jackpotMethods.hasNearMiss, 'playNearMiss exists (sad trombone)');
+
+    // --- Slot selector feedback ---
+    let selectorMethods = await inGame(() => ({
+        hasSelect: typeof Audio.playSelect === 'function',
+        hasDeselect: typeof Audio.playDeselect === 'function',
+        hasPlace: typeof Audio.playPlace === 'function',
+        hasUnlock: typeof Audio.playUnlock === 'function',
+        hasSwap: typeof Audio.playSwap === 'function',
+    }));
+    assert(selectorMethods.hasSelect, 'playSelect exists (light tap)');
+    assert(selectorMethods.hasDeselect, 'playDeselect exists (reverse tap)');
+    assert(selectorMethods.hasPlace, 'playPlace exists (thunk + tick)');
+    assert(selectorMethods.hasUnlock, 'playUnlock exists (cyan chime + sparkle)');
+    assert(selectorMethods.hasSwap, 'playSwap exists (crossfade)');
+
+    // --- Max combo sting ---
+    let maxCombo = await inGame(() => ({ has: typeof Audio.playMaxCombo === 'function' }));
+    assert(maxCombo.has, 'playMaxCombo exists (combo 7 celebration)');
+
+    // --- Call without throwing (all new methods) ---
+    let noThrow = await inGame(() => {
+        Audio.init();
+        Audio.setSfxVolume(0.4);
+        var errs = [];
+        try { Audio.playPegNode(0, false); } catch(e) { errs.push('playPegNode'); }
+        try { Audio.playPegCache(3, false); } catch(e) { errs.push('playPegCache'); }
+        try { Audio.playPegTeleport(2, false); } catch(e) { errs.push('playPegTeleport'); }
+        try { Audio.playPegSeismic(4, true); } catch(e) { errs.push('playPegSeismic'); }
+        try { Audio.playPegExplosive(1, false); } catch(e) { errs.push('playPegExplosive'); }
+        try { Audio.playPegDormant(0, false); } catch(e) { errs.push('playPegDormant'); }
+        try { Audio.playPegIce(5, true); } catch(e) { errs.push('playPegIce'); }
+        try { Audio.playPegFiber(3, false, 2); } catch(e) { errs.push('playPegFiber'); }
+        try { Audio.playPegMirror(1, false); } catch(e) { errs.push('playPegMirror'); }
+        try { Audio.playPegHoneycomb(6, false, 3); } catch(e) { errs.push('playPegHoneycomb'); }
+        try { Audio.playPegOverload(2, false); } catch(e) { errs.push('playPegOverload'); }
+        try { Audio.playPegHitByType(0, 0, false); } catch(e) { errs.push('playPegHitByType'); }
+        try { Audio.playPayloadDrop('scrambler'); } catch(e) { errs.push('playPayloadDrop'); }
+        try { Audio.playPayloadActivate('worm'); } catch(e) { errs.push('playPayloadActivate'); }
+        try { Audio.playReelTick(1); } catch(e) { errs.push('playReelTick'); }
+        try { Audio.playReelStop(0, true); } catch(e) { errs.push('playReelStop'); }
+        try { Audio.playJackpotChime(); } catch(e) { errs.push('playJackpotChime'); }
+        try { Audio.playJackpotDrop(); } catch(e) { errs.push('playJackpotDrop'); }
+        try { Audio.playJackpotSparkle(); } catch(e) { errs.push('playJackpotSparkle'); }
+        try { Audio.playNearMiss(); } catch(e) { errs.push('playNearMiss'); }
+        try { Audio.playMaxCombo(); } catch(e) { errs.push('playMaxCombo'); }
+        try { Audio.playSelect(); } catch(e) { errs.push('playSelect'); }
+        try { Audio.playDeselect(); } catch(e) { errs.push('playDeselect'); }
+        try { Audio.playPlace(); } catch(e) { errs.push('playPlace'); }
+        try { Audio.playUnlock(); } catch(e) { errs.push('playUnlock'); }
+        try { Audio.playSwap(); } catch(e) { errs.push('playSwap'); }
+        return { errs: errs };
+    });
+    assert(noThrow.errs.length === 0, 'All new SFX methods call without throwing', 'failed: ' + noThrow.errs.join(', '));
+
+    // --- Dispatcher routing: playPegHitByType routes to the correct per-type method.
+    // The 8ms throttle must be reset before each call so the mock fires.
+    let dispatchTest = await inGame(() => {
+        var dispatched = '';
+        var orig = Audio.playPegNode;
+        Audio.playPegNode = function() { dispatched = 'node'; };
+        Audio.lastPegSound = 0; // reset throttle
+        Audio.playPegHitByType(0, 0, false);
+        Audio.playPegNode = orig;
+        return dispatched;
+    });
+    assert(dispatchTest === 'node', 'playPegHitByType(0) routes to playPegNode', 'got ' + dispatchTest);
+
+    let dispatchCache = await inGame(() => {
+        var dispatched = '';
+        var orig = Audio.playPegCache;
+        Audio.playPegCache = function() { dispatched = 'cache'; };
+        Audio.lastPegSound = 0;
+        Audio.playPegHitByType(1, 3, true);
+        Audio.playPegCache = orig;
+        return dispatched;
+    });
+    assert(dispatchCache === 'cache', 'playPegHitByType(1) routes to playPegCache', 'got ' + dispatchCache);
+
+    let dispatchExplosive = await inGame(() => {
+        var dispatched = '';
+        var orig = Audio.playPegExplosive;
+        Audio.playPegExplosive = function() { dispatched = 'explosive'; };
+        Audio.lastPegSound = 0;
+        Audio.playPegHitByType(4, 5, false);
+        Audio.playPegExplosive = orig;
+        return dispatched;
+    });
+    assert(dispatchExplosive === 'explosive', 'playPegHitByType(4) routes to playPegExplosive', 'got ' + dispatchExplosive);
+
+    let dispatchHoneycomb = await inGame(() => {
+        var dispatched = '';
+        var orig = Audio.playPegHoneycomb;
+        Audio.playPegHoneycomb = function() { dispatched = 'honeycomb'; };
+        Audio.lastPegSound = 0;
+        Audio.playPegHitByType(9, 2, false, { attractCount: 4 });
+        Audio.playPegHoneycomb = orig;
+        return dispatched;
+    });
+    assert(dispatchHoneycomb === 'honeycomb', 'playPegHitByType(9) routes to playPegHoneycomb', 'got ' + dispatchHoneycomb);
+
+    let dispatchOverload = await inGame(() => {
+        var dispatched = '';
+        var orig = Audio.playPegOverload;
+        Audio.playPegOverload = function() { dispatched = 'overload'; };
+        Audio.lastPegSound = 0;
+        Audio.playPegHitByType(10, 0, false);
+        Audio.playPegOverload = orig;
+        return dispatched;
+    });
+    assert(dispatchOverload === 'overload', 'playPegHitByType(10) routes to playPegOverload', 'got ' + dispatchOverload);
+
+    // --- Backward compat: playPegHit still exists and calls playPegNode ---
+    let backcompat = await inGame(() => {
+        var called = false;
+        var orig = Audio.playPegNode;
+        Audio.playPegNode = function() { called = true; };
+        Audio.playPegHit(5);
+        Audio.playPegNode = orig;
+        return { called: called };
+    });
+    assert(backcompat.called, 'playPegHit (legacy) delegates to playPegNode');
+
+    // --- Backward compat: playDragPickup aliases to playSelect ---
+    let dragCompat = await inGame(() => {
+        var called = false;
+        var orig = Audio.playSelect;
+        Audio.playSelect = function() { called = true; };
+        Audio.playDragPickup();
+        Audio.playSelect = orig;
+        return { called: called };
+    });
+    assert(dragCompat.called, 'playDragPickup (legacy) aliases to playSelect');
+
+    // --- Backward compat: playDragDrop aliases to playPlace ---
+    let dropCompat = await inGame(() => {
+        var called = false;
+        var orig = Audio.playPlace;
+        Audio.playPlace = function() { called = true; };
+        Audio.playDragDrop();
+        Audio.playPlace = orig;
+        return { called: called };
+    });
+    assert(dropCompat.called, 'playDragDrop (legacy) aliases to playPlace');
+
+    // --- Visual coupling helpers ---
+    let visualHelpers = await inGame(() => ({
+        hasPayloadRing: typeof window.__TEST__.spawnPayloadRing === 'function',
+        hasPegBurst: typeof window.__TEST__.spawnPegBurstByType === 'function',
+    }));
+    assert(visualHelpers.hasPayloadRing, 'spawnPayloadRing helper exists (expanding colored ring)');
+    assert(visualHelpers.hasPegBurst, 'spawnPegBurstByType helper exists (per-type particle burst)');
+
+    // --- spawnPayloadRing / spawnPegBurstByType: verify they call without throwing ---
+    let burstWorks = await inGame(() => {
+        var t = window.__TEST__;
+        var threwRing = false, threwBurst = false;
+        try {
+            t.spawnPayloadRing(240, 300, '#ff00ff', 100);
+        } catch(e) { threwRing = true; }
+        try {
+            t.spawnPegBurstByType(0, 240, 300);
+        } catch(e) { threwBurst = true; }
+        return { threwRing, threwBurst };
+    });
+    assert(burstWorks.threwRing === false, 'spawnPayloadRing does not throw');
+    assert(burstWorks.threwBurst === false, 'spawnPegBurstByType does not throw');
+
+    // --- Ball constructor: Phase 12 flags ---
+    let ballFlags = await inGame(() => {
+        var b = new Ball(240, 100, 0, 2, []);
+        return {
+            hasWormActivated: 'wormActivated' in b,
+            hasGhostActivated: 'ghostActivated' in b,
+            wormInit: b.wormActivated,
+            ghostInit: b.ghostActivated,
+        };
+    });
+    assert(ballFlags.hasWormActivated, 'Ball constructor has wormActivated flag');
+    assert(ballFlags.hasGhostActivated, 'Ball constructor has ghostActivated flag');
+    assert(ballFlags.wormInit === false, 'Ball.wormActivated defaults to false');
+    assert(ballFlags.ghostInit === false, 'Ball.ghostActivated defaults to false');
+
+    // --- Peg.hit: fiberHits and attractCount passed to playPegHitByType ---
+    let extraData = await inGame(() => {
+        var passedData = null;
+        var orig = Audio.playPegHitByType;
+        Audio.playPegHitByType = function(pegType, combo, frenzy, extra) {
+            passedData = extra;
+        };
+        var p = new Peg(240, 300, C.PT.F, 999);
+        p.fiberHits = 2;
+        p.hit(new Ball(240, 300, 0, 5, []));
+        Audio.playPegHitByType = orig;
+        return passedData ? passedData.fiberHits : null;
+    });
+    assert(extraData === 2, 'Peg.hit passes fiberHits to playPegHitByType', 'got ' + extraData);
+
+    // --- Throttle: playPegHitByType respects 8ms throttle ---
+    let throttleTest = await inGame(() => {
+        var callCount = 0;
+        var orig = Audio.playPegNode;
+        Audio.playPegNode = function() { callCount++; };
+        Audio.lastPegSound = 0;
+        // First call: should go through
+        Audio.playPegHitByType(0, 0, false);
+        var afterFirst = callCount;
+        // Second call immediately: should be throttled
+        Audio.playPegHitByType(0, 0, false);
+        var afterSecond = callCount;
+        Audio.playPegNode = orig;
+        return { first: afterFirst, second: afterSecond };
+    });
+    assert(throttleTest.first === 1, 'First playPegHitByType call goes through', 'count: ' + throttleTest.first);
+    assert(throttleTest.second === 1, 'Immediate second call is throttled', 'count: ' + throttleTest.second);
+
+    // --- Wire check: Peg.hit dispatches through playPegHitByType ---
+    let pegWire = await inGame(() => {
+        var called = false;
+        var calledType = -1;
+        var orig = Audio.playPegHitByType;
+        Audio.playPegHitByType = function(pegType) { called = true; calledType = pegType; };
+        // Reset throttle so the call goes through
+        Audio.lastPegSound = 0;
+        var p = new Peg(240, 300, C.PT.C, 999);
+        p.hit(new Ball(240, 300, 0, 5, []));
+        Audio.playPegHitByType = orig;
+        return { called: called, type: calledType };
+    });
+    assert(pegWire.called, 'Peg.hit dispatches through playPegHitByType');
+    assert(pegWire.type === 1, 'Peg.hit passes peg type 1 (CACHE) to playPegHitByType', 'got ' + pegWire.type);
+
     // ========== CLEANUP ==========
     await browser.close();
 
