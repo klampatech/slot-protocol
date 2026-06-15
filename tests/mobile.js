@@ -89,6 +89,17 @@ async function withDevice(browser, deviceName, fn) {
             const expectedH = 700 * m.scale;
             assert(Math.abs(m.w - expectedW) < 2, `${t.name}: scaler width ≈ 480*scale`, `w=${m.w.toFixed(1)} expected≈${expectedW.toFixed(1)}`);
             assert(Math.abs(m.h - expectedH) < 2, `${t.name}: scaler height ≈ 700*scale`, `h=${m.h.toFixed(1)} expected≈${expectedH.toFixed(1)}`);
+
+            // Phase 11b regression: on viewports <= 600px, the body
+            // gets 15px horizontal padding so the .board-active
+            // 30px box-shadow has room to render (without it, the
+            // glow gets clipped by overflow:hidden at the viewport
+            // edge). The scaler should sit at least 14px from each
+            // side on those devices, giving the glow ~15px of room.
+            if (m.vpW <= 600) {
+                assert(m.left >= 14, `${t.name}: scaler has >= 14px left margin for glow (Phase 11b)`, `left=${m.left.toFixed(1)}`);
+                assert(m.vpW - m.right >= 14, `${t.name}: scaler has >= 14px right margin for glow (Phase 11b)`, `right-margin=${(m.vpW - m.right).toFixed(1)}`);
+            }
         });
     }
 

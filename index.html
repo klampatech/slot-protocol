@@ -11,6 +11,35 @@
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a12; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Share Tech Mono', 'Courier New', monospace; color: #e0e0ff; overflow: hidden; padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); box-sizing: border-box; }
+        /* ========== PHASE 11b: GLOW-BORDER PADDING (NARROW VIEWPORTS) ==========
+           The main board's .board-active box-shadow (2px solid ring + 30px
+           outer glow) is drawn outside the layout box. On viewports
+           narrower than ~480, the layout box fills the body edge-to-edge
+           (Phase 11-A), so the body's overflow:hidden clips the glow on
+           the left and right - the user sees only the inner half of the
+           halo and a partial 2px ring (the overlays don't have this issue
+           because their 2px border is a real `border` inside the box,
+           only the outer glow is partially clipped).
+
+           On narrow viewports, add 15px of horizontal padding so the
+           30px CSS glow (scaled to ~24-26px at the typical 0.6-0.86x
+           scale, so the half-blur is ~12-13px) has room to render
+           without clipping. Desktop and tablet are unaffected - the
+           viewport is wide enough that the centered board already has
+           hundreds of px of room on each side.
+
+           The scaleToFit() JS reads getComputedStyle(body).paddingLeft
+           and .paddingRight and subtracts them from the viewport width
+           so the scale is computed against the content area, not the
+           full viewport. Without that, the visual board would overflow
+           the body content area and the padding would clip it (re-
+           introducing the Phase 11-A bug). */
+        @media (max-width: 600px) {
+            body {
+                padding-left: calc(env(safe-area-inset-left, 0) + 15px);
+                padding-right: calc(env(safe-area-inset-right, 0) + 15px);
+            }
+        }
         /* ========== PHASE 11: LAYOUT-VS-VISUAL FIX ==========
            Phase 5 used a single #scaler element with intrinsic 480x700
            and a transform: scale() applied to it. The body flex-centered
@@ -7104,8 +7133,26 @@
     // (64*0.4=25.6 visual px per tile, above the 24px iOS HIG
     // minimum for a touch target).
     function scaleToFit() {
-        var w = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
-        var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        // Phase 11b: read the computed body padding so the scale is
+        // computed against the body's content area, not the full
+        // viewport. The Phase 11-A layout-vs-visual fix made the
+        // board fill the viewport edge-to-edge, but on narrow
+        // viewports the .board-active 30px box-shadow gets clipped
+        // by the body's overflow:hidden where the board meets the
+        // viewport edge. The 11b fix adds 15px horizontal padding
+        // on viewports <= 600px (see the @media block in the body
+        // CSS) so the glow has room. Subtracting the padding here
+        // prevents the visual board from overflowing the (now
+        // smaller) content area.
+        var computedStyle = getComputedStyle(document.body);
+        var padL = parseFloat(computedStyle.paddingLeft) || 0;
+        var padR = parseFloat(computedStyle.paddingRight) || 0;
+        var padT = parseFloat(computedStyle.paddingTop) || 0;
+        var padB = parseFloat(computedStyle.paddingBottom) || 0;
+        var vpW = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+        var vpH = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        var w = vpW - padL - padR;
+        var h = vpH - padT - padB;
         var s = Math.min(w / 480, h / 700);
         s = Math.max(0.40, Math.min(1.0, s));
         document.documentElement.style.setProperty('--scale', s);
