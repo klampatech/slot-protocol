@@ -527,4 +527,23 @@ Visual:
 
 Activation flags: `chainReactionActivated` and `synergyActivated` on Ball constructor, fire once per ball to prevent audio spam.
 
-Pending: existing payload reworks (Scrambler → Ricochet, Ghost → Phase, Worm → Tunnel, Slowmo → Stasis, Explosive → Detonator).
+### 2026-06-15: Phase P3 Shipped
+
+**5 existing payloads reworked.** All mechanics implemented, 364 tests passing (+21 new).
+
+| Old Name | New Name | Cost | Mechanic | Key Change |
+|----------|----------|------|----------|------------|
+| Scrambler | **Ricochet** | 80cr | 3 smart bounces toward nearest unhit peg | Reliable (guaranteed 3 extra hits vs old reversal that could hurt) |
+| Ghost | **Phase** | 100cr | Phase through + warp back to drop zone once | Unique identity (vs old ghost ≈ worm) |
+| Worm | **Tunnel** | 180cr | Pass through + tagged pegs explode on exit | Dramatic payoff (exit cascade vs old subtle pass-through) |
+| Slowmo | **Stasis** | 150cr | 30-frame freeze + peg attraction, resume at half speed | Active moment (hang time + cluster vs old sluggish) |
+| Explosive | **Detonator** | 180cr | Each peg hit = targeted explosion (500*(cc+1)*pts) | Every-hit trigger (vs old one-shot AoE) |
+
+Key implementation details:
+- **Ricochet** steers by setting `b.vx/vy` toward the nearest unhit peg (within 300px) at the ball's current speed. Decrements `ricochetBounces` each time.
+- **Phase** warp-back triggers in Ball.update's exit check (`y > C.H + 50`). Resets position to drop zone, velocity to 0/2, clears slot state. `phaseWarps` decrements so it only warps once.
+- **Tunnel** tags pegs by ID in `tunnelTagged[]` during Peg.hit's worm activation block. Exit explosion fires in Ball.update's exit check, before `this.on = false`. Staggered 60ms per peg for cascade visual.
+- **Stasis** freeze runs in Ball.update before gravity. When `stasisTimer > 0`, velocity is zeroed, pegs within 40px attracted at 3px/frame, and the update returns early (skips all physics). After freeze, `dt60 *= 0.5` for remaining lifetime.
+- **Detonator** sets `this.detonate = true` in Peg.hit's flag block. The actual destruction runs AFTER per-type logic (so cache bonus, seismic shockwave, etc. still fire). Score is `500*(cc+1)*(frenzy?3:1)`.
+
+Pending: slot effect improvements (EMPTY → OVERFLOW, OVERCLOCK → MAGNETIZE slot, etc.) and payload + slot interactions.
