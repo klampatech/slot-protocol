@@ -774,8 +774,9 @@ function section(title) {
         };
     });
     assert(tooltipAfterFlatten.found === true, 'Tooltip after flatten: describe() returns info');
-    assert(tooltipAfterFlatten.name === 'GHOST', 'Tooltip after flatten: ghost metadata lookup works');
-    assert(tooltipAfterFlatten.desc && tooltipAfterFlatten.desc.indexOf('phase') !== -1, 'Tooltip after flatten: ghost desc contains expected text');
+    // Phase P3: ghost reworked to Phase
+    assert(tooltipAfterFlatten.name === 'PHASE', 'Tooltip after flatten: ghost→Phase metadata lookup works');
+    assert(tooltipAfterFlatten.desc && tooltipAfterFlatten.desc.toLowerCase().indexOf('phase') !== -1, 'Tooltip after flatten: Phase desc contains expected text');
 
     // 8c-10: dedup stress test - fill the queue with N unique types
     // and verify no duplicates can be re-added through any code path.
@@ -874,7 +875,8 @@ function section(title) {
     assert(payloadMeta.icons.every(k => typeof k === 'string'), 'C.PAYLOADS icon keys are strings');
     assert(payloadMeta.names.includes('DAEMON'), 'C.PAYLOADS includes DAEMON');
     assert(payloadMeta.names.includes('LOGIC BOMB'), 'C.PAYLOADS includes LOGIC BOMB');
-    assert(payloadMeta.names.includes('SLOWMO'), 'C.PAYLOADS includes SLOWMO');
+    // Phase P3: slowmo reworked to Stasis
+    assert(payloadMeta.names.includes('STASIS'), 'C.PAYLOADS includes STASIS');
     assert(payloadMeta.names.includes('CHAIN REACTION'), 'C.PAYLOADS includes CHAIN REACTION');
     assert(payloadMeta.names.includes('SYNERGY'), 'C.PAYLOADS includes SYNERGY');
     assert(payloadMeta.names.includes('MAGNETIZE'), 'C.PAYLOADS includes MAGNETIZE');
@@ -1117,6 +1119,120 @@ function section(title) {
         return { ok };
     });
     assert(p2MagnetizeRender.ok === true, 'Magnetize gravity well ring math is valid');
+
+    // ========== PHASE P3: REWORKED PAYLOADS ==========
+    section('Phase P3: Reworked Payloads');
+
+    // Ricochet (was Scrambler): ball flag + bounces set on drop
+    let p3Ricochet = await dropWithPayload('scrambler');
+    assert(p3Ricochet && p3Ricochet.ricochet === true, 'Ricochet sets ball.ricochet = true');
+    assert(p3Ricochet && p3Ricochet.ricochetBounces === 3, 'Ricochet sets ricochetBounces = 3');
+
+    // Ricochet: smart bounce steers toward nearest unhit peg
+    let p3RicochetSteer = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        // Hit peg at 200,200. Target peg at 250,250 (diagonal).
+        var hitPeg = new Peg(200, 200, C.PT.N, 0);
+        var targetPeg = new Peg(250, 250, C.PT.N, 1);
+        GS.bd.push(hitPeg, targetPeg);
+        var b = new Ball(200, 190, 0, 5, []);
+        b.ricochet = true;
+        b.ricochetBounces = 3;
+        b.hp = {};
+        var vxBefore = b.vx;
+        hitPeg.hit(b);
+        // After ricochet, vx should be positive (toward target at x=250)
+        return { vxAfter: b.vx, bouncesLeft: b.ricochetBounces, steered: b.vx !== vxBefore };
+    });
+    assert(p3RicochetSteer.bouncesLeft === 2, 'Ricochet decrements bounces (3→2)');
+    assert(p3RicochetSteer.vxAfter > 0, 'Ricochet steers ball toward target peg (vx > 0)');
+
+    // Phase (was Ghost): ball flag + warps set on drop
+    let p3Phase = await dropWithPayload('ghost');
+    assert(p3Phase && p3Phase.ghostMode === true, 'Phase sets ball.ghostMode = true');
+    assert(p3Phase && p3Phase.phaseWarps === 1, 'Phase sets phaseWarps = 1');
+
+    // Tunnel (was Worm): ball flag + tagged array set on drop
+    let p3Tunnel = await dropWithPayload('worm');
+    assert(p3Tunnel && p3Tunnel.worm === true, 'Tunnel sets ball.worm = true');
+    assert(p3Tunnel && Array.isArray(p3Tunnel.tunnelTagged), 'Tunnel sets tunnelTagged array');
+
+    // Tunnel: peg gets tagged on hit
+    let p3TunnelTag = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var peg = new Peg(200, 200, C.PT.N, 42);
+        GS.bd.push(peg);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.worm = true;
+        b.tunnelTagged = [];
+        b.hp = {};
+        peg.hit(b);
+        return { tagged: b.tunnelTagged, containsId: b.tunnelTagged.indexOf(42) !== -1 };
+    });
+    assert(p3TunnelTag.tagged.length === 1, 'Tunnel tags 1 peg on hit');
+    assert(p3TunnelTag.containsId === true, 'Tunnel tagged peg has correct ID');
+
+    // Stasis (was Slowmo): ball flag set on drop
+    let p3Stasis = await dropWithPayload('slowmo');
+    assert(p3Stasis && p3Stasis.stasis === true, 'Stasis sets ball.stasis = true');
+
+    // Stasis: timer activates on first peg hit
+    let p3StasisHit = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var peg = new Peg(200, 200, C.PT.N, 0);
+        GS.bd.push(peg);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.stasis = true;
+        b.stasisTimer = 0;
+        b.stasisActivated = false;
+        b.hp = {};
+        peg.hit(b);
+        return { timer: b.stasisTimer, activated: b.stasisActivated };
+    });
+    assert(p3StasisHit.timer === 30, 'Stasis sets timer to 30 on first hit');
+    assert(p3StasisHit.activated === true, 'Stasis marks as activated');
+
+    // Detonator (was Explosive): ball flag set on drop
+    let p3Detonator = await dropWithPayload('explosive');
+    assert(p3Detonator && p3Detonator.detonator === true, 'Detonator sets ball.detonator = true');
+
+    // Detonator: peg gets marked for destruction on hit
+    let p3DetonatorHit = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var peg = new Peg(200, 200, C.PT.N, 0);
+        GS.bd.push(peg);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.detonator = true;
+        b.hp = {};
+        var scBefore = GS.sc;
+        peg.hit(b);
+        // Peg should be destroyed (removed from board) with score bonus
+        var scDelta = GS.sc - scBefore;
+        var pegGone = GS.bd.indexOf(peg) === -1;
+        return { pegGone, scDelta };
+    });
+    assert(p3DetonatorHit.pegGone === true, 'Detonator destroys the hit peg');
+    assert(p3DetonatorHit.scDelta > 0, 'Detonator adds score bonus (got ' + p3DetonatorHit.scDelta + ')');
+
+    // Payload names updated in C.PAYLOADS
+    let p3Names = await inGame(() => {
+        return {
+            ricochet: C.PAYLOADS.scrambler.name,
+            tunnel: C.PAYLOADS.worm.name,
+            phase: C.PAYLOADS.ghost.name,
+            stasis: C.PAYLOADS.slowmo.name,
+            detonator: C.PAYLOADS.explosive.name
+        };
+    });
+    assert(p3Names.ricochet === 'RICOCHET', 'Scrambler renamed to RICOCHET');
+    assert(p3Names.tunnel === 'TUNNEL', 'Worm renamed to TUNNEL');
+    assert(p3Names.phase === 'PHASE', 'Ghost renamed to PHASE');
+    assert(p3Names.stasis === 'STASIS', 'Slowmo renamed to STASIS');
+    assert(p3Names.detonator === 'DETONATOR', 'Explosive renamed to DETONATOR');
 
     // ========== SCREEN MANAGEMENT ==========
     section('Screen Management');
