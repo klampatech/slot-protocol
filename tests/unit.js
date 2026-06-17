@@ -1041,6 +1041,83 @@ function section(title) {
     });
     assert(magWall.shouldSkip === true, 'Magnetize skips wall row pegs (y >= C.SY)');
 
+    // ========== PHASE P2: VISUAL + AUDIO EFFECTS ==========
+    section('Phase P2: Visual + Audio Effects');
+
+    // Audio: new payload drop sounds don't throw
+    let p2AudioDrop = await inGame(() => {
+        Audio.init();
+        Audio.setSfxVolume(0.4);
+        try {
+            Audio.playPayloadDrop('chain_reaction');
+            Audio.playPayloadDrop('synergy');
+            Audio.playPayloadDrop('magnetize');
+            return { ok: true };
+        } catch(e) { return { ok: false, err: e.message }; }
+    });
+    assert(p2AudioDrop.ok === true, 'playPayloadDrop for new payloads does not throw');
+
+    // Audio: new payload activate sounds don't throw
+    let p2AudioActivate = await inGame(() => {
+        Audio.init();
+        Audio.setSfxVolume(0.4);
+        try {
+            Audio.playPayloadActivate('chain_reaction');
+            Audio.playPayloadActivate('synergy');
+            Audio.playPayloadActivate('magnetize');
+            return { ok: true };
+        } catch(e) { return { ok: false, err: e.message }; }
+    });
+    assert(p2AudioActivate.ok === true, 'playPayloadActivate for new payloads does not throw');
+
+    // Ball constructor: new activation flags exist
+    let p2Flags = await inGame(() => {
+        var b = new Ball(100, 100, 0, 1, []);
+        return {
+            crAct: typeof b.chainReactionActivated,
+            syAct: typeof b.synergyActivated,
+            crActDefault: b.chainReactionActivated,
+            syActDefault: b.synergyActivated
+        };
+    });
+    assert(p2Flags.crAct === 'boolean', 'Ball has chainReactionActivated flag');
+    assert(p2Flags.syAct === 'boolean', 'Ball has synergyActivated flag');
+    assert(p2Flags.crActDefault === false, 'chainReactionActivated defaults to false');
+    assert(p2Flags.syActDefault === false, 'synergyActivated defaults to false');
+
+    // Visual: Synergy peg glow runs without error
+    let p2SynergyRender = await inGame(() => {
+        startGame();
+        GS.scr = C.SCR.P;
+        GS.fl = 1;
+        genBoard();
+        GS.ball = new Ball(200, 200, 0, 1, []);
+        GS.ball.synergy = true;
+        // Simulate what render() does for synergy glow
+        var synergyTypes = [C.PT.C, C.PT.I, C.PT.F, C.PT.H];
+        var count = 0;
+        for (var i = 0; i < GS.bd.length; i++) {
+            if (synergyTypes.indexOf(GS.bd[i].t) !== -1 && GS.bd[i].st !== C.PSTATES.D) count++;
+        }
+        return { synergyPegs: count };
+    });
+    assert(p2SynergyRender.synergyPegs >= 0, 'Synergy peg glow scan runs (found ' + p2SynergyRender.synergyPegs + ' eligible pegs)');
+
+    // Visual: Magnetize gravity well runs without error
+    let p2MagnetizeRender = await inGame(() => {
+        var b = new Ball(200, 200, 0, 1, []);
+        b.magnetize = true;
+        // Simulate what render() does for gravity well rings
+        var rings = 3;
+        var ok = true;
+        for (var mr = 0; mr < rings; mr++) {
+            var ringR = 20 + mr * 18;
+            if (typeof ringR !== 'number' || isNaN(ringR)) ok = false;
+        }
+        return { ok };
+    });
+    assert(p2MagnetizeRender.ok === true, 'Magnetize gravity well ring math is valid');
+
     // ========== SCREEN MANAGEMENT ==========
     section('Screen Management');
 

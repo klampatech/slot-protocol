@@ -1898,6 +1898,22 @@
                     this._sweep(800, 200, 0.3, 0.2, 'sawtooth', 800);
                     this._sub(60, 0.3, 0.2, 30);
                     break;
+                case 'chain_reaction':
+                    // Staccato burst — 3 rapid ticks building tension
+                    this._tone(600, 0.04, 'square', 0.15);
+                    setTimeout(function() { self._tone(800, 0.04, 'square', 0.18); }, 40);
+                    setTimeout(function() { self._tone(1000, 0.04, 'square', 0.2); }, 80);
+                    this._noise(0.06, 0.1, 4000);
+                    break;
+                case 'synergy':
+                    // Metallic ping — single resonant bell
+                    this._bell(1200, 0.25, 0.2);
+                    break;
+                case 'magnetize':
+                    // Deep pull — rising sub-bass + soft sweep
+                    this._sub(40, 0.5, 0.25, 80);
+                    this._sweep(200, 600, 0.3, 0.12, 'sine');
+                    break;
             }
         },
 
@@ -1952,6 +1968,23 @@
                     // Time-warp sound (rising then falling)
                     this._sweep(400, 1200, 0.15, 0.2, 'sine', 1000);
                     setTimeout(function() { self._sweep(1200, 400, 0.2, 0.18, 'sine', 1000); }, 150);
+                    break;
+                case 'chain_reaction':
+                    // Expansion boom — kick + sub + noise crack
+                    this._kick(0.3, 0.4);
+                    this._sub(60, 0.3, 0.35, 30);
+                    this._noise(0.1, 0.2, 3000);
+                    break;
+                case 'synergy':
+                    // Crystalline bell chime — 3 harmonics
+                    this._bell(1400, 0.2, 0.3);
+                    setTimeout(function() { self._bell(2100, 0.15, 0.2); }, 40);
+                    setTimeout(function() { self._bell(2800, 0.12, 0.15); }, 80);
+                    break;
+                case 'magnetize':
+                    // Sustained pull — deep oscillating hum
+                    this._sub(80, 0.4, 0.3, 60);
+                    this._tone(160, 0.3, 'sine', 0.15, 120);
                     break;
             }
         },
@@ -3226,6 +3259,9 @@
         this.chainReaction = false; // AoE explosion on every peg hit
         this.synergy = false;       // 2× score on Cache/Ice/Fiber/Honeycomb
         this.magnetize = false;     // attract pegs toward ball (lifetime)
+        // Phase P2: one-shot activation sound flags for new payloads
+        this.chainReactionActivated = false;
+        this.synergyActivated = false;
     }
 
     Ball.prototype.update = function(dt) {
@@ -3695,6 +3731,12 @@
         if (b && b.synergy && synergyBonusAmount > 0) {
             GS.sc += synergyBonusAmount;
             createFloat(this.x, this.y - 20, '2× +' + synergyBonusAmount, '#88ddff');
+            // Audio: crystalline bell chime on first synergy activation
+            if (!b.synergyActivated) {
+                b.synergyActivated = true;
+                Audio.playPayloadActivate('synergy');
+            }
+            spawnPayloadRing(this.x, this.y, '#88ddff', 50);
         }
 
         // --- Phase P1: Chain Reaction AoE ---
@@ -3706,6 +3748,11 @@
         if (b && b.chainReaction && !this.aoeHit) {
             var aoeR = 30;
             var aoeScorePct = 0.5;
+            // Play activation sound once on first AoE trigger
+            if (!b.chainReactionActivated) {
+                b.chainReactionActivated = true;
+                Audio.playPayloadActivate('chain_reaction');
+            }
             for (var ai = 0; ai < GS.bd.length; ai++) {
                 var ap = GS.bd[ai];
                 if (ap === this || ap.aoeHit || ap.removed) continue;
@@ -3720,10 +3767,12 @@
                     PERSIST.totalPegsHit++;
                     createFloat(ap.x, ap.y - 12, '+' + aoePts, '#ff6644');
                     spawnParticles('#ff4444', ap.x, ap.y, 6, 2);
+                    spawnPayloadRing(ap.x, ap.y, '#ff4444', 40);
                 }
             }
             // Visual: explosion ring at the source peg
             spawnParticles('#ff4444', this.x, this.y, 12, 3);
+            spawnPayloadRing(this.x, this.y, '#ff4444', 60);
         }
 
         if (this.st < C.PSTATES.EX) this.st++;
@@ -6887,6 +6936,30 @@
             }
         }
 
+        // Phase P2: Synergy peg glow. When the ball has the synergy
+        // payload, Cache/Ice/Fiber/Honeycomb pegs glow with a soft
+        // blue aura so the player can see which pegs will give 2×.
+        // Drawn on top of the pegs but under the prediction line.
+        if (GS.ball && GS.ball.synergy) {
+            var synergyTypes = [C.PT.C, C.PT.I, C.PT.F, C.PT.H];
+            var synPulse = 0.3 + Math.sin((ts || 0) / 200) * 0.15;
+            for (let si = 0; si < GS.bd.length; si++) {
+                var sp = GS.bd[si];
+                if (synergyTypes.indexOf(sp.t) !== -1 && sp.st !== C.PSTATES.D) {
+                    ctx.globalAlpha = synPulse;
+                    ctx.strokeStyle = '#88ddff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(sp.x, sp.y, sp.r + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.globalAlpha = synPulse * 0.4;
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+
         // Bounce-aware prediction line. Replaces the previous
         // free-fall-only trajectory with a real 2-bounce lookahead
         // (see simulateTrajectory / drawPredictionLine). Drawn after
@@ -7086,6 +7159,25 @@
                 ctx.fillStyle = ballColor;
             }
             
+            // Phase P2: Magnetize gravity well. Concentric rings
+            // radiating outward from the ball, pulsing to suggest
+            // attraction. Drawn before the ball body so the ball
+            // renders on top of the rings.
+            if (b.magnetize) {
+                var magPulse = (ts || 0) / 300;
+                for (let mr = 0; mr < 3; mr++) {
+                    var ringR = 20 + mr * 18 + Math.sin(magPulse + mr) * 4;
+                    var ringAlpha = 0.25 - mr * 0.07;
+                    ctx.globalAlpha = ringAlpha;
+                    ctx.strokeStyle = '#00ccff';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, ringR, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+            }
+
             // Ball body with enhanced gradient
             ctx.beginPath();
             ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
