@@ -497,3 +497,23 @@ Add to `tests/unit.js`:
 - Proposed reworks for 6 existing payloads (Scrambler, Ghost, Worm, Slowmo, Explosive, Trojan)
 - Proposed 5 slot effect improvements (EMPTY→OVERFLOW, OVERCLOCK→MAGNETIZE, SLOWMO→STASIS, AMPLIFY+burst, JACKPOT+credits)
 - Defined design principles: every effect needs a "moment", effects should combo, scale with skill, no dead slots, clear identity
+
+### 2026-06-15: Phase P1 Shipped
+
+**3 new payloads with peg interactions.** All mechanics implemented, 335 tests passing.
+
+Key implementation notes:
+- **Synergy uses per-branch bonus tracking**, not delta-score. The `synergyBonusAmount` variable is set inside each eligible peg-type branch (Cache, Ice, Fiber, Honeycomb) before `GS.sc +=`. This captures only the type-specific bonus, not the base `pegBasePoints()`. The Cache branch *replaces* the base bonus (doesn't add on top), so Synergy Cache at cc=3 = 350 + 350 = 700.
+- **Chain Reaction AoE uses flat 50% scoring**, not per-type effects. AoE-affected pegs score `pegBasePoints() * 0.5 * (cc+1) * (frenzy?3:1)`. The AoE does NOT call `Peg.hit` on affected pegs (no recursive per-type effects). This keeps Phase P1 simple; per-type AoE interactions can be added later.
+- **Magnetize permanently moves pegs** — pulled pegs stay in their new position after the ball exits. This reshapes the board for future balls, creating emergent combo opportunities.
+- **`getPayloadIcon` fixed** — was receiving integer indices but expecting string keys. All payloads now use string icon keys. The function was also updated to accept both strings and integers (backward compat).
+- **`dropBall` exposed in `__TEST__`** for unit testing payload flag wiring.
+
+Pending: visual effects (Chain Reaction explosion rings, Synergy peg glow, Magnetize gravity well), audio (drop/activation sounds), existing payload reworks.
+
+### Phase P2: Visual + Audio Effects (planned)
+
+- Chain Reaction: orange explosion ring at each AoE point + particles
+- Synergy: synergy pegs glow blue while ball is in flight + bell chime on hit
+- Magnetize: concentric gravity-well rings around the ball + low hum
+- All 3: drop sounds + activation sounds via Audio helpers
