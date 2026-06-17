@@ -546,4 +546,31 @@ Key implementation details:
 - **Stasis** freeze runs in Ball.update before gravity. When `stasisTimer > 0`, velocity is zeroed, pegs within 40px attracted at 3px/frame, and the update returns early (skips all physics). After freeze, `dt60 *= 0.5` for remaining lifetime.
 - **Detonator** sets `this.detonate = true` in Peg.hit's flag block. The actual destruction runs AFTER per-type logic (so cache bonus, seismic shockwave, etc. still fire). Score is `500*(cc+1)*(frenzy?3:1)`.
 
-Pending: slot effect improvements (EMPTY → OVERFLOW, OVERCLOCK → MAGNETIZE slot, etc.) and payload + slot interactions.
+### 2026-06-15: Phase S1/S2/S3 Shipped
+
+**Slot reworks, payload+slot interactions, Trojan rework.** 381 tests passing (+17 new).
+
+Slot Reworks (Phase S1):
+- EMPTY → **OVERFLOW**: ball launched back up (vy=-10) for second pass through pegs. Resets slotChecked so the ball can trigger another slot on re-entry.
+- OVERCLOCK → **MAGNETIZE slot**: pulls all pegs within 60px toward the ball's landing point (30px per peg). Creates clusters for future balls.
+- AMPLIFY + frenzy: activates frenzy (90 frames) when combo >= 3. Turns AMPLIFY into a "combo extender + burst" slot.
+- JACKPOT + credits: adds `pegBasePoints*(cc+1)*(frenzy?3:1)` bonus score on top of the jackpot. Makes JACKPOT feel like a "big win".
+
+Payload + Slot Interactions (Phase S2):
+- Phase + AMPLIFY: sets `GS.phaseComboPersist = true`. On ball exit, if the flag is set, combo/cc/ct/fa are preserved instead of reset. Flag cleared after one use.
+- Chain Reaction + CRUMBLE: instead of destroying 3 pegs, creates 3 new NODE pegs at random positions. Turns destructive into creative.
+- Daemon + SHIELD: super bounce (vy=-12 vs normal -7) + wider vx nudge. Daemon balls get a much better second chance from SHIELD slots.
+
+Trojan Rework (Phase S3):
+- Minis inherit parent's offensive payload flags: chainReaction, synergy, magnetize, ricochet, ricochetBounces, detonator, stasis.
+- Defensive/lifetime flags NOT inherited: worm, ghostMode, trojanActive, cl. Prevents recursive spawning and conflicting mechanics.
+
+Infrastructure:
+- `checkSlot(bx, by)` → `checkSlot(bx, by, ball)` — ball parameter threaded through for payload+slot interactions.
+- `triggerSlotCollected(slotIdx, slotType)` → `triggerSlotCollected(slotIdx, slotType, ball)` — receives ball for interaction checks.
+- `checkBallExit` — checks `GS.phaseComboPersist` before resetting combo.
+- `GS.phaseComboPersist` — initialized false in `startGame`, set in AMPLIFY slot when ball has Phase, cleared after one use in `checkBallExit`.
+- `C.ST_NAMES` — updated: 'EMPTY' → 'OVERFLOW', 'OVERCLOCK' → 'MAGNETIZE'.
+- `C.SLOT_TOOLTIPS` — updated for OVERFLOW and MAGNETIZE.
+
+All planned redesign items are now implemented.
