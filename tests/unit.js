@@ -1234,6 +1234,111 @@ function section(title) {
     assert(p3Names.stasis === 'STASIS', 'Slowmo renamed to STASIS');
     assert(p3Names.detonator === 'DETONATOR', 'Explosive renamed to DETONATOR');
 
+    // ========== PHASE S1/S2/S3: SLOT REWORKS & INTERACTIONS ==========
+    section('Phase S1/S2/S3: Slot Reworks & Interactions');
+
+    // Slot names updated
+    let s1Names = await inGame(() => {
+        return {
+            overflow: C.ST_NAMES[0],
+            magnetize: C.ST_NAMES[6]
+        };
+    });
+    assert(s1Names.overflow === 'OVERFLOW', 'EMPTY renamed to OVERFLOW in ST_NAMES');
+    assert(s1Names.magnetize === 'MAGNETIZE', 'OVERCLOCK renamed to MAGNETIZE in ST_NAMES');
+
+    // Slot tooltips updated
+    let s1Tooltips = await inGame(() => {
+        return {
+            overflow: C.SLOT_TOOLTIPS[0].name,
+            magnetize: C.SLOT_TOOLTIPS[6].name
+        };
+    });
+    assert(s1Tooltips.overflow === 'OVERFLOW', 'EMPTY tooltip renamed to OVERFLOW');
+    assert(s1Tooltips.magnetize === 'MAGNETIZE', 'OVERCLOCK tooltip renamed to MAGNETIZE');
+
+    // OVERFLOW slot launches ball back up
+    let s1Overflow = await inGame(() => {
+        GS.fl = 1; GS.cc = 0;
+        var ball = new Ball(200, 570, 0, 5, []);
+        ball.slotChecked = true;
+        ball.shieldedSlot = -1;
+        triggerSlotCollected(0, C.ST.E, ball);
+        return { vy: ball.vy, slotChecked: ball.slotChecked };
+    });
+    assert(s1Overflow.vy === -10, 'OVERFLOW sets ball.vy = -10 (upward kick)');
+    assert(s1Overflow.slotChecked === false, 'OVERFLOW resets slotChecked for re-entry');
+
+    // AMPLIFY + Phase interaction: combo persists flag
+    let s2AmplifyPhase = await inGame(() => {
+        GS.fl = 1; GS.cc = 3; GS.ct = 36;
+        GS.phaseComboPersist = false;
+        var ball = new Ball(200, 570, 0, 5, []);
+        ball.ghostMode = true; // Phase payload
+        triggerSlotCollected(2, C.ST.AM, ball);
+        return { persist: GS.phaseComboPersist, cc: GS.cc };
+    });
+    assert(s2AmplifyPhase.persist === true, 'Phase + AMPLIFY sets phaseComboPersist');
+    assert(s2AmplifyPhase.cc === 4, 'AMPLIFY increments combo (3→4)');
+
+    // Combo persists on ball exit when flag is set
+    let s2ComboPersist = await inGame(() => {
+        startGame();
+        GS.scr = C.SCR.P;
+        GS.bl = 5;
+        GS.cc = 5;
+        GS.ct = 36;
+        GS.phaseComboPersist = true;
+        var ball = new Ball(200, 200, 0, 1, []);
+        ball.on = false;
+        ball.slotChecked = true;
+        checkBallExit(ball);
+        return { cc: GS.cc, ct: GS.ct, persist: GS.phaseComboPersist };
+    });
+    assert(s2ComboPersist.cc === 5, 'Combo persists on exit when phaseComboPersist = true');
+    assert(s2ComboPersist.ct === 36, 'Chain timer persists on exit when phaseComboPersist = true');
+    assert(s2ComboPersist.persist === false, 'phaseComboPersist cleared after use');
+
+    // Daemon + SHIELD interaction: super bounce
+    let s2DaemonShield = await inGame(() => {
+        GS.fl = 1;
+        var ball = new Ball(200, 570, 0, 5, []);
+        ball.sh = true; // Daemon payload
+        ball.slotChecked = true;
+        triggerSlotCollected(5, C.ST.SH, ball);
+        return { vy: ball.vy, sh: ball.sh };
+    });
+    assert(s2DaemonShield.vy === -12, 'Daemon + SHIELD sets ball.vy = -12 (super bounce)');
+
+    // Trojan minis inherit payload flags
+    let s3Trojan = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var peg = new Peg(200, 200, C.PT.N, 0);
+        GS.bd.push(peg);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.trojanActive = true;
+        b.chainReaction = true;
+        b.synergy = true;
+        b.detonator = true;
+        b.hp = {};
+        peg.hit(b);
+        var minis = b.mb;
+        if (minis.length < 2) return { error: 'no minis spawned' };
+        return {
+            cr0: minis[0].chainReaction,
+            sy0: minis[0].synergy,
+            de0: minis[0].detonator,
+            cr1: minis[1].chainReaction,
+            count: minis.length
+        };
+    });
+    assert(s3Trojan.count === 2, 'Trojan spawns 2 minis');
+    assert(s3Trojan.cr0 === true, 'Trojan mini inherits chainReaction');
+    assert(s3Trojan.sy0 === true, 'Trojan mini inherits synergy');
+    assert(s3Trojan.de0 === true, 'Trojan mini inherits detonator');
+    assert(s3Trojan.cr1 === true, 'Second mini also inherits chainReaction');
+
     // ========== SCREEN MANAGEMENT ==========
     section('Screen Management');
 

@@ -1153,7 +1153,7 @@
         // Contrast mode colors
         PC_CONTRAST: {0:'#cccccc', 1:'#ffffff', 2:'#aaaaaa', 3:'#ffffff', 4:'#ffcccc', 5:'#888888', 6:'#ddddff', 7:'#ffccaa', 8:'#ffffff', 9:'#ffffcc', 10:'#ffaaaa'},
         ST: {E:0, CR:1, AM:2, PA:3, CM:4, SH:5, OC:6, JP:7},
-        ST_NAMES: ['EMPTY', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'OVERCLOCK', 'JACKPOT'],
+        ST_NAMES: ['OVERFLOW', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'MAGNETIZE', 'JACKPOT'],
         // Tooltip text for each peg type and slot effect. Shown on hover in
         // the slot-selector and during in-game mouseover (pegs + bottom slots).
         // Keys are the enum indices from C.PT and C.ST respectively.
@@ -1171,7 +1171,7 @@
             10: { name: 'OVERLOAD',  desc: '+75 pts but drains 10% of the jackpot. Erratic bounce.' }
         },
         SLOT_TOOLTIPS: {
-            0: { name: 'EMPTY',     desc: 'No effect when the ball lands here. 35% base chance.' },
+            0: { name: 'OVERFLOW',  desc: 'Ball gets launched back up for a second pass through the pegs.' },
             1: { name: 'CREDITS',   desc: 'Adds score: 50 × (combo+1) × (frenzy ? 3 : 1).' },
             2: { name: 'AMPLIFY',   desc: '+1 combo (capped at x7). Chain timer refreshes to 210.' },
             3: { name: 'PAYLOAD',   desc: 'Adds a random payload to your queue (max 2).' },
@@ -1179,7 +1179,7 @@
             // Phase 4.5-E: tooltip now clarifies the bounced ball re-enters
             // the peg field and can score more points, not just gets a free pass.
             5: { name: 'SHIELD',    desc: 'Bounces the next ball back from overflow exit so it can hit more pegs.' },
-            6: { name: 'OVERCLOCK', desc: '1.5× gravity for the current ball only.' },
+            6: { name: 'MAGNETIZE', desc: 'Pulls nearby pegs toward the ball, creating clusters for future hits.' },
             7: { name: 'JACKPOT',   desc: 'Adds the current jackpot to your score. Jackpot grows 15% if missed.' }
         },
         // Phase 8a: payload metadata table - single source of truth for
@@ -3377,7 +3377,7 @@
                 // bounce, so this is a clean death).
             } else {
                 if (this.shieldedSlot === -1) this.shieldedSlot = slotIdx;
-                checkSlot(this.x, this.y);
+                checkSlot(this.x, this.y, this);
             }
         }
         
@@ -3610,6 +3610,19 @@
             for (let i = 0; i < 2; i++) {
                 var clone = new Ball(b.x, b.y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, []);
                 clone.r = b.r * 0.6;
+                // Phase S3: Trojan minis inherit parent's payload flags.
+                // Offensive payloads (chainReaction, synergy, magnetize,
+                // ricochet, detonator, stasis) are inherited so the minis
+                // benefit from the same effects. Defensive/lifetime payloads
+                // (worm, ghostMode, trojanActive, cl) are NOT inherited to
+                // prevent recursive spawning or conflicting mechanics.
+                clone.chainReaction = b.chainReaction;
+                clone.synergy = b.synergy;
+                clone.magnetize = b.magnetize;
+                clone.ricochet = b.ricochet;
+                clone.ricochetBounces = b.ricochetBounces;
+                clone.detonator = b.detonator;
+                clone.stasis = b.stasis;
                 b.mb.push(clone);
             }
             createFloat(b.x, b.y, 'TROJAN!', '#ff2244');
@@ -4395,15 +4408,25 @@
         if (ball.slotChecked) {
             // Already triggered slot effect in update()
         }
-        
+
         // Ball consumed
         GS.bl--;
-        
-        // Reset multiplier on ball exit (cascade)
-        GS.cc = 0;
-        GS.ct = 0;
-        GS.ctMax = 0;
-        GS.fa = false;
+
+        // Phase S2 interaction: Phase + AMPLIFY. If the ball had Phase
+        // and landed in an AMPLIFY slot, the combo persists to the next
+        // ball instead of resetting. The flag is cleared so it only
+        // persists once.
+        if (GS.phaseComboPersist) {
+            GS.phaseComboPersist = false;
+            // Don't reset combo — keep GS.cc, GS.ct, GS.ctMax, GS.fa
+            createFloat(C.W / 2, C.SY - 40, 'COMBO PERSIST!', '#88ddff');
+        } else {
+            // Reset multiplier on ball exit (cascade)
+            GS.cc = 0;
+            GS.ct = 0;
+            GS.ctMax = 0;
+            GS.fa = false;
+        }
 
         // Reset gravity modifier
         GS.gravityMult = 1;
@@ -4427,7 +4450,8 @@
     }
 
     // Check if ball entered a slot (only unlocked slots)
-    function checkSlot(bx, by) {
+    // Phase S1: ball parameter threaded through for payload+slot interactions.
+    function checkSlot(bx, by, ball) {
         // Ball must enter slot zone
         if (by < C.SY) return;
 
@@ -4438,13 +4462,14 @@
         if (!isSlotUnlocked(si)) return;
 
         var st = slots[si];
-        triggerSlotCollected(si, st);
+        triggerSlotCollected(si, st, ball);
     }
 
     // ========== EFFECTS ==========
 
     // Trigger slot effect
-    function triggerSlotCollected(slotIdx, slotType) {
+    // Phase S1: ball parameter for payload+slot interactions.
+    function triggerSlotCollected(slotIdx, slotType, ball) {
         var slotName = C.ST_NAMES[slotType];
         createFloat(getSlotX(slotIdx), C.SY + C.SH / 2, slotName, '#00fff2');
 
@@ -4460,9 +4485,23 @@
                 break;
                 
             case C.ST.AM: // AMPLIFY: +1 multiplier + 180 chain timer
+                // Phase S1: if combo >= 3, also activate frenzy for 90 frames.
+                // Phase S2 interaction: Phase + AMPLIFY. If the ball has
+                // Phase payload, flag it so the combo persists when the
+                // ball dies (instead of resetting). The next ball starts
+                // with the accumulated combo.
                 GS.cc = Math.min(GS.cc + 1, C.MAXM);
                 GS.ct = Math.max(GS.ct, C.CHAIN_T + 180);
-                createFloat(C.W / 2, C.SY - 20, '+COMBO', '#ff00ff');
+                if (ball && ball.ghostMode) {
+                    GS.phaseComboPersist = true;
+                }
+                if (GS.cc >= 3) {
+                    GS.fa = true;
+                    GS.faTimer = 90;
+                    createFloat(C.W / 2, C.SY - 30, '+COMBO +FRENZY!', '#ff00ff');
+                } else {
+                    createFloat(C.W / 2, C.SY - 20, '+COMBO', '#ff00ff');
+                }
                 break;
                 
             case C.ST.PA: // PAYLOAD: Add free payload
@@ -4495,48 +4534,110 @@
                 }
                 break;
                 
-            case C.ST.CM: // CRUMBLE: Destroy up to 3 random non-seismic/non-explosive pegs, +1 toward objective
-                var crumbleCount = 0;
-                for (let i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
-                    var p = GS.bd[i];
-                    if (p.t !== C.PT.E && p.t !== C.PT.S) {
-                        createFrag(p.x, p.y);
-                        GS.bd.splice(i, 1);
-                        crumbleCount++;
+            case C.ST.CM: // CRUMBLE: Destroy up to 3 random non-seismic/non-explosive pegs
+                // Phase S2 interaction: Chain Reaction + CRUMBLE.
+                // Instead of destroying pegs, CREATE 3 new NODE pegs
+                // at random positions in the play field. Turns Crumble
+                // from a destructive slot into a creative one when
+                // combined with Chain Reaction.
+                if (ball && ball.chainReaction) {
+                    var createCount = 0;
+                    for (var ci = 0; ci < 3; ci++) {
+                        var newPegX = 60 + Math.random() * (C.W - 120);
+                        var newPegY = C.TOP + 20 + Math.random() * (C.BOT - C.TOP - 40);
+                        var newPeg = new Peg(newPegX, newPegY, C.PT.N, GS.bd.length + ci);
+                        GS.bd.push(newPeg);
+                        spawnPayloadRing(newPegX, newPegY, '#00ff88', 30);
+                        createCount++;
                     }
+                    if (createCount > 0) GS.obj.prg++;
+                    createFloat(C.W / 2, C.SY - 20, 'CRUMBLE → CREATE!', '#00ff88');
+                } else {
+                    var crumbleCount = 0;
+                    for (let i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
+                        var p = GS.bd[i];
+                        if (p.t !== C.PT.E && p.t !== C.PT.S) {
+                            createFrag(p.x, p.y);
+                            GS.bd.splice(i, 1);
+                            crumbleCount++;
+                        }
+                    }
+                    if (crumbleCount > 0) GS.obj.prg++;
+                    createFloat(C.W / 2, C.SY - 20, 'CRUMBLE!', '#ff6600');
                 }
-                // Phase 4.5-D: was GS.obj.prg++ inside the loop (one per
-                // destroyed peg, up to 3 free progress per Crumble). Now
-                // fires once per Crumble (0 if no qualifying pegs existed).
-                if (crumbleCount > 0) GS.obj.prg++;
-                createFloat(C.W / 2, C.SY - 20, 'CRUMBLE!', '#ff6600');
                 break;
                 
             case C.ST.SH: // SHIELD: Next ball protected from overflow
+                // Phase S2 interaction: Daemon + SHIELD.
+                // If the ball has Daemon payload, the shield bounce is
+                // extra strong (vy=-12 vs normal -7) giving the ball a
+                // much better second chance.
                 GS.shielded = true;
-                createFloat(C.W / 2, C.SY - 20, 'SHIELD READY', '#00fff2');
-                // Audio: power-up shield sound
+                if (ball && ball.sh) {
+                    // Daemon ball + SHIELD slot = super bounce
+                    ball.vy = -12;
+                    ball.vx += (Math.random() - 0.5) * 8;
+                    createFloat(C.W / 2, C.SY - 20, 'SUPER SHIELD!', '#00ff88');
+                    triggerScreenShake(3);
+                    spawnPayloadRing(ball.x, ball.y, '#00ff88', 100);
+                } else {
+                    createFloat(C.W / 2, C.SY - 20, 'SHIELD READY', '#00fff2');
+                }
                 Audio.playShield();
                 break;
                 
-            case C.ST.OC: // OVERCLOCK: 1.5× gravity for this ball
-                GS.gravityMult = 1.5;
-                createFloat(C.W / 2, C.SY - 20, 'OVERCLOCK!', '#ffff00');
+            case C.ST.OC: // Phase S1 rework: MAGNETIZE slot (was OVERCLOCK)
+                // Attracts all pegs within 60px toward the ball's position
+                // for 60 frames (~1 second). Creates a cluster of pegs
+                // around the ball's landing point, setting up combos for
+                // the next ball. Pegs are permanently moved.
+                if (ball) {
+                    var magSlotR = 60;
+                    var magSlotStr = 3;
+                    for (var oi = 0; oi < GS.bd.length; oi++) {
+                        var op = GS.bd[oi];
+                        if (op.removed || op.y >= C.SY) continue;
+                        var odx = ball.x - op.x;
+                        var ody = ball.y - op.y;
+                        var oDist = Math.sqrt(odx * odx + ody * ody);
+                        if (oDist < magSlotR && oDist > 0) {
+                            op.x += (odx / oDist) * magSlotStr * 10;
+                            op.y += (ody / oDist) * magSlotStr * 10;
+                        }
+                    }
+                    createFloat(C.W / 2, C.SY - 20, 'MAGNETIZE!', '#ffff00');
+                    triggerScreenShake(2);
+                    spawnPayloadRing(ball.x, ball.y, '#ffff00', 80);
+                }
                 break;
                 
             case C.ST.JP: // JACKPOT: Win jackpot
+                // Phase S1: also give credits bonus (50 * (cc+1) * frenzy).
+                // Makes JACKPOT feel like a "big win" with both score and credits.
                 GS.sc += GS.jp;
+                var jpCreditsBonus = Math.floor(pegBasePoints() * (GS.cc + 1) * (GS.fa ? 3 : 1));
+                GS.sc += jpCreditsBonus;
                 createFloat(C.W / 2, C.SY - 30, '+JACKPOT ' + GS.jp, '#ff00ff');
+                createFloat(C.W / 2, C.SY - 10, '+' + jpCreditsBonus + ' BONUS', '#ffff00');
                 GS.jackpotWon += GS.jp;
                 GS.jackpotWins++;
-                GS.jp = Math.floor(500 * GS.fl * 1.15); // Grow jackpot for next
+                GS.jp = Math.floor(500 * GS.fl * 1.15);
                 triggerScreenShake(5);
-                // Check jackpot achievements
                 checkAchievements();
                 break;
                 
-            case C.ST.E: // EMPTY: Nothing happens
-            default:
+            case C.ST.E: // Phase S1 rework: OVERFLOW (was EMPTY)
+                // Ball gets launched back up with a strong upward kick,
+                // giving it a second chance to hit more pegs. Like a
+                // guaranteed mini-shield on every ball that lands here.
+                if (ball) {
+                    ball.vy = -10;
+                    ball.vx += (Math.random() - 0.5) * 6;
+                    ball.slotChecked = false;
+                    ball.shieldedSlot = slotIdx;
+                    createFloat(C.W / 2, C.SY - 20, 'OVERFLOW!', '#00fff2');
+                    triggerScreenShake(2);
+                }
                 break;
         }
     }
@@ -7613,6 +7714,7 @@
         GS.pl = [];
         GS.ball = null;
         GS.gravityMult = 1;
+        GS.phaseComboPersist = false;
         GS.shielded = false;
         GS.overload = false;
         GS.whiteFlash = false;
@@ -8742,6 +8844,7 @@
         BOARD_TEMPLATES: BOARD_TEMPLATES,
         rollPegType: rollPegType, cellToPos: cellToPos,
         triggerSlotCollected: triggerSlotCollected,
+        checkBallExit: checkBallExit,
         savePersist: savePersist, loadPersist: loadPersist,
         applyContrastMode: applyContrastMode,
         // Phase 12: SFX overhaul helpers exposed for testing.
