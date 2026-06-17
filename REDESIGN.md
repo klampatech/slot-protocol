@@ -574,3 +574,59 @@ Infrastructure:
 - `C.SLOT_TOOLTIPS` — updated for OVERFLOW and MAGNETIZE.
 
 All planned redesign items are now implemented.
+
+---
+
+## 6. Balance Pass (2026-06-15)
+
+### Problem
+
+The 5% credit earning rate was too generous. Floor 1 earned 350cr — enough for 3 payloads. By floor 10, players could buy 5+. Payloads should feel like meaningful investments, not routine purchases.
+
+### Changes
+
+**Credit rate: 5% → 4%** (divide floor score delta by 25 instead of 20).
+
+| Floor | Old Credits | New Credits | Old Purchases | New Purchases |
+|-------|------------|------------|---------------|---------------|
+| 1 | 350cr | 280cr | 3 | 2 cheap |
+| 5 | 490cr | 392cr | 4 | 2 cheap + 1 mid |
+| 10 | 665cr | 532cr | 5 | 2 cheap + 2 mid |
+| 15 | 840cr | 672cr | 5+ | 2 cheap + 3 mid |
+
+**Payload cost increases** (all raised to create tighter economy):
+
+| Payload | Old Cost | New Cost | Tier |
+|---------|----------|----------|------|
+| Ricochet | 80 | 90 | Cheap |
+| Phase | 100 | 110 | Cheap |
+| Daemon | 130 | 140 | Mid |
+| Trojan | 140 | 150 | Mid |
+| Stasis | 150 | 170 | Mid |
+| Magnetize | 150 | 170 | Mid |
+| Synergy | 160 | 180 | Mid |
+| Detonator | 180 | 200 | Premium |
+| Cluster | 180 | 200 | Premium |
+| Tunnel | 180 | 220 | Premium |
+| Chain Reaction | 200 | 240 | Premium |
+| Logic Bomb | 220 | 250 | Premium |
+
+**Peg target curve: `1.5` → `1.6`** multiplier.
+
+| Floor | Old Target | New Target | Max Hits (5 balls × 8) | Margin |
+|-------|-----------|-----------|----------------------|--------|
+| 1 | 13 | 13 | 35 | 22 |
+| 5 | 19 | 20 | 40 | 20 |
+| 10 | 27 | 28 | 45 | 17 |
+| 15 | 34 | 36 | 40 | 4 |
+| 20 | 42 | 44 | 40 | -4 (needs payloads) |
+
+### Design Rationale
+
+- **Floor 1**: 280cr buys 2 cheap payloads. Player learns the payload system without being overwhelmed.
+- **Floor 5**: 392cr buys 2 cheap + 1 mid. First real choice: which mid-tier payload?
+- **Floor 10**: 532cr buys 2 cheap + 2 mid. Can almost afford a premium if skipping mids.
+- **Floor 15**: 672cr buys 2 cheap + 3 mid. Premium payloads become realistic.
+- **Floor 20+**: Requires payloads to clear (target > max raw hits). Payloads are now essential, not optional.
+
+The PA slot (random payload) and daily challenges still provide free payloads, so players aren't entirely dependent on the shop. The tighter economy makes shop purchases feel special.

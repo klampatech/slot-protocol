@@ -1192,19 +1192,23 @@
         // from integer index to string key to fix getPayloadIcon lookup
         // (was falling through to scrambler for all payloads).
         PAYLOADS: {
-            scrambler:      { name: 'RICOCHET',       short: 'RCHET',  desc: 'Ball gets 3 smart bounces toward unhit pegs on first hit.',           cost:  80, color: '#ff6600', icon: 'scrambler' },
-            trojan:         { name: 'TROJAN',         short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',                       cost: 140, color: '#ff2244', icon: 'trojan' },
-            worm:           { name: 'TUNNEL',         short: 'TUNL',   desc: 'Pass through pegs (tagged = 2× score). Tagged pegs explode on exit.', cost: 180, color: '#00ff88', icon: 'worm' },
-            logicbomb:      { name: 'LOGIC BOMB',     short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',                       cost: 220, color: '#ffff00', icon: 'logic_bomb' },
-            daemon:         { name: 'DAEMON',         short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).',                   cost: 130, color: '#9944ff', icon: 'daemon' },
-            ghost:          { name: 'PHASE',          short: 'PHASE',  desc: 'Phase through pegs + warp back to drop zone once for a second pass.', cost: 100, color: '#88ddff', icon: 'ghost' },
-            cluster:        { name: 'CLUSTER',        short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',                      cost: 180, color: '#ff00ff', icon: 'cluster' },
-            explosive:      { name: 'DETONATOR',      short: 'DETON',  desc: 'Each peg hit triggers a targeted explosion. Boom on every bounce.',   cost: 180, color: '#ff4444', icon: 'explosive' },
-            slowmo:         { name: 'STASIS',         short: 'STAS',   desc: 'Freeze mid-air 30 frames, attract pegs, resume at half speed.',      cost: 150, color: '#00fff2', icon: 'slowmo' },
+            // Balance pass: cost increases. Cheap (90-110), Mid (140-180),
+            // Premium (200-250). At 4% credit rate, fl 1 earns ~280cr
+            // (2 cheap), fl 5 earns ~392cr (2 cheap + 1 mid), fl 10 earns
+            // ~532cr (2 cheap + 2 mid). Payloads feel like investments.
+            scrambler:      { name: 'RICOCHET',       short: 'RCHET',  desc: 'Ball gets 3 smart bounces toward unhit pegs on first hit.',           cost:  90, color: '#ff6600', icon: 'scrambler' },
+            trojan:         { name: 'TROJAN',         short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',                       cost: 150, color: '#ff2244', icon: 'trojan' },
+            worm:           { name: 'TUNNEL',         short: 'TUNL',   desc: 'Pass through pegs (tagged = 2× score). Tagged pegs explode on exit.', cost: 220, color: '#00ff88', icon: 'worm' },
+            logicbomb:      { name: 'LOGIC BOMB',     short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',                       cost: 250, color: '#ffff00', icon: 'logic_bomb' },
+            daemon:         { name: 'DAEMON',         short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).',                   cost: 140, color: '#9944ff', icon: 'daemon' },
+            ghost:          { name: 'PHASE',          short: 'PHASE',  desc: 'Phase through pegs + warp back to drop zone once for a second pass.', cost: 110, color: '#88ddff', icon: 'ghost' },
+            cluster:        { name: 'CLUSTER',        short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',                      cost: 200, color: '#ff00ff', icon: 'cluster' },
+            explosive:      { name: 'DETONATOR',      short: 'DETON',  desc: 'Each peg hit triggers a targeted explosion. Boom on every bounce.',   cost: 200, color: '#ff4444', icon: 'explosive' },
+            slowmo:         { name: 'STASIS',         short: 'STAS',   desc: 'Freeze mid-air 30 frames, attract pegs, resume at half speed.',      cost: 170, color: '#00fff2', icon: 'slowmo' },
             // --- Phase P1: peg-interaction payloads ---
-            chain_reaction: { name: 'CHAIN REACTION', short: 'C.RXN',  desc: 'Each peg hit triggers an AoE explosion (30px). Affected pegs score 50%.', cost: 200, color: '#ff4444', icon: 'chain_reaction' },
-            synergy:        { name: 'SYNERGY',        short: 'SYNR',   desc: 'Cache, Ice, Fiber, and Honeycomb pegs give 2× score.',              cost: 160, color: '#88ddff', icon: 'synergy' },
-            magnetize:      { name: 'MAGNETIZE',      short: 'MAGN',   desc: 'Pegs within 80px are attracted toward the ball (lifetime).',        cost: 150, color: '#00ccff', icon: 'magnetize' }
+            chain_reaction: { name: 'CHAIN REACTION', short: 'C.RXN',  desc: 'Each peg hit triggers an AoE explosion (30px). Affected pegs score 50%.', cost: 240, color: '#ff4444', icon: 'chain_reaction' },
+            synergy:        { name: 'SYNERGY',        short: 'SYNR',   desc: 'Cache, Ice, Fiber, and Honeycomb pegs give 2× score.',              cost: 180, color: '#88ddff', icon: 'synergy' },
+            magnetize:      { name: 'MAGNETIZE',      short: 'MAGN',   desc: 'Pegs within 80px are attracted toward the ball (lifetime).',        cost: 170, color: '#00ccff', icon: 'magnetize' }
         },
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
@@ -4178,7 +4182,10 @@
         // (5 balls * ~6 hits/ball = 30 max). New curve: fl 1=13, fl 5=19,
         // fl 10=27, fl 12=30. Softens the late-game grind without
         // trivialising it.
-        var t = 12 + Math.floor(GS.fl * 1.5);
+        // Balance pass: steeper curve (1.6 multiplier, was 1.5).
+        // fl 1=13, fl 5=20, fl 10=28, fl 15=36, fl 20=44.
+        // By fl 15, players need payloads to clear comfortably.
+        var t = 12 + Math.floor(GS.fl * 1.6);
         GS.obj = { tp: 'standard', tgt: t, prg: 0 };
         document.getElementById('ot').textContent = t;
     }
@@ -7645,8 +7652,10 @@
                 // triviality. Pairs with the Phase 4.5-K payload cost
                 // rebalance (50-120 -> 80-220) so the same run buys ~1-2
                 // premium payloads, not 6-8.
+                // Balance pass: 4% credit rate (was 5%). Tighter
+                // economy makes payload purchases feel special.
                 var floorDelta = GS.sc - (GS.lastFloorScore || 0);
-                var floorCredits = Math.floor(floorDelta / 20);
+                var floorCredits = Math.floor(floorDelta / 25);
                 GS.lastFloorScore = GS.sc;
                 GS.creditsEarned += floorCredits;
                 PERSIST.br += floorCredits;
