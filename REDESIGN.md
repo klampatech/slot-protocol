@@ -511,9 +511,20 @@ Key implementation notes:
 
 Pending: visual effects (Chain Reaction explosion rings, Synergy peg glow, Magnetize gravity well), audio (drop/activation sounds), existing payload reworks.
 
-### Phase P2: Visual + Audio Effects (planned)
+### 2026-06-15: Phase P2 Shipped
 
-- Chain Reaction: orange explosion ring at each AoE point + particles
-- Synergy: synergy pegs glow blue while ball is in flight + bell chime on hit
-- Magnetize: concentric gravity-well rings around the ball + low hum
-- All 3: drop sounds + activation sounds via Audio helpers
+**Visual + audio effects for the 3 new payloads.** 343 tests passing (+8 new).
+
+Audio:
+- Chain Reaction: staccato burst on drop (3 rapid ascending ticks), kick+sub+noise boom on first AoE activation
+- Synergy: metallic bell ping on drop (single _bell), crystalline 3-harmonic chime on first synergy activation
+- Magnetize: deep pull sub-bass+sweep on drop, oscillating sub hum on activation
+
+Visual:
+- Chain Reaction: orange `spawnPayloadRing` + red particles at each AoE-affected peg, larger ring at source peg
+- Synergy: blue pulsing aura (`ctx.arc` + oscillating alpha) on Cache/Ice/Fiber/Honeycomb pegs while ball is in flight. Draws between peg loop and prediction line.
+- Magnetize: 3 concentric gravity-well rings around the ball, pulsing with `sin(ts/300)`. Draws before ball body so ball renders on top.
+
+Activation flags: `chainReactionActivated` and `synergyActivated` on Ball constructor, fire once per ball to prevent audio spam.
+
+Pending: existing payload reworks (Scrambler → Ricochet, Ghost → Phase, Worm → Tunnel, Slowmo → Stasis, Explosive → Detonator).
