@@ -1183,26 +1183,28 @@
             7: { name: 'JACKPOT',   desc: 'Adds the current jackpot to your score. Jackpot grows 15% if missed.' }
         },
         // Phase 8a: payload metadata table - single source of truth for
-        // the 9 payload types. Fields: name (display, uppercase), short
-        // (4-letter badge text for the drop-zone indicator), desc (effect
+        // all payload types. Fields: name (display, uppercase), short
+        // (badge text for the drop-zone indicator), desc (effect
         // description for tooltips), cost (in credits, shop price), color
-        // (in-game + tooltip header color), icon (integer 0..8 passed to
-        // SVG_ICONS.getPayloadIcon). Order matches the existing
-        // updateShop / updateHUD / triggerSlotCollected PA-case arrays, so
-        // the icon index here is consistent with the current visual layout.
-        // 8a uses this for tooltips; 8b will refactor updateShop +
-        // updateHUD to read from it; 8c will use it for the buy-handler
-        // dedup and the all-on-drop flag application.
+        // (in-game + tooltip header color), icon (string key passed to
+        // SVG_ICONS.getPayloadIcon, e.g. 'scrambler' → PAYLOAD_SCRAMBLER).
+        // Phase P1: added chain_reaction, synergy, magnetize. Changed icon
+        // from integer index to string key to fix getPayloadIcon lookup
+        // (was falling through to scrambler for all payloads).
         PAYLOADS: {
-            scrambler: { name: 'SCRAMBLER',  short: 'SCRAM',  desc: 'Reverses ball direction on first peg hit.',        cost:  80, color: '#ff6600', icon: 0 },
-            trojan:    { name: 'TROJAN',     short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',     cost: 140, color: '#ff2244', icon: 1 },
-            worm:      { name: 'WORM',       short: 'WORM',   desc: 'Ball passes through pegs without bouncing.',      cost: 180, color: '#00ff88', icon: 2 },
-            logicbomb: { name: 'LOGIC BOMB', short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',     cost: 220, color: '#ffff00', icon: 3 },
-            daemon:    { name: 'DAEMON',     short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).', cost: 130, color: '#9944ff', icon: 4 },
-            ghost:     { name: 'GHOST',      short: 'GHOST',  desc: 'Ball phases through pegs (lifetime).',            cost: 100, color: '#88ddff', icon: 5 },
-            cluster:   { name: 'CLUSTER',    short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',    cost: 180, color: '#ff00ff', icon: 6 },
-            explosive: { name: 'EXPLOSIVE',  short: 'EXPL',   desc: 'Chain-destroys nearby pegs on first peg hit.',    cost: 180, color: '#ff4444', icon: 7 },
-            slowmo:    { name: 'SLOWMO',     short: 'SLOW',   desc: 'Slows the ball to half speed (lifetime).',        cost: 150, color: '#00fff2', icon: 8 }
+            scrambler:      { name: 'SCRAMBLER',      short: 'SCRAM',  desc: 'Reverses ball direction on first peg hit.',                          cost:  80, color: '#ff6600', icon: 'scrambler' },
+            trojan:         { name: 'TROJAN',         short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',                       cost: 140, color: '#ff2244', icon: 'trojan' },
+            worm:           { name: 'WORM',           short: 'WORM',   desc: 'Ball passes through pegs without bouncing.',                        cost: 180, color: '#00ff88', icon: 'worm' },
+            logicbomb:      { name: 'LOGIC BOMB',     short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',                       cost: 220, color: '#ffff00', icon: 'logic_bomb' },
+            daemon:         { name: 'DAEMON',         short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).',                   cost: 130, color: '#9944ff', icon: 'daemon' },
+            ghost:          { name: 'GHOST',          short: 'GHOST',  desc: 'Ball phases through pegs (lifetime).',                              cost: 100, color: '#88ddff', icon: 'ghost' },
+            cluster:        { name: 'CLUSTER',        short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',                      cost: 180, color: '#ff00ff', icon: 'cluster' },
+            explosive:      { name: 'EXPLOSIVE',      short: 'EXPL',   desc: 'Chain-destroys nearby pegs on first peg hit.',                      cost: 180, color: '#ff4444', icon: 'explosive' },
+            slowmo:         { name: 'SLOWMO',         short: 'SLOW',   desc: 'Slows the ball to half speed (lifetime).',                          cost: 150, color: '#00fff2', icon: 'slowmo' },
+            // --- Phase P1: peg-interaction payloads ---
+            chain_reaction: { name: 'CHAIN REACTION', short: 'C.RXN',  desc: 'Each peg hit triggers an AoE explosion (30px). Affected pegs score 50%.', cost: 200, color: '#ff4444', icon: 'chain_reaction' },
+            synergy:        { name: 'SYNERGY',        short: 'SYNR',   desc: 'Cache, Ice, Fiber, and Honeycomb pegs give 2× score.',              cost: 160, color: '#88ddff', icon: 'synergy' },
+            magnetize:      { name: 'MAGNETIZE',      short: 'MAGN',   desc: 'Pegs within 80px are attracted toward the ball (lifetime).',        cost: 150, color: '#00ccff', icon: 'magnetize' }
         },
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
@@ -3220,6 +3222,10 @@
         // to true on first peg contact in Peg.hit for worm/ghost.
         this.wormActivated = false;
         this.ghostActivated = false;
+        // Phase P1: peg-interaction payload flags (set in dropBall)
+        this.chainReaction = false; // AoE explosion on every peg hit
+        this.synergy = false;       // 2× score on Cache/Ice/Fiber/Honeycomb
+        this.magnetize = false;     // attract pegs toward ball (lifetime)
     }
 
     Ball.prototype.update = function(dt) {
@@ -3251,7 +3257,31 @@
         this.y += this.vy * dt60;
         this.tr.push({x: this.x, y: this.y});
         if (this.tr.length > 10) this.tr.shift();
-        
+
+        // --- Phase P1: Magnetize payload ---
+        // Attract pegs within 80px toward the ball at 2px/frame.
+        // Peg positions are permanently modified — pulled pegs stay
+        // in their new position after the ball exits, reshaping the
+        // board for future balls. Wall row pegs (y >= C.SY) are
+        // unaffected (they're structural, not gameplay). The attraction
+        // runs before collision detection so pegs are closer when the
+        // overlap check fires.
+        if (this.magnetize) {
+            var magR = 80;
+            var magStr = 2;
+            for (var mi = 0; mi < GS.bd.length; mi++) {
+                var mp = GS.bd[mi];
+                if (mp.removed || mp.y >= C.SY) continue;
+                var mdx = this.x - mp.x;
+                var mdy = this.y - mp.y;
+                var mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+                if (mDist < magR && mDist > 0) {
+                    mp.x += (mdx / mDist) * magStr;
+                    mp.y += (mdy / mDist) * magStr;
+                }
+            }
+        }
+
         // Check if ball entered slot zone. On first entry, remember the slot
         // index in `shieldedSlot` so the same-slot guard below can suppress
         // a duplicate trigger if the ball gets bounced back by a shield and
@@ -3360,6 +3390,7 @@
         this.fiberHits = 0; // for fiber peg
         this.mirrorDir = Math.random() > 0.5 ? 1 : -1; // for mirror peg
         this.attractCount = 0; // for honeypot peg
+        this.aoeHit = false; // Phase P1: Chain Reaction AoE per-ball flag
     }
     Peg.prototype.hit = function(b) {
         this.hc++;
@@ -3503,10 +3534,17 @@
         // Update combo indicator
         comboIndicator.timer = 30;
         comboIndicator.scale = 1.3;
-        
+
+        // Phase P1: Synergy payload tracks the per-type bonus amount
+        // so it can be doubled after the branch. Initialized to 0;
+        // set inside eligible branches (Cache, Ice, Fiber, Honeycomb).
+        var synergyBonusAmount = 0;
+
         if (this.t === C.PT.C) {
-            GS.sc += 200 + GS.cc * 50;
-            createFloat(this.x, this.y, '+' + (200 + GS.cc * 50), '#ffff00');
+            var cacheBonus = 200 + GS.cc * 50;
+            synergyBonusAmount = cacheBonus;
+            GS.sc += cacheBonus;
+            createFloat(this.x, this.y, '+' + cacheBonus, '#ffff00');
         } else if (this.t === C.PT.S) {
             GS.sc += 100;
             createFloat(this.x, this.y, '+100', '#ff6600');
@@ -3549,8 +3587,10 @@
         } else if (this.t === C.PT.I) {
             // ICE PEG: Freezes ball briefly, bonus on second hit
             if (this.frozen) {
-                GS.sc += 150 + GS.cc * 75;
-                createFloat(this.x, this.y, 'FROZEN! +' + (150 + GS.cc * 75), '#88ddff');
+                var iceBonus = 150 + GS.cc * 75;
+                synergyBonusAmount = iceBonus;
+                GS.sc += iceBonus;
+                createFloat(this.x, this.y, 'FROZEN! +' + iceBonus, '#88ddff');
                 this.frozen = false;
             } else {
                 GS.sc += bonus;
@@ -3565,8 +3605,10 @@
             // FIBER PEG: Multi-hit bonus, breaks after 3 hits
             this.fiberHits++;
             if (this.fiberHits >= 3) {
-                GS.sc += 300 + GS.cc * 100;
-                createFloat(this.x, this.y, 'FIBER BREAK! +' + (300 + GS.cc * 100), '#ff8844');
+                var fiberBonus = 300 + GS.cc * 100;
+                synergyBonusAmount = fiberBonus;
+                GS.sc += fiberBonus;
+                createFloat(this.x, this.y, 'FIBER BREAK! +' + fiberBonus, '#ff8844');
                 // Spawn shatter/debris effect
                 spawnShatterDebris(this);
                 // Remove peg
@@ -3587,8 +3629,10 @@
             // HONEYCOMB PEG: Attracts nearby pegs, bonus on 5th hit
             this.attractCount++;
             if (this.attractCount >= 5) {
-                GS.sc += 500 + GS.cc * 150;
-                createFloat(this.x, this.y, 'HONEYCOMB! +' + (500 + GS.cc * 150), '#ffcc00');
+                var honeyBonus = 500 + GS.cc * 150;
+                synergyBonusAmount = honeyBonus;
+                GS.sc += honeyBonus;
+                createFloat(this.x, this.y, 'HONEYCOMB! +' + honeyBonus, '#ffcc00');
                 // Spawn honeycomb burst effect
                 for (let i = 0; i < 6; i++) {
                     var angle = (i / 6) * Math.PI * 2;
@@ -3639,6 +3683,49 @@
         } else {
             GS.sc += bonus;
         }
+
+        // --- Phase P1: Synergy payload ---
+        // Double the per-type bonus for Cache, Ice, Fiber, Honeycomb.
+        // The synergyBonusAmount is set inside the per-type branch
+        // (before the GS.sc +=) so it captures only the type-specific
+        // bonus, not the base pegBasePoints hit. This way a Cache hit
+        // at cc=0 gives 50 + 200 + 200 = 450 (base + bonus + synergy)
+        // instead of 50 + 200 + 250 = 500 (which would double the
+        // base too).
+        if (b && b.synergy && synergyBonusAmount > 0) {
+            GS.sc += synergyBonusAmount;
+            createFloat(this.x, this.y - 20, '2× +' + synergyBonusAmount, '#88ddff');
+        }
+
+        // --- Phase P1: Chain Reaction AoE ---
+        // After the per-peg-type logic, trigger an AoE explosion at the
+        // peg's position. Affected pegs within 30px score at 50% of
+        // their base value (before combo/frenzy). Each peg can only be
+        // AoE-hit once per ball (aoeHit flag) to prevent cascades.
+        // The AoE hit counts toward objectives and pegsHit.
+        if (b && b.chainReaction && !this.aoeHit) {
+            var aoeR = 30;
+            var aoeScorePct = 0.5;
+            for (var ai = 0; ai < GS.bd.length; ai++) {
+                var ap = GS.bd[ai];
+                if (ap === this || ap.aoeHit || ap.removed) continue;
+                var adx = ap.x - this.x;
+                var ady = ap.y - this.y;
+                if (adx * adx + ady * ady < aoeR * aoeR) {
+                    ap.aoeHit = true;
+                    var aoePts = Math.floor(pegBasePoints() * aoeScorePct * (GS.cc + 1) * (GS.fa ? 3 : 1));
+                    GS.sc += aoePts;
+                    GS.obj.prg++;
+                    GS.pegsHit++;
+                    PERSIST.totalPegsHit++;
+                    createFloat(ap.x, ap.y - 12, '+' + aoePts, '#ff6644');
+                    spawnParticles('#ff4444', ap.x, ap.y, 6, 2);
+                }
+            }
+            // Visual: explosion ring at the source peg
+            spawnParticles('#ff4444', this.x, this.y, 12, 3);
+        }
+
         if (this.st < C.PSTATES.EX) this.st++;
         spawnParticles(C.PC[this.t] || '#00fff2', this.x, this.y, 20, 4);
     };
@@ -7370,6 +7457,14 @@
         
         var newBall = new Ball(GS.mouseX, C.DZY + 10, 0, 2, pl);
 
+        // Phase P1: reset Chain Reaction AoE flags on all pegs so each
+        // ball gets fresh AoE tracking. Without this, pegs AoE-hit by a
+        // previous ball would stay flagged and be immune to AoE from
+        // subsequent balls.
+        for (var ri = 0; ri < GS.bd.length; ri++) {
+            GS.bd[ri].aoeHit = false;
+        }
+
         // Daily mod: small_ball shrinks the ball to 60% radius
         if (modActive('small_ball')) {
             newBall.r = C.BR * 0.6;
@@ -7469,7 +7564,34 @@
             Audio.playPayloadDrop('cluster');
             spawnPayloadRing(newBall.x, newBall.y, '#ff00ff', 90);
         }
-        
+
+        // --- Phase P1: peg-interaction payloads ---
+
+        if (pl.indexOf('chain_reaction') !== -1) {
+            // Chain Reaction: every peg hit triggers an AoE explosion
+            // (30px radius) that scores affected pegs at 50%. Peg.hit
+            // checks b.chainReaction and runs the AoE loop after the
+            // per-peg-type logic.
+            newBall.chainReaction = true;
+            Audio.playPayloadDrop('chain_reaction');
+            spawnPayloadRing(newBall.x, newBall.y, '#ff4444', 80);
+        }
+        if (pl.indexOf('synergy') !== -1) {
+            // Synergy: Cache, Ice, Fiber, Honeycomb pegs give 2× score.
+            // Peg.hit checks b.synergy and doubles the per-type bonus.
+            newBall.synergy = true;
+            Audio.playPayloadDrop('synergy');
+            spawnPayloadRing(newBall.x, newBall.y, '#88ddff', 80);
+        }
+        if (pl.indexOf('magnetize') !== -1) {
+            // Magnetize: pegs within 80px are attracted toward the ball
+            // at 2px/frame for the ball's lifetime. Implemented in
+            // Ball.update (runs every frame, not just on hit).
+            newBall.magnetize = true;
+            Audio.playPayloadDrop('magnetize');
+            spawnPayloadRing(newBall.x, newBall.y, '#00ccff', 80);
+        }
+
         if (PERSIST.multiballEnabled && GS.ball) {
             // Add to existing ball's mini-balls array for rendering
             GS.ball.mb.push(newBall);
@@ -8356,7 +8478,7 @@
         checkAchievements: checkAchievements,
         modActive: modActive, getDailySeed: getDailySeed,
         seededRandom: seededRandom, getDailyModifiers: getDailyModifiers,
-        startGame: startGame, showScreen: showScreen,
+        startGame: startGame, dropBall: dropBall, showScreen: showScreen,
         // Exposed for the render-loop regression test (ts-bug guard).
         // The functions are scoped to the IIFE, so the test suite can't
         // call them directly; exposing the .length (parameter arity) is

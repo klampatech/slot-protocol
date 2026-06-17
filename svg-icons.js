@@ -120,6 +120,21 @@ var SVG_ICONS = {
     // Slowmo - clock with a "rewind" arrow loop. Reads as "time".
     PAYLOAD_SLOWMO: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8" fill="none" stroke="#88ddff" stroke-width="1.75"/><path d="M16 8C15 6.5 13.5 5.5 12 5.5C10.5 5.5 9 6.5 8 8" fill="none" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round"/><path d="M16 8L13 8L13 5" fill="none" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9V13L14.5 11" fill="none" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 
+    // Chain Reaction - concentric explosion rings with radial lines.
+    // Reads as "AoE blast" - the expanding rings suggest area effect.
+    // Red (#ff4444) matches the explosive peg family.
+    PAYLOAD_CHAIN_REACTION: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" fill="none" stroke="#ff4444" stroke-width="1.75"/><circle cx="12" cy="12" r="8" fill="none" stroke="#ff4444" stroke-width="1.25" opacity="0.6"/><path d="M12 2L12 5M12 19L12 22M2 12L5 12M19 12L22 12M5 5L7 7M17 7L19 5M5 19L7 17M17 17L19 19" stroke="#ff4444" stroke-width="1.5" stroke-linecap="round"/></svg>',
+
+    // Synergy - diamond with connecting inner lines. Reads as
+    // "connection / amplification" - the cross-hairs suggest targeted
+    // enhancement. Light blue (#88ddff) pairs with the ice peg color.
+    PAYLOAD_SYNERGY: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L21 12L12 21L3 12Z" fill="none" stroke="#88ddff" stroke-width="1.75" stroke-linejoin="round"/><path d="M8 12H16M12 8V16" stroke="#88ddff" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="#88ddff" opacity="0.8"/></svg>',
+
+    // Magnetize - concentric rings radiating inward (gravity well).
+    // Reads as "attraction / pull" - rings converging on center.
+    // Cyan (#00ccff) is between the node cyan and ice blue.
+    PAYLOAD_MAGNETIZE: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="2" fill="#00ccff"/><circle cx="12" cy="12" r="5" fill="none" stroke="#00ccff" stroke-width="1.5" opacity="0.8"/><circle cx="12" cy="12" r="8" fill="none" stroke="#00ccff" stroke-width="1.25" opacity="0.5"/><circle cx="12" cy="12" r="10.5" fill="none" stroke="#00ccff" stroke-width="1" opacity="0.3"/></svg>',
+
     // ========== UI ICONS ==========
     // Trophy - cup on a base. Used in leaderboard.
     UI_TROPHY: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 4H17V10C17 13 15 15 12 15C9 15 7 13 7 10V4Z" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linejoin="round"/><path d="M7 6H4V8C4 10 5 11 7 11" fill="none" stroke="#ffcc00" stroke-width="1.5" stroke-linecap="round"/><path d="M17 6H20V8C20 10 19 11 17 11" fill="none" stroke="#ffcc00" stroke-width="1.5" stroke-linecap="round"/><path d="M9 19H15M12 15V19M10 21H14" fill="none" stroke="#ffcc00" stroke-width="1.75" stroke-linecap="round"/></svg>',
@@ -201,8 +216,17 @@ var SVG_ICONS = {
         return this['SLOT_' + (names[type] || 'EMPTY')];
     },
     getPayloadIcon: function(type) {
-        // type is the payload name string (e.g. 'scrambler', 'logicbomb')
-        var key = ('payload_' + type).toUpperCase().replace(/-/g, '_');
-        return this[key] || this.PAYLOAD_SCRAMBLER;
+        // Accepts either a payload name string (e.g. 'scrambler',
+        // 'chain_reaction') or a numeric index (legacy). Strings
+        // are uppercased and prefixed with 'PAYLOAD_'; indices
+        // fall through to the legacy array lookup (kept for
+        // backward compat with any external callers).
+        if (typeof type === 'string') {
+            var key = 'PAYLOAD_' + type.toUpperCase().replace(/-/g, '_');
+            return this[key] || this.PAYLOAD_SCRAMBLER;
+        }
+        // Legacy integer index path
+        var names = ['SCRAMBLER','TROJAN','WORM','LOGIC_BOMB','DAEMON','GHOST','CLUSTER','EXPLOSIVE','SLOWMO'];
+        return this['PAYLOAD_' + (names[type] || 'SCRAMBLER')];
     }
 };

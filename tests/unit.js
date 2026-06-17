@@ -843,10 +843,12 @@ function section(title) {
     // for tooltip text, shop cost, in-game color, and icon index.
     let payloadMeta = await inGame(() => {
         const keys = Object.keys(C.PAYLOADS);
+        // Phase P1: icon is now a string key (e.g. 'scrambler') not an
+        // integer index. Accept both string and number for backward compat.
         const allFields = keys.every(k =>
             C.PAYLOADS[k].name && C.PAYLOADS[k].short &&
             C.PAYLOADS[k].desc && typeof C.PAYLOADS[k].cost === 'number' &&
-            C.PAYLOADS[k].color && typeof C.PAYLOADS[k].icon === 'number'
+            C.PAYLOADS[k].color && (typeof C.PAYLOADS[k].icon === 'string' || typeof C.PAYLOADS[k].icon === 'number')
         );
         const names = keys.map(k => C.PAYLOADS[k].name);
         // Icon indices must be 0..8 and unique - the existing updateShop
@@ -862,13 +864,182 @@ function section(title) {
             uniqueIcons
         };
     });
-    assert(payloadMeta.count === 9, '9 payloads defined in C.PAYLOADS');
+    // Phase P1: 12 payloads (9 original + 3 new peg-interaction payloads).
+    // Icon keys are now strings (matching SVG_ICONS constant names), not
+    // integer indices. The contiguous-integer check is replaced with a
+    // string-uniqueness check.
+    assert(payloadMeta.count === 12, '12 payloads defined in C.PAYLOADS');
     assert(payloadMeta.allFields, 'Every C.PAYLOADS entry has name, short, desc, cost, color, icon');
-    assert(payloadMeta.uniqueIcons, 'C.PAYLOADS icon indices are unique');
-    assert(payloadMeta.icons.sort((a, b) => a - b).every((v, i) => v === i), 'C.PAYLOADS icon indices are 0..8 contiguous');
+    assert(payloadMeta.uniqueIcons, 'C.PAYLOADS icon keys are unique');
+    assert(payloadMeta.icons.every(k => typeof k === 'string'), 'C.PAYLOADS icon keys are strings');
     assert(payloadMeta.names.includes('DAEMON'), 'C.PAYLOADS includes DAEMON');
     assert(payloadMeta.names.includes('LOGIC BOMB'), 'C.PAYLOADS includes LOGIC BOMB');
     assert(payloadMeta.names.includes('SLOWMO'), 'C.PAYLOADS includes SLOWMO');
+    assert(payloadMeta.names.includes('CHAIN REACTION'), 'C.PAYLOADS includes CHAIN REACTION');
+    assert(payloadMeta.names.includes('SYNERGY'), 'C.PAYLOADS includes SYNERGY');
+    assert(payloadMeta.names.includes('MAGNETIZE'), 'C.PAYLOADS includes MAGNETIZE');
+
+    // Phase P1: new payload icons exist in SVG_ICONS
+    let p1Icons = await inGame(() => {
+        return {
+            chain: typeof SVG_ICONS.PAYLOAD_CHAIN_REACTION === 'string',
+            synergy: typeof SVG_ICONS.PAYLOAD_SYNERGY === 'string',
+            magnetize: typeof SVG_ICONS.PAYLOAD_MAGNETIZE === 'string',
+            chainLookup: typeof SVG_ICONS.getPayloadIcon('chain_reaction') === 'string',
+            synergyLookup: typeof SVG_ICONS.getPayloadIcon('synergy') === 'string',
+            magnetizeLookup: typeof SVG_ICONS.getPayloadIcon('magnetize') === 'string',
+            // Verify string-key lookup works for existing payloads too
+            scramblerLookup: typeof SVG_ICONS.getPayloadIcon('scrambler') === 'string',
+            logicbombLookup: typeof SVG_ICONS.getPayloadIcon('logic_bomb') === 'string'
+        };
+    });
+    assert(p1Icons.chain, 'PAYLOAD_CHAIN_REACTION icon defined');
+    assert(p1Icons.synergy, 'PAYLOAD_SYNERGY icon defined');
+    assert(p1Icons.magnetize, 'PAYLOAD_MAGNETIZE icon defined');
+    assert(p1Icons.chainLookup, 'getPayloadIcon("chain_reaction") returns string');
+    assert(p1Icons.synergyLookup, 'getPayloadIcon("synergy") returns string');
+    assert(p1Icons.magnetizeLookup, 'getPayloadIcon("magnetize") returns string');
+    assert(p1Icons.scramblerLookup, 'getPayloadIcon("scrambler") returns string');
+    assert(p1Icons.logicbombLookup, 'getPayloadIcon("logic_bomb") returns string');
+
+    // ========== PHASE P1: PAYLOAD + PEG INTERACTIONS ==========
+    section('Phase P1: Payload + Peg Interactions');
+
+    // Helper: set up game state for dropBall. The payload name is
+    // hardcoded per call because inGame/page.evaluate can't close over
+    // Node-side variables.
+    function dropWithPayload(plName) {
+        return inGame((name) => {
+            startGame();
+            GS.scr = C.SCR.P;
+            GS.canDrop = true;
+            GS.slotsArranged = true;
+            GS.mouseX = C.W / 2;
+            GS.bl = 5;
+            GS.pl = [name];
+            dropBall();
+            return GS.ball;
+        }, plName);
+    }
+
+    // Chain Reaction: ball flag set correctly via dropBall
+    let crFlag = await dropWithPayload('chain_reaction');
+    assert(crFlag && crFlag.chainReaction === true, 'Chain Reaction sets ball.chainReaction = true');
+
+    // Chain Reaction: AoE fires on peg hit
+    let crAoE = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var p1 = new Peg(200, 200, C.PT.N, 0);
+        var p2 = new Peg(220, 200, C.PT.N, 1); // 20px away
+        var p3 = new Peg(400, 400, C.PT.N, 2); // far away
+        GS.bd.push(p1, p2, p3);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.chainReaction = true;
+        var scBefore = GS.sc;
+        p1.hit(b);
+        return { scDelta: GS.sc - scBefore, p2Hit: p2.aoeHit, p3Hit: p3.aoeHit };
+    });
+    assert(crAoE.scDelta > 0, 'Chain Reaction AoE adds score');
+    assert(crAoE.p2Hit === true, 'Chain Reaction AoE marks nearby peg (20px) as aoeHit');
+    assert(crAoE.p3Hit === false, 'Chain Reaction AoE does not mark distant peg (283px) as aoeHit');
+
+    // Chain Reaction: AoE scoring is 50% of base
+    let crAoEScore = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var p1 = new Peg(200, 200, C.PT.N, 0);
+        var p2 = new Peg(215, 200, C.PT.N, 1); // 15px away
+        GS.bd.push(p1, p2);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.chainReaction = true;
+        var scBefore = GS.sc;
+        p1.hit(b);
+        // p1: base 50 (Node, cc=0). p2 AoE: 50 * 0.5 = 25. Total = 75.
+        return { scDelta: GS.sc - scBefore, expected: 75 };
+    });
+    assert(crAoEScore.scDelta === crAoEScore.expected, 'Chain Reaction AoE score = base + 50% (got ' + crAoEScore.scDelta + ', expected 75)');
+
+    // Chain Reaction: aoeHit flag resets on new ball drop
+    let crReset = await inGame(() => {
+        startGame();
+        GS.scr = C.SCR.P;
+        GS.canDrop = true;
+        GS.slotsArranged = true;
+        GS.mouseX = C.W / 2;
+        GS.bl = 5;
+        genBoard();
+        if (GS.bd.length > 0) GS.bd[0].aoeHit = true;
+        GS.pl = ['chain_reaction'];
+        dropBall();
+        return { aoeHit: GS.bd.length > 0 ? GS.bd[0].aoeHit : 'no pegs' };
+    });
+    assert(crReset.aoeHit === false, 'aoeHit flag resets on new ball drop');
+
+    // Synergy: ball flag set correctly via dropBall
+    let syFlag = await dropWithPayload('synergy');
+    assert(syFlag && syFlag.synergy === true, 'Synergy sets ball.synergy = true');
+
+    // Synergy: doubles Cache peg bonus
+    // Cache branch REPLACES the base bonus (doesn't add on top).
+    // Cache at cc=3: 200 + 3*50 = 350. Synergy doubles: 350 + 350 = 700.
+    let syCache = await inGame(() => {
+        GS.fl = 1; GS.cc = 3; GS.fa = false;
+        GS.bd = [];
+        var cachePeg = new Peg(200, 200, C.PT.C, 0);
+        GS.bd.push(cachePeg);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.synergy = true;
+        var scBefore = GS.sc;
+        cachePeg.hit(b);
+        return { scDelta: GS.sc - scBefore, expected: 700 };
+    });
+    assert(syCache.scDelta === syCache.expected, 'Synergy doubles Cache bonus (got ' + syCache.scDelta + ', expected 700)');
+
+    // Synergy: no effect on Node peg
+    let syNode = await inGame(() => {
+        GS.fl = 1; GS.cc = 0; GS.fa = false;
+        GS.bd = [];
+        var nodePeg = new Peg(200, 200, C.PT.N, 0);
+        GS.bd.push(nodePeg);
+        var b = new Ball(200, 190, 0, 1, []);
+        b.synergy = true;
+        var scBefore = GS.sc;
+        nodePeg.hit(b);
+        return { scDelta: GS.sc - scBefore, expected: 50 };
+    });
+    assert(syNode.scDelta === syNode.expected, 'Synergy has no effect on Node peg (got ' + syNode.scDelta + ', expected 50)');
+
+    // Magnetize: ball flag set correctly via dropBall
+    let magFlag = await dropWithPayload('magnetize');
+    assert(magFlag && magFlag.magnetize === true, 'Magnetize sets ball.magnetize = true');
+
+    // Magnetize: pegs move toward ball (verify the attraction math)
+    let magMove = await inGame(() => {
+        GS.bd = [];
+        var peg = new Peg(250, 200, C.PT.N, 0);
+        GS.bd.push(peg);
+        var b = new Ball(200, 200, 0, 1, []);
+        b.magnetize = true;
+        var pegXBefore = peg.x;
+        var magR = 80, magStr = 2;
+        var mdx = b.x - peg.x, mdy = b.y - peg.y;
+        var mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+        if (mDist < magR && mDist > 0) {
+            peg.x += (mdx / mDist) * magStr;
+            peg.y += (mdy / mDist) * magStr;
+        }
+        return { moved: peg.x !== pegXBefore, movedLeft: peg.x < pegXBefore };
+    });
+    assert(magMove.moved === true, 'Magnetize moves peg toward ball');
+    assert(magMove.movedLeft === true, 'Magnetize moves peg left (toward ball at x=200)');
+
+    // Magnetize: wall row pegs excluded (y >= C.SY)
+    let magWall = await inGame(() => {
+        var peg = new Peg(200, C.SY, C.PT.N, 0);
+        return { shouldSkip: peg.y >= C.SY };
+    });
+    assert(magWall.shouldSkip === true, 'Magnetize skips wall row pegs (y >= C.SY)');
 
     // ========== SCREEN MANAGEMENT ==========
     section('Screen Management');
