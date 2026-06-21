@@ -9,11 +9,20 @@ through procedurally-generated peg boards, chain hits for combo multipliers,
 arrange slot effects between floors, and survive as long as you can.*
 
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
-[![Tests](https://img.shields.io/badge/tests-214%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-381%20passing-brightgreen.svg)]()
 [![Single file](https://img.shields.io/badge/build-single%20HTML%20file-orange.svg)]()
 [![No dependencies](https://img.shields.io/badge/runtime-no%20dependencies-blueviolet.svg)]()
 
 </div>
+
+---
+
+## 🕹️ Play Now
+
+**[👉 Play Slot Protocol](https://klampatech.github.io/slot-protocol/)**
+
+No install, no download — just open the link in any modern browser.
+Works on desktop and mobile.
 
 ---
 
@@ -97,31 +106,35 @@ one more and assign it a random slot effect from a 3-card pool:
 
 | Effect | What it does |
 |---|---|
-| **EMPTY** | No effect (not offered in the pool — see GOAL.md Phase 4.5-F). |
-| **CREDITS** | +50×(combo+1)×(frenzy?3:1) score. |
-| **AMPLIFY** | +1 combo (capped at ×7), chain timer refreshes. |
+| **OVERFLOW** | Ball gets launched back up for a second pass through the pegs. |
+| **CREDITS** | +base×(combo+1)×(frenzy?3:1) score. Scales with floor. |
+| **AMPLIFY** | +1 combo (capped at ×7), chain timer refreshes. Activates frenzy at combo ≥ 3. |
 | **PAYLOAD** | Adds a random payload to your queue. |
-| **CRUMBLE** | Destroys up to 3 random pegs. |
-| **SHIELD** | Bounces the next ball back from overflow so it can hit more pegs. |
-| **OVERCLOCK** | 1.5× gravity for the current ball. |
-| **JACKPOT** | Adds the current jackpot to your score; jackpot grows 15% if missed. |
+| **CRUMBLE** | Destroys up to 3 random pegs. With Chain Reaction: creates 3 pegs instead. |
+| **SHIELD** | Bounces the next ball back from overflow. With Daemon: super bounce. |
+| **MAGNETIZE** | Pulls nearby pegs toward the ball’s landing point. |
+| **JACKPOT** | Adds the current jackpot to your score + credits bonus; jackpot grows 15% if missed. |
 
-### Payloads (9)
+### Payloads (12)
 Bought in the shop, consumed on the **next ball drop** (all queued
 payloads fire simultaneously — Phase 8c loadout model). 2 slots at
 floor 1, scaling +1 every 10 floors (so 3 at fl 10, 4 at fl 20, etc.).
+Several payloads interact with specific peg types (see REDESIGN.md).
 
 | Payload | Cost | Effect |
 |---|---|---|
-| **Scrambler** | 80 | Reverses ball direction on first peg hit. |
-| **Trojan** | 140 | Spawns 2 clone mini-balls on first peg hit. |
-| **Worm** | 180 | Ball passes through pegs without bouncing (still scores). |
-| **Logic Bomb** | 220 | Triples the current score on first peg hit. |
-| **Daemon** | 130 | Shields the ball from overflow exit for its lifetime. |
-| **Ghost** | 100 | Ball phases through pegs for its lifetime. |
-| **Cluster** | 180 | Splits into 3 mini-balls shortly after drop. |
-| **Explosive** | 180 | Chain-destroys nearby pegs on first peg hit. |
-| **Slowmo** | 150 | Slows the ball to half speed for its lifetime. |
+| **Ricochet** | 90 | Ball gets 3 smart bounces toward unhit pegs on first hit. |
+| **Phase** | 110 | Phase through pegs + warp back to drop zone once for a second pass. |
+| **Daemon** | 140 | Shields the ball from overflow exit for its lifetime. |
+| **Trojan** | 150 | Spawns 2 clone mini-balls (inherit parent’s payload flags). |
+| **Stasis** | 170 | Freeze mid-air 30 frames, attract pegs, resume at half speed. |
+| **Magnetize** | 170 | Pegs within 80px attracted toward the ball (lifetime). |
+| **Synergy** | 180 | Cache, Ice, Fiber, and Honeycomb pegs give 2× score. |
+| **Detonator** | 200 | Each peg hit triggers a targeted explosion. Boom on every bounce. |
+| **Cluster** | 200 | Splits into 3 mini-balls shortly after drop. |
+| **Tunnel** | 220 | Pass through pegs (tagged = 2× score). Tagged pegs explode on exit. |
+| **Chain Reaction** | 240 | Each peg hit triggers an AoE explosion (30px radius). |
+| **Logic Bomb** | 250 | Triples the current score on first peg hit. |
 
 ### Daily challenge
 A new seeded run every day with **2 random modifiers from 6**:
@@ -149,7 +162,7 @@ are deduplicated — you won't get two of them on the same day.
 
 ```
 slot-protocol/
-├── index.html              (6,529 lines — the entire game)
+├── index.html              (8,385 lines — the entire game)
 │   ├── <style>             (~300 lines of cyberpunk CSS)
 │   ├── <body>              (~570 lines of HTML overlays)
 │   └── <script>            (~5,700 lines of vanilla JS, IIFE-wrapped)
@@ -171,9 +184,10 @@ slot-protocol/
 ├── svg-icons.js            (neon-line-art icon set, 30+ icons)
 ├── audio/                  (3 BGM tracks)
 ├── tests/
-│   ├── unit.js             (183 Playwright unit tests)
+│   ├── unit.js             (381 Playwright unit tests)
 │   ├── performance-validation.js  (20 perf tests)
-│   ├── screenshot-suite.js (11 visual assertions across 16 captures)
+│   ├── screenshot-suite.js (16 visual assertions across 16 captures)
+└── mobile.js           (54 mobile device-emulation tests)
 │   └── screenshots/        (regenerated on every test run)
 ├── GOAL.md                 (the living spec — full project history)
 └── README.md               (this file)
@@ -267,8 +281,8 @@ spec that's been updated as each phase shipped. Highlights:
 - **Test infrastructure**: 214 tests total, all wired into GitHub
   Actions CI
 
-183 unit tests, 20 performance tests, 11 visual assertions. The full
-spec is in `GOAL.md`.
+381 unit tests, 20 performance tests, 16 screenshot tests, 54 mobile
+tests. The full spec is in `GOAL.md`. Design analysis in `REDESIGN.md`.
 
 ---
 
