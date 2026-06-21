@@ -1153,7 +1153,7 @@
         // Contrast mode colors
         PC_CONTRAST: {0:'#cccccc', 1:'#ffffff', 2:'#aaaaaa', 3:'#ffffff', 4:'#ffcccc', 5:'#888888', 6:'#ddddff', 7:'#ffccaa', 8:'#ffffff', 9:'#ffffcc', 10:'#ffaaaa'},
         ST: {E:0, CR:1, AM:2, PA:3, CM:4, SH:5, OC:6, JP:7},
-        ST_NAMES: ['EMPTY', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'OVERCLOCK', 'JACKPOT'],
+        ST_NAMES: ['OVERFLOW', 'CREDITS', 'AMPLIFY', 'PAYLOAD', 'CRUMBLE', 'SHIELD', 'MAGNETIZE', 'JACKPOT'],
         // Tooltip text for each peg type and slot effect. Shown on hover in
         // the slot-selector and during in-game mouseover (pegs + bottom slots).
         // Keys are the enum indices from C.PT and C.ST respectively.
@@ -1171,7 +1171,7 @@
             10: { name: 'OVERLOAD',  desc: '+75 pts but drains 10% of the jackpot. Erratic bounce.' }
         },
         SLOT_TOOLTIPS: {
-            0: { name: 'EMPTY',     desc: 'No effect when the ball lands here. 35% base chance.' },
+            0: { name: 'OVERFLOW',  desc: 'Ball gets launched back up for a second pass through the pegs.' },
             1: { name: 'CREDITS',   desc: 'Adds score: 50 × (combo+1) × (frenzy ? 3 : 1).' },
             2: { name: 'AMPLIFY',   desc: '+1 combo (capped at x7). Chain timer refreshes to 210.' },
             3: { name: 'PAYLOAD',   desc: 'Adds a random payload to your queue (max 2).' },
@@ -1179,30 +1179,36 @@
             // Phase 4.5-E: tooltip now clarifies the bounced ball re-enters
             // the peg field and can score more points, not just gets a free pass.
             5: { name: 'SHIELD',    desc: 'Bounces the next ball back from overflow exit so it can hit more pegs.' },
-            6: { name: 'OVERCLOCK', desc: '1.5× gravity for the current ball only.' },
+            6: { name: 'MAGNETIZE', desc: 'Pulls nearby pegs toward the ball, creating clusters for future hits.' },
             7: { name: 'JACKPOT',   desc: 'Adds the current jackpot to your score. Jackpot grows 15% if missed.' }
         },
         // Phase 8a: payload metadata table - single source of truth for
-        // the 9 payload types. Fields: name (display, uppercase), short
-        // (4-letter badge text for the drop-zone indicator), desc (effect
+        // all payload types. Fields: name (display, uppercase), short
+        // (badge text for the drop-zone indicator), desc (effect
         // description for tooltips), cost (in credits, shop price), color
-        // (in-game + tooltip header color), icon (integer 0..8 passed to
-        // SVG_ICONS.getPayloadIcon). Order matches the existing
-        // updateShop / updateHUD / triggerSlotCollected PA-case arrays, so
-        // the icon index here is consistent with the current visual layout.
-        // 8a uses this for tooltips; 8b will refactor updateShop +
-        // updateHUD to read from it; 8c will use it for the buy-handler
-        // dedup and the all-on-drop flag application.
+        // (in-game + tooltip header color), icon (string key passed to
+        // SVG_ICONS.getPayloadIcon, e.g. 'scrambler' → PAYLOAD_SCRAMBLER).
+        // Phase P1: added chain_reaction, synergy, magnetize. Changed icon
+        // from integer index to string key to fix getPayloadIcon lookup
+        // (was falling through to scrambler for all payloads).
         PAYLOADS: {
-            scrambler: { name: 'SCRAMBLER',  short: 'SCRAM',  desc: 'Reverses ball direction on first peg hit.',        cost:  80, color: '#ff6600', icon: 0 },
-            trojan:    { name: 'TROJAN',     short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',     cost: 140, color: '#ff2244', icon: 1 },
-            worm:      { name: 'WORM',       short: 'WORM',   desc: 'Ball passes through pegs without bouncing.',      cost: 180, color: '#00ff88', icon: 2 },
-            logicbomb: { name: 'LOGIC BOMB', short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',     cost: 220, color: '#ffff00', icon: 3 },
-            daemon:    { name: 'DAEMON',     short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).', cost: 130, color: '#9944ff', icon: 4 },
-            ghost:     { name: 'GHOST',      short: 'GHOST',  desc: 'Ball phases through pegs (lifetime).',            cost: 100, color: '#88ddff', icon: 5 },
-            cluster:   { name: 'CLUSTER',    short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',    cost: 180, color: '#ff00ff', icon: 6 },
-            explosive: { name: 'EXPLOSIVE',  short: 'EXPL',   desc: 'Chain-destroys nearby pegs on first peg hit.',    cost: 180, color: '#ff4444', icon: 7 },
-            slowmo:    { name: 'SLOWMO',     short: 'SLOW',   desc: 'Slows the ball to half speed (lifetime).',        cost: 150, color: '#00fff2', icon: 8 }
+            // Balance pass: cost increases. Cheap (90-110), Mid (140-180),
+            // Premium (200-250). At 4% credit rate, fl 1 earns ~280cr
+            // (2 cheap), fl 5 earns ~392cr (2 cheap + 1 mid), fl 10 earns
+            // ~532cr (2 cheap + 2 mid). Payloads feel like investments.
+            scrambler:      { name: 'RICOCHET',       short: 'RCHET',  desc: 'Ball gets 3 smart bounces toward unhit pegs on first hit.',           cost:  90, color: '#ff6600', icon: 'scrambler' },
+            trojan:         { name: 'TROJAN',         short: 'TROJ',   desc: 'Spawns 2 clone mini-balls on first peg hit.',                       cost: 150, color: '#ff2244', icon: 'trojan' },
+            worm:           { name: 'TUNNEL',         short: 'TUNL',   desc: 'Pass through pegs (tagged = 2× score). Tagged pegs explode on exit.', cost: 220, color: '#00ff88', icon: 'worm' },
+            logicbomb:      { name: 'LOGIC BOMB',     short: 'L.BOMB', desc: 'Triples the current score on first peg hit.',                       cost: 250, color: '#ffff00', icon: 'logic_bomb' },
+            daemon:         { name: 'DAEMON',         short: 'DAEMON', desc: 'Shields the ball from overflow exit (lifetime).',                   cost: 140, color: '#9944ff', icon: 'daemon' },
+            ghost:          { name: 'PHASE',          short: 'PHASE',  desc: 'Phase through pegs + warp back to drop zone once for a second pass.', cost: 110, color: '#88ddff', icon: 'ghost' },
+            cluster:        { name: 'CLUSTER',        short: 'CLUST',  desc: 'Splits into 3 mini-balls shortly after drop.',                      cost: 200, color: '#ff00ff', icon: 'cluster' },
+            explosive:      { name: 'DETONATOR',      short: 'DETON',  desc: 'Each peg hit triggers a targeted explosion. Boom on every bounce.',   cost: 200, color: '#ff4444', icon: 'explosive' },
+            slowmo:         { name: 'STASIS',         short: 'STAS',   desc: 'Freeze mid-air 30 frames, attract pegs, resume at half speed.',      cost: 170, color: '#00fff2', icon: 'slowmo' },
+            // --- Phase P1: peg-interaction payloads ---
+            chain_reaction: { name: 'CHAIN REACTION', short: 'C.RXN',  desc: 'Each peg hit triggers an AoE explosion (30px). Affected pegs score 50%.', cost: 240, color: '#ff4444', icon: 'chain_reaction' },
+            synergy:        { name: 'SYNERGY',        short: 'SYNR',   desc: 'Cache, Ice, Fiber, and Honeycomb pegs give 2× score.',              cost: 180, color: '#88ddff', icon: 'synergy' },
+            magnetize:      { name: 'MAGNETIZE',      short: 'MAGN',   desc: 'Pegs within 80px are attracted toward the ball (lifetime).',        cost: 170, color: '#00ccff', icon: 'magnetize' }
         },
         SCR: {M:'MENU', P:'PLAYING', FC:'FLOOR_COMPLETE', SH:'SHOP', RE:'RUN_END', TU:'TUTORIAL'},
         DZY: 50,
@@ -1896,6 +1902,22 @@
                     this._sweep(800, 200, 0.3, 0.2, 'sawtooth', 800);
                     this._sub(60, 0.3, 0.2, 30);
                     break;
+                case 'chain_reaction':
+                    // Staccato burst — 3 rapid ticks building tension
+                    this._tone(600, 0.04, 'square', 0.15);
+                    setTimeout(function() { self._tone(800, 0.04, 'square', 0.18); }, 40);
+                    setTimeout(function() { self._tone(1000, 0.04, 'square', 0.2); }, 80);
+                    this._noise(0.06, 0.1, 4000);
+                    break;
+                case 'synergy':
+                    // Metallic ping — single resonant bell
+                    this._bell(1200, 0.25, 0.2);
+                    break;
+                case 'magnetize':
+                    // Deep pull — rising sub-bass + soft sweep
+                    this._sub(40, 0.5, 0.25, 80);
+                    this._sweep(200, 600, 0.3, 0.12, 'sine');
+                    break;
             }
         },
 
@@ -1950,6 +1972,23 @@
                     // Time-warp sound (rising then falling)
                     this._sweep(400, 1200, 0.15, 0.2, 'sine', 1000);
                     setTimeout(function() { self._sweep(1200, 400, 0.2, 0.18, 'sine', 1000); }, 150);
+                    break;
+                case 'chain_reaction':
+                    // Expansion boom — kick + sub + noise crack
+                    this._kick(0.3, 0.4);
+                    this._sub(60, 0.3, 0.35, 30);
+                    this._noise(0.1, 0.2, 3000);
+                    break;
+                case 'synergy':
+                    // Crystalline bell chime — 3 harmonics
+                    this._bell(1400, 0.2, 0.3);
+                    setTimeout(function() { self._bell(2100, 0.15, 0.2); }, 40);
+                    setTimeout(function() { self._bell(2800, 0.12, 0.15); }, 80);
+                    break;
+                case 'magnetize':
+                    // Sustained pull — deep oscillating hum
+                    this._sub(80, 0.4, 0.3, 60);
+                    this._tone(160, 0.3, 'sine', 0.15, 120);
                     break;
             }
         },
@@ -3220,6 +3259,22 @@
         // to true on first peg contact in Peg.hit for worm/ghost.
         this.wormActivated = false;
         this.ghostActivated = false;
+        // Phase P1: peg-interaction payload flags (set in dropBall)
+        this.chainReaction = false; // AoE explosion on every peg hit
+        this.synergy = false;       // 2× score on Cache/Ice/Fiber/Honeycomb
+        this.magnetize = false;     // attract pegs toward ball (lifetime)
+        // Phase P2: one-shot activation sound flags for new payloads
+        this.chainReactionActivated = false;
+        this.synergyActivated = false;
+        // Phase P3: reworked payload flags (set in dropBall)
+        this.ricochet = false;          // ricochet: smart bounces toward unhit pegs
+        this.ricochetBounces = 0;       // ricochet: remaining smart bounces (3)
+        this.tunnelTagged = [];         // tunnel: peg IDs tagged for exit explosion
+        this.stasis = false;            // stasis: time-freeze + peg attraction
+        this.stasisTimer = 0;           // stasis: frames remaining in freeze
+        this.stasisActivated = false;   // stasis: one-shot activation sound
+        this.detonator = false;         // detonator: per-hit targeted explosion
+        this.phaseWarps = 0;            // phase: remaining warp-backs (1 for ghost rework)
     }
 
     Ball.prototype.update = function(dt) {
@@ -3232,7 +3287,39 @@
         // touch physics - only scaling dt60 does. Note this is independent
         // of `this.slow` (the ice peg's 500ms transient slow) further down.
         if (this.slowmoMode) dt60 *= 0.5;
-        
+
+        // Phase P3: Stasis freeze. When stasisTimer > 0, the ball is
+        // frozen in mid-air (zero velocity, no gravity). Pegs within
+        // 40px are attracted toward the ball at 3px/frame (faster than
+        // Magnetize's 2px). After the timer expires, the ball resumes
+        // at half speed (slowmoMode is set). Creates a "hang time"
+        // moment where pegs visibly cluster around the frozen ball.
+        if (this.stasis && this.stasisTimer > 0) {
+            this.stasisTimer--;
+            this.vx = 0;
+            this.vy = 0;
+            // Attract pegs toward the frozen ball
+            var stasisR = 40;
+            var stasisStr = 3;
+            for (var si = 0; si < GS.bd.length; si++) {
+                var sp2 = GS.bd[si];
+                if (sp2.removed || sp2.y >= C.SY) continue;
+                var sdx = this.x - sp2.x;
+                var sdy = this.y - sp2.y;
+                var sDist = Math.sqrt(sdx * sdx + sdy * sdy);
+                if (sDist < stasisR && sDist > 0) {
+                    sp2.x += (sdx / sDist) * stasisStr;
+                    sp2.y += (sdy / sDist) * stasisStr;
+                }
+            }
+            // Skip all physics while frozen
+            return;
+        }
+        // After stasis expires, apply half speed for remaining lifetime
+        if (this.stasis && this.stasisTimer <= 0 && this.stasisActivated) {
+            dt60 *= 0.5;
+        }
+
         // Apply gravity with OVERCLOCK modifier
         this.vy += C.G * GS.gravityMult * dt60;
         
@@ -3251,7 +3338,31 @@
         this.y += this.vy * dt60;
         this.tr.push({x: this.x, y: this.y});
         if (this.tr.length > 10) this.tr.shift();
-        
+
+        // --- Phase P1: Magnetize payload ---
+        // Attract pegs within 80px toward the ball at 2px/frame.
+        // Peg positions are permanently modified — pulled pegs stay
+        // in their new position after the ball exits, reshaping the
+        // board for future balls. Wall row pegs (y >= C.SY) are
+        // unaffected (they're structural, not gameplay). The attraction
+        // runs before collision detection so pegs are closer when the
+        // overlap check fires.
+        if (this.magnetize) {
+            var magR = 80;
+            var magStr = 2;
+            for (var mi = 0; mi < GS.bd.length; mi++) {
+                var mp = GS.bd[mi];
+                if (mp.removed || mp.y >= C.SY) continue;
+                var mdx = this.x - mp.x;
+                var mdy = this.y - mp.y;
+                var mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+                if (mDist < magR && mDist > 0) {
+                    mp.x += (mdx / mDist) * magStr;
+                    mp.y += (mdy / mDist) * magStr;
+                }
+            }
+        }
+
         // Check if ball entered slot zone. On first entry, remember the slot
         // index in `shieldedSlot` so the same-slot guard below can suppress
         // a duplicate trigger if the ball gets bounced back by a shield and
@@ -3270,7 +3381,7 @@
                 // bounce, so this is a clean death).
             } else {
                 if (this.shieldedSlot === -1) this.shieldedSlot = slotIdx;
-                checkSlot(this.x, this.y);
+                checkSlot(this.x, this.y, this);
             }
         }
         
@@ -3338,6 +3449,64 @@
                 createFloat(this.x, this.y, 'SHIELDED!', '#00fff2');
                 return;
             }
+
+            // Phase P3: Phase warp-back. If the ball has phaseWarps
+            // remaining, warp back to the drop zone instead of dying.
+            // Resets position, velocity, and slot state so the ball
+            // gets a clean second pass through the peg field. The
+            // ghostMode flag stays active so it continues phasing.
+            // phaseWarps decrements so it only warps once.
+            if (this.phaseWarps && this.phaseWarps > 0) {
+                this.phaseWarps--;
+                this.y = C.DZY + 10;
+                this.x = GS.mouseX || C.W / 2;
+                this.vx = 0;
+                this.vy = 2;
+                this.slotChecked = false;
+                this.shieldedSlot = -1;
+                this.tr = [];
+                createFloat(this.x, this.y, 'PHASE!', '#88ddff');
+                Audio.playPayloadActivate('ghost');
+                spawnPayloadRing(this.x, this.y, '#88ddff', 100);
+                return;
+            }
+
+            // Phase P3: Tunnel exit explosion. When the ball dies,
+            // all tagged pegs explode in a chain reaction. Each tagged
+            // peg is destroyed with a score bonus and explosion FX.
+            // The chain creates a satisfying "cascade" visual as
+            // pegs detonate one after another.
+            if (this.tunnelTagged && this.tunnelTagged.length > 0) {
+                var tunnelBonus = Math.floor(200 * (GS.cc + 1) * (GS.fa ? 3 : 1));
+                var tunnelDelay = 0;
+                for (var ti = 0; ti < this.tunnelTagged.length; ti++) {
+                    var tagId = this.tunnelTagged[ti];
+                    for (var tj = 0; tj < GS.bd.length; tj++) {
+                        if (GS.bd[tj].id === tagId) {
+                            var tp = GS.bd[tj];
+                            GS.sc += tunnelBonus;
+                            GS.obj.prg++;
+                            createFloat(tp.x, tp.y, 'TUNNEL +' + tunnelBonus, '#00ff88');
+                            createFrag(tp.x, tp.y);
+                            spawnParticles('#00ff88', tp.x, tp.y, 10, 3);
+                            // Stagger the visual explosion for cascade effect
+                            (function(px, py, delay) {
+                                setTimeout(function() {
+                                    spawnPayloadRing(px, py, '#00ff88', 50);
+                                }, delay);
+                            })(tp.x, tp.y, tunnelDelay);
+                            GS.bd.splice(tj, 1);
+                            tunnelDelay += 60;
+                            break;
+                        }
+                    }
+                }
+                if (this.tunnelTagged.length > 0) {
+                    triggerScreenShake(2);
+                    Audio.playPayloadActivate('worm');
+                }
+            }
+
             this.on = false;
         }
     };
@@ -3360,6 +3529,8 @@
         this.fiberHits = 0; // for fiber peg
         this.mirrorDir = Math.random() > 0.5 ? 1 : -1; // for mirror peg
         this.attractCount = 0; // for honeypot peg
+        this.aoeHit = false; // Phase P1: Chain Reaction AoE per-ball flag
+        this.detonate = false; // Phase P3: Detonator per-hit destruction flag
     }
     Peg.prototype.hit = function(b) {
         this.hc++;
@@ -3381,43 +3552,55 @@
             spawnPayloadRing(b.x, b.y, '#ffff00', 130);
         }
 
-        // Explosive payload: on the ball's first peg hit, chain-destroy all non-Explosive
-        // pegs within 80px of the ball's position (one-shot per ball). We do the destruction
-        // inline rather than calling triggerExplosion() because the latter only spawns
-        // fragments without actually removing the pegs — too weak for a 85cr payload.
-        // Phase 12: audio is the layered explosion (kick + multi-band noise + sub).
-        if (b && b.explosive) {
-            b.explosive = false;
-            for (let i = GS.bd.length - 1; i >= 0; i--) {
-                var p = GS.bd[i];
-                if (p === this) continue;  // skip the hit peg itself
-                var dx = p.x - b.x, dy = p.y - b.y;
-                if (dx*dx + dy*dy < 80*80 && p.t !== C.PT.E) {
-                    createFrag(p.x, p.y);
-                    GS.bd.splice(i, 1);
-                    GS.obj.prg++;
-                }
-            }
-            triggerScreenShake(4);
-            triggerWhiteFlash();
+        // Phase P3 rework: Detonator payload. Each peg hit triggers
+        // a targeted explosion at that peg's position. The hit peg is
+        // marked for destruction (peg.detonate = true) so the per-type
+        // logic below can still run before removal. After the per-type
+        // logic, the peg is destroyed with a flat score bonus of
+        // 500*(cc+1)*(frenzy?3:1), screen shake, and explosion FX.
+        // Unlike old Explosive (one-shot AoE chain), Detonator fires
+        // on EVERY peg hit — "boom on every bounce".
+        if (b && b.detonator) {
+            this.detonate = true;
             Audio.playPayloadActivate('explosive');
-            createFloat(b.x, b.y, 'BOOM', '#ff2244');
-            spawnPayloadRing(b.x, b.y, '#ff2244', 110);
         }
 
-        // Scrambler payload: on the ball's first peg hit, reverse the ball's velocity
-        // so it bounces back the way it came (one-shot per ball). Applied before the
-        // per-type branches so the per-peg bounce reflection in checkCols is skipped
-        // (Peg.hit runs before the bounce in checkCols only in terms of state, not order).
-        // Phase 12: audio is the "WHOOP" + reverse noise + glitch, more dramatic than
-        // the old simple playTeleport(). The visual ring is a signature orange.
-        if (b && b.scrambled === false) {
-            b.scrambled = true;
-            b.vx = -b.vx;
-            b.vy = -b.vy;
-            createFloat(b.x, b.y, 'SCRAM!', '#ff8844');
-            Audio.playPayloadActivate('scrambler');
-            spawnPayloadRing(b.x, b.y, '#ff8844', 90);
+        // Phase P3 rework: Ricochet payload. On the ball's first peg hit,
+        // activate ricochet mode. The ball steers toward the nearest unhit
+        // peg on each subsequent hit (up to 3 bounces). Each smart bounce
+        // sets the ball's velocity toward the target peg and decrements
+        // ricochetBounces. The effect creates a visible zigzag pattern.
+        if (b && b.ricochet && b.ricochetBounces > 0) {
+            // Find nearest unhit peg
+            var nearestPeg = null;
+            var nearestDist = Infinity;
+            for (var ri = 0; ri < GS.bd.length; ri++) {
+                var rp = GS.bd[ri];
+                if (rp === this || b.hp[rp.id]) continue;
+                if (rp.t === C.PT.D && rp.st === C.PSTATES.D) continue;
+                var rdx = rp.x - b.x;
+                var rdy = rp.y - b.y;
+                var rDist = Math.sqrt(rdx * rdx + rdy * rdy);
+                if (rDist < nearestDist) {
+                    nearestDist = rDist;
+                    nearestPeg = rp;
+                }
+            }
+            if (nearestPeg && nearestDist < 300) {
+                // Steer toward nearest unhit peg
+                var rdx2 = nearestPeg.x - b.x;
+                var rdy2 = nearestPeg.y - b.y;
+                var rDist2 = Math.sqrt(rdx2 * rdx2 + rdy2 * rdy2);
+                var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                if (rDist2 > 0 && speed > 0) {
+                    b.vx = (rdx2 / rDist2) * speed;
+                    b.vy = (rdy2 / rDist2) * speed;
+                }
+                b.ricochetBounces--;
+                createFloat(b.x, b.y, 'RICOCHET!', '#ff8844');
+                Audio.playPayloadActivate('scrambler');
+                spawnPayloadRing(b.x, b.y, '#ff8844', 70);
+            }
         }
 
         // Trojan payload: on the ball's first peg hit, spawn 2 mini-balls with random
@@ -3431,6 +3614,19 @@
             for (let i = 0; i < 2; i++) {
                 var clone = new Ball(b.x, b.y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, []);
                 clone.r = b.r * 0.6;
+                // Phase S3: Trojan minis inherit parent's payload flags.
+                // Offensive payloads (chainReaction, synergy, magnetize,
+                // ricochet, detonator, stasis) are inherited so the minis
+                // benefit from the same effects. Defensive/lifetime payloads
+                // (worm, ghostMode, trojanActive, cl) are NOT inherited to
+                // prevent recursive spawning or conflicting mechanics.
+                clone.chainReaction = b.chainReaction;
+                clone.synergy = b.synergy;
+                clone.magnetize = b.magnetize;
+                clone.ricochet = b.ricochet;
+                clone.ricochetBounces = b.ricochetBounces;
+                clone.detonator = b.detonator;
+                clone.stasis = b.stasis;
                 b.mb.push(clone);
             }
             createFloat(b.x, b.y, 'TROJAN!', '#ff2244');
@@ -3443,10 +3639,17 @@
         // but the hit still registers here (combos work, Peg.hit
         // runs). Fire the activation sound once on the first peg
         // contact so the player hears "worm engaged" exactly once.
-        if (b && b.worm && !b.wormActivated) {
-            b.wormActivated = true;
-            Audio.playPayloadActivate('worm');
-            spawnPayloadRing(b.x, b.y, '#00ff88', 100);
+        // Phase P3: Tunnel — each peg hit is tagged for exit explosion.
+        if (b && b.worm) {
+            // Tag this peg for exit explosion (Tunnel mechanic)
+            if (b.tunnelTagged && b.tunnelTagged.indexOf(this.id) === -1) {
+                b.tunnelTagged.push(this.id);
+            }
+            if (!b.wormActivated) {
+                b.wormActivated = true;
+                Audio.playPayloadActivate('worm');
+                spawnPayloadRing(b.x, b.y, '#00ff88', 100);
+            }
         }
 
         // Ghost activation: one-shot per ball. Ghost balls phase
@@ -3457,6 +3660,20 @@
             b.ghostActivated = true;
             Audio.playPayloadActivate('ghost');
             spawnPayloadRing(b.x, b.y, '#88ddff', 100);
+        }
+
+        // Phase P3: Stasis activation. On the ball's first peg hit,
+        // freeze the ball in mid-air for 30 frames. During the freeze,
+        // pegs within 40px are attracted toward the ball (like
+        // Magnetize). After the freeze, the ball resumes at half speed.
+        // Creates a "hang time" moment where pegs cluster around the
+        // ball, then a burst of hits as the ball resumes.
+        if (b && b.stasis && !b.stasisActivated) {
+            b.stasisActivated = true;
+            b.stasisTimer = 30;
+            Audio.playPayloadActivate('slowmo');
+            spawnPayloadRing(b.x, b.y, '#00fff2', 80);
+            createFloat(b.x, b.y - 20, 'STASIS!', '#00fff2');
         }
 
         // Track peg types hit for achievements
@@ -3503,10 +3720,17 @@
         // Update combo indicator
         comboIndicator.timer = 30;
         comboIndicator.scale = 1.3;
-        
+
+        // Phase P1: Synergy payload tracks the per-type bonus amount
+        // so it can be doubled after the branch. Initialized to 0;
+        // set inside eligible branches (Cache, Ice, Fiber, Honeycomb).
+        var synergyBonusAmount = 0;
+
         if (this.t === C.PT.C) {
-            GS.sc += 200 + GS.cc * 50;
-            createFloat(this.x, this.y, '+' + (200 + GS.cc * 50), '#ffff00');
+            var cacheBonus = 200 + GS.cc * 50;
+            synergyBonusAmount = cacheBonus;
+            GS.sc += cacheBonus;
+            createFloat(this.x, this.y, '+' + cacheBonus, '#ffff00');
         } else if (this.t === C.PT.S) {
             GS.sc += 100;
             createFloat(this.x, this.y, '+100', '#ff6600');
@@ -3549,8 +3773,10 @@
         } else if (this.t === C.PT.I) {
             // ICE PEG: Freezes ball briefly, bonus on second hit
             if (this.frozen) {
-                GS.sc += 150 + GS.cc * 75;
-                createFloat(this.x, this.y, 'FROZEN! +' + (150 + GS.cc * 75), '#88ddff');
+                var iceBonus = 150 + GS.cc * 75;
+                synergyBonusAmount = iceBonus;
+                GS.sc += iceBonus;
+                createFloat(this.x, this.y, 'FROZEN! +' + iceBonus, '#88ddff');
                 this.frozen = false;
             } else {
                 GS.sc += bonus;
@@ -3565,8 +3791,10 @@
             // FIBER PEG: Multi-hit bonus, breaks after 3 hits
             this.fiberHits++;
             if (this.fiberHits >= 3) {
-                GS.sc += 300 + GS.cc * 100;
-                createFloat(this.x, this.y, 'FIBER BREAK! +' + (300 + GS.cc * 100), '#ff8844');
+                var fiberBonus = 300 + GS.cc * 100;
+                synergyBonusAmount = fiberBonus;
+                GS.sc += fiberBonus;
+                createFloat(this.x, this.y, 'FIBER BREAK! +' + fiberBonus, '#ff8844');
                 // Spawn shatter/debris effect
                 spawnShatterDebris(this);
                 // Remove peg
@@ -3587,8 +3815,10 @@
             // HONEYCOMB PEG: Attracts nearby pegs, bonus on 5th hit
             this.attractCount++;
             if (this.attractCount >= 5) {
-                GS.sc += 500 + GS.cc * 150;
-                createFloat(this.x, this.y, 'HONEYCOMB! +' + (500 + GS.cc * 150), '#ffcc00');
+                var honeyBonus = 500 + GS.cc * 150;
+                synergyBonusAmount = honeyBonus;
+                GS.sc += honeyBonus;
+                createFloat(this.x, this.y, 'HONEYCOMB! +' + honeyBonus, '#ffcc00');
                 // Spawn honeycomb burst effect
                 for (let i = 0; i < 6; i++) {
                     var angle = (i / 6) * Math.PI * 2;
@@ -3639,6 +3869,81 @@
         } else {
             GS.sc += bonus;
         }
+
+        // --- Phase P3: Detonator destruction ---
+        // If the Detonator flag is set on this peg, destroy it with
+        // a flat score bonus and explosion FX. This runs AFTER the
+        // per-type logic so the peg's special effects (cache bonus,
+        // seismic shockwave, etc.) still fire before destruction.
+        if (this.detonate) {
+            var detBonus = Math.floor(500 * (GS.cc + 1) * (GS.fa ? 3 : 1));
+            GS.sc += detBonus;
+            GS.obj.prg++;
+            createFloat(this.x, this.y, 'DETONATE +' + detBonus, '#ff2244');
+            triggerScreenShake(3);
+            spawnPayloadRing(this.x, this.y, '#ff2244', 80);
+            spawnParticles('#ff2244', this.x, this.y, 16, 4);
+            createFrag(this.x, this.y);
+            // Remove the peg from the board
+            var detIdx = GS.bd.indexOf(this);
+            if (detIdx !== -1) GS.bd.splice(detIdx, 1);
+        }
+
+        // --- Phase P1: Synergy payload ---
+        // Double the per-type bonus for Cache, Ice, Fiber, Honeycomb.
+        // The synergyBonusAmount is set inside the per-type branch
+        // (before the GS.sc +=) so it captures only the type-specific
+        // bonus, not the base pegBasePoints hit. This way a Cache hit
+        // at cc=0 gives 50 + 200 + 200 = 450 (base + bonus + synergy)
+        // instead of 50 + 200 + 250 = 500 (which would double the
+        // base too).
+        if (b && b.synergy && synergyBonusAmount > 0) {
+            GS.sc += synergyBonusAmount;
+            createFloat(this.x, this.y - 20, '2× +' + synergyBonusAmount, '#88ddff');
+            // Audio: crystalline bell chime on first synergy activation
+            if (!b.synergyActivated) {
+                b.synergyActivated = true;
+                Audio.playPayloadActivate('synergy');
+            }
+            spawnPayloadRing(this.x, this.y, '#88ddff', 50);
+        }
+
+        // --- Phase P1: Chain Reaction AoE ---
+        // After the per-peg-type logic, trigger an AoE explosion at the
+        // peg's position. Affected pegs within 30px score at 50% of
+        // their base value (before combo/frenzy). Each peg can only be
+        // AoE-hit once per ball (aoeHit flag) to prevent cascades.
+        // The AoE hit counts toward objectives and pegsHit.
+        if (b && b.chainReaction && !this.aoeHit) {
+            var aoeR = 30;
+            var aoeScorePct = 0.5;
+            // Play activation sound once on first AoE trigger
+            if (!b.chainReactionActivated) {
+                b.chainReactionActivated = true;
+                Audio.playPayloadActivate('chain_reaction');
+            }
+            for (var ai = 0; ai < GS.bd.length; ai++) {
+                var ap = GS.bd[ai];
+                if (ap === this || ap.aoeHit || ap.removed) continue;
+                var adx = ap.x - this.x;
+                var ady = ap.y - this.y;
+                if (adx * adx + ady * ady < aoeR * aoeR) {
+                    ap.aoeHit = true;
+                    var aoePts = Math.floor(pegBasePoints() * aoeScorePct * (GS.cc + 1) * (GS.fa ? 3 : 1));
+                    GS.sc += aoePts;
+                    GS.obj.prg++;
+                    GS.pegsHit++;
+                    PERSIST.totalPegsHit++;
+                    createFloat(ap.x, ap.y - 12, '+' + aoePts, '#ff6644');
+                    spawnParticles('#ff4444', ap.x, ap.y, 6, 2);
+                    spawnPayloadRing(ap.x, ap.y, '#ff4444', 40);
+                }
+            }
+            // Visual: explosion ring at the source peg
+            spawnParticles('#ff4444', this.x, this.y, 12, 3);
+            spawnPayloadRing(this.x, this.y, '#ff4444', 60);
+        }
+
         if (this.st < C.PSTATES.EX) this.st++;
         spawnParticles(C.PC[this.t] || '#00fff2', this.x, this.y, 20, 4);
     };
@@ -3877,7 +4182,10 @@
         // (5 balls * ~6 hits/ball = 30 max). New curve: fl 1=13, fl 5=19,
         // fl 10=27, fl 12=30. Softens the late-game grind without
         // trivialising it.
-        var t = 12 + Math.floor(GS.fl * 1.5);
+        // Balance pass: steeper curve (1.6 multiplier, was 1.5).
+        // fl 1=13, fl 5=20, fl 10=28, fl 15=36, fl 20=44.
+        // By fl 15, players need payloads to clear comfortably.
+        var t = 12 + Math.floor(GS.fl * 1.6);
         GS.obj = { tp: 'standard', tgt: t, prg: 0 };
         document.getElementById('ot').textContent = t;
     }
@@ -4107,15 +4415,25 @@
         if (ball.slotChecked) {
             // Already triggered slot effect in update()
         }
-        
+
         // Ball consumed
         GS.bl--;
-        
-        // Reset multiplier on ball exit (cascade)
-        GS.cc = 0;
-        GS.ct = 0;
-        GS.ctMax = 0;
-        GS.fa = false;
+
+        // Phase S2 interaction: Phase + AMPLIFY. If the ball had Phase
+        // and landed in an AMPLIFY slot, the combo persists to the next
+        // ball instead of resetting. The flag is cleared so it only
+        // persists once.
+        if (GS.phaseComboPersist) {
+            GS.phaseComboPersist = false;
+            // Don't reset combo — keep GS.cc, GS.ct, GS.ctMax, GS.fa
+            createFloat(C.W / 2, C.SY - 40, 'COMBO PERSIST!', '#88ddff');
+        } else {
+            // Reset multiplier on ball exit (cascade)
+            GS.cc = 0;
+            GS.ct = 0;
+            GS.ctMax = 0;
+            GS.fa = false;
+        }
 
         // Reset gravity modifier
         GS.gravityMult = 1;
@@ -4139,7 +4457,8 @@
     }
 
     // Check if ball entered a slot (only unlocked slots)
-    function checkSlot(bx, by) {
+    // Phase S1: ball parameter threaded through for payload+slot interactions.
+    function checkSlot(bx, by, ball) {
         // Ball must enter slot zone
         if (by < C.SY) return;
 
@@ -4150,13 +4469,14 @@
         if (!isSlotUnlocked(si)) return;
 
         var st = slots[si];
-        triggerSlotCollected(si, st);
+        triggerSlotCollected(si, st, ball);
     }
 
     // ========== EFFECTS ==========
 
     // Trigger slot effect
-    function triggerSlotCollected(slotIdx, slotType) {
+    // Phase S1: ball parameter for payload+slot interactions.
+    function triggerSlotCollected(slotIdx, slotType, ball) {
         var slotName = C.ST_NAMES[slotType];
         createFloat(getSlotX(slotIdx), C.SY + C.SH / 2, slotName, '#00fff2');
 
@@ -4172,9 +4492,23 @@
                 break;
                 
             case C.ST.AM: // AMPLIFY: +1 multiplier + 180 chain timer
+                // Phase S1: if combo >= 3, also activate frenzy for 90 frames.
+                // Phase S2 interaction: Phase + AMPLIFY. If the ball has
+                // Phase payload, flag it so the combo persists when the
+                // ball dies (instead of resetting). The next ball starts
+                // with the accumulated combo.
                 GS.cc = Math.min(GS.cc + 1, C.MAXM);
                 GS.ct = Math.max(GS.ct, C.CHAIN_T + 180);
-                createFloat(C.W / 2, C.SY - 20, '+COMBO', '#ff00ff');
+                if (ball && ball.ghostMode) {
+                    GS.phaseComboPersist = true;
+                }
+                if (GS.cc >= 3) {
+                    GS.fa = true;
+                    GS.faTimer = 90;
+                    createFloat(C.W / 2, C.SY - 30, '+COMBO +FRENZY!', '#ff00ff');
+                } else {
+                    createFloat(C.W / 2, C.SY - 20, '+COMBO', '#ff00ff');
+                }
                 break;
                 
             case C.ST.PA: // PAYLOAD: Add free payload
@@ -4207,48 +4541,110 @@
                 }
                 break;
                 
-            case C.ST.CM: // CRUMBLE: Destroy up to 3 random non-seismic/non-explosive pegs, +1 toward objective
-                var crumbleCount = 0;
-                for (let i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
-                    var p = GS.bd[i];
-                    if (p.t !== C.PT.E && p.t !== C.PT.S) {
-                        createFrag(p.x, p.y);
-                        GS.bd.splice(i, 1);
-                        crumbleCount++;
+            case C.ST.CM: // CRUMBLE: Destroy up to 3 random non-seismic/non-explosive pegs
+                // Phase S2 interaction: Chain Reaction + CRUMBLE.
+                // Instead of destroying pegs, CREATE 3 new NODE pegs
+                // at random positions in the play field. Turns Crumble
+                // from a destructive slot into a creative one when
+                // combined with Chain Reaction.
+                if (ball && ball.chainReaction) {
+                    var createCount = 0;
+                    for (var ci = 0; ci < 3; ci++) {
+                        var newPegX = 60 + Math.random() * (C.W - 120);
+                        var newPegY = C.TOP + 20 + Math.random() * (C.BOT - C.TOP - 40);
+                        var newPeg = new Peg(newPegX, newPegY, C.PT.N, GS.bd.length + ci);
+                        GS.bd.push(newPeg);
+                        spawnPayloadRing(newPegX, newPegY, '#00ff88', 30);
+                        createCount++;
                     }
+                    if (createCount > 0) GS.obj.prg++;
+                    createFloat(C.W / 2, C.SY - 20, 'CRUMBLE → CREATE!', '#00ff88');
+                } else {
+                    var crumbleCount = 0;
+                    for (let i = GS.bd.length - 1; i >= 0 && crumbleCount < 3; i--) {
+                        var p = GS.bd[i];
+                        if (p.t !== C.PT.E && p.t !== C.PT.S) {
+                            createFrag(p.x, p.y);
+                            GS.bd.splice(i, 1);
+                            crumbleCount++;
+                        }
+                    }
+                    if (crumbleCount > 0) GS.obj.prg++;
+                    createFloat(C.W / 2, C.SY - 20, 'CRUMBLE!', '#ff6600');
                 }
-                // Phase 4.5-D: was GS.obj.prg++ inside the loop (one per
-                // destroyed peg, up to 3 free progress per Crumble). Now
-                // fires once per Crumble (0 if no qualifying pegs existed).
-                if (crumbleCount > 0) GS.obj.prg++;
-                createFloat(C.W / 2, C.SY - 20, 'CRUMBLE!', '#ff6600');
                 break;
                 
             case C.ST.SH: // SHIELD: Next ball protected from overflow
+                // Phase S2 interaction: Daemon + SHIELD.
+                // If the ball has Daemon payload, the shield bounce is
+                // extra strong (vy=-12 vs normal -7) giving the ball a
+                // much better second chance.
                 GS.shielded = true;
-                createFloat(C.W / 2, C.SY - 20, 'SHIELD READY', '#00fff2');
-                // Audio: power-up shield sound
+                if (ball && ball.sh) {
+                    // Daemon ball + SHIELD slot = super bounce
+                    ball.vy = -12;
+                    ball.vx += (Math.random() - 0.5) * 8;
+                    createFloat(C.W / 2, C.SY - 20, 'SUPER SHIELD!', '#00ff88');
+                    triggerScreenShake(3);
+                    spawnPayloadRing(ball.x, ball.y, '#00ff88', 100);
+                } else {
+                    createFloat(C.W / 2, C.SY - 20, 'SHIELD READY', '#00fff2');
+                }
                 Audio.playShield();
                 break;
                 
-            case C.ST.OC: // OVERCLOCK: 1.5× gravity for this ball
-                GS.gravityMult = 1.5;
-                createFloat(C.W / 2, C.SY - 20, 'OVERCLOCK!', '#ffff00');
+            case C.ST.OC: // Phase S1 rework: MAGNETIZE slot (was OVERCLOCK)
+                // Attracts all pegs within 60px toward the ball's position
+                // for 60 frames (~1 second). Creates a cluster of pegs
+                // around the ball's landing point, setting up combos for
+                // the next ball. Pegs are permanently moved.
+                if (ball) {
+                    var magSlotR = 60;
+                    var magSlotStr = 3;
+                    for (var oi = 0; oi < GS.bd.length; oi++) {
+                        var op = GS.bd[oi];
+                        if (op.removed || op.y >= C.SY) continue;
+                        var odx = ball.x - op.x;
+                        var ody = ball.y - op.y;
+                        var oDist = Math.sqrt(odx * odx + ody * ody);
+                        if (oDist < magSlotR && oDist > 0) {
+                            op.x += (odx / oDist) * magSlotStr * 10;
+                            op.y += (ody / oDist) * magSlotStr * 10;
+                        }
+                    }
+                    createFloat(C.W / 2, C.SY - 20, 'MAGNETIZE!', '#ffff00');
+                    triggerScreenShake(2);
+                    spawnPayloadRing(ball.x, ball.y, '#ffff00', 80);
+                }
                 break;
                 
             case C.ST.JP: // JACKPOT: Win jackpot
+                // Phase S1: also give credits bonus (50 * (cc+1) * frenzy).
+                // Makes JACKPOT feel like a "big win" with both score and credits.
                 GS.sc += GS.jp;
+                var jpCreditsBonus = Math.floor(pegBasePoints() * (GS.cc + 1) * (GS.fa ? 3 : 1));
+                GS.sc += jpCreditsBonus;
                 createFloat(C.W / 2, C.SY - 30, '+JACKPOT ' + GS.jp, '#ff00ff');
+                createFloat(C.W / 2, C.SY - 10, '+' + jpCreditsBonus + ' BONUS', '#ffff00');
                 GS.jackpotWon += GS.jp;
                 GS.jackpotWins++;
-                GS.jp = Math.floor(500 * GS.fl * 1.15); // Grow jackpot for next
+                GS.jp = Math.floor(500 * GS.fl * 1.15);
                 triggerScreenShake(5);
-                // Check jackpot achievements
                 checkAchievements();
                 break;
                 
-            case C.ST.E: // EMPTY: Nothing happens
-            default:
+            case C.ST.E: // Phase S1 rework: OVERFLOW (was EMPTY)
+                // Ball gets launched back up with a strong upward kick,
+                // giving it a second chance to hit more pegs. Like a
+                // guaranteed mini-shield on every ball that lands here.
+                if (ball) {
+                    ball.vy = -10;
+                    ball.vx += (Math.random() - 0.5) * 6;
+                    ball.slotChecked = false;
+                    ball.shieldedSlot = slotIdx;
+                    createFloat(C.W / 2, C.SY - 20, 'OVERFLOW!', '#00fff2');
+                    triggerScreenShake(2);
+                }
                 break;
         }
     }
@@ -6800,6 +7196,30 @@
             }
         }
 
+        // Phase P2: Synergy peg glow. When the ball has the synergy
+        // payload, Cache/Ice/Fiber/Honeycomb pegs glow with a soft
+        // blue aura so the player can see which pegs will give 2×.
+        // Drawn on top of the pegs but under the prediction line.
+        if (GS.ball && GS.ball.synergy) {
+            var synergyTypes = [C.PT.C, C.PT.I, C.PT.F, C.PT.H];
+            var synPulse = 0.3 + Math.sin((ts || 0) / 200) * 0.15;
+            for (let si = 0; si < GS.bd.length; si++) {
+                var sp = GS.bd[si];
+                if (synergyTypes.indexOf(sp.t) !== -1 && sp.st !== C.PSTATES.D) {
+                    ctx.globalAlpha = synPulse;
+                    ctx.strokeStyle = '#88ddff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(sp.x, sp.y, sp.r + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.globalAlpha = synPulse * 0.4;
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+
         // Bounce-aware prediction line. Replaces the previous
         // free-fall-only trajectory with a real 2-bounce lookahead
         // (see simulateTrajectory / drawPredictionLine). Drawn after
@@ -6999,6 +7419,25 @@
                 ctx.fillStyle = ballColor;
             }
             
+            // Phase P2: Magnetize gravity well. Concentric rings
+            // radiating outward from the ball, pulsing to suggest
+            // attraction. Drawn before the ball body so the ball
+            // renders on top of the rings.
+            if (b.magnetize) {
+                var magPulse = (ts || 0) / 300;
+                for (let mr = 0; mr < 3; mr++) {
+                    var ringR = 20 + mr * 18 + Math.sin(magPulse + mr) * 4;
+                    var ringAlpha = 0.25 - mr * 0.07;
+                    ctx.globalAlpha = ringAlpha;
+                    ctx.strokeStyle = '#00ccff';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, ringR, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+            }
+
             // Ball body with enhanced gradient
             ctx.beginPath();
             ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -7213,8 +7652,10 @@
                 // triviality. Pairs with the Phase 4.5-K payload cost
                 // rebalance (50-120 -> 80-220) so the same run buys ~1-2
                 // premium payloads, not 6-8.
+                // Balance pass: 4% credit rate (was 5%). Tighter
+                // economy makes payload purchases feel special.
                 var floorDelta = GS.sc - (GS.lastFloorScore || 0);
-                var floorCredits = Math.floor(floorDelta / 20);
+                var floorCredits = Math.floor(floorDelta / 25);
                 GS.lastFloorScore = GS.sc;
                 GS.creditsEarned += floorCredits;
                 PERSIST.br += floorCredits;
@@ -7282,6 +7723,7 @@
         GS.pl = [];
         GS.ball = null;
         GS.gravityMult = 1;
+        GS.phaseComboPersist = false;
         GS.shielded = false;
         GS.overload = false;
         GS.whiteFlash = false;
@@ -7370,6 +7812,15 @@
         
         var newBall = new Ball(GS.mouseX, C.DZY + 10, 0, 2, pl);
 
+        // Phase P1: reset Chain Reaction AoE flags on all pegs so each
+        // ball gets fresh AoE tracking. Without this, pegs AoE-hit by a
+        // previous ball would stay flagged and be immune to AoE from
+        // subsequent balls.
+        for (var ri = 0; ri < GS.bd.length; ri++) {
+            GS.bd[ri].aoeHit = false;
+            GS.bd[ri].detonate = false;
+        }
+
         // Daily mod: small_ball shrinks the ball to 60% radius
         if (modActive('small_ball')) {
             newBall.r = C.BR * 0.6;
@@ -7377,22 +7828,25 @@
 
         // Apply payload effects to ball
         if (pl.indexOf('ghost') !== -1) {
+            // Phase P3 rework: Phase. Ball phases through pegs
+            // (ghostMode, unchanged) AND warps back to drop zone
+            // on exit (phaseWarps counter). The warp resets the
+            // ball to the top of the board with the same payload
+            // flags, giving it a second pass through the peg field.
+            // Warps once per ball (phaseWarps starts at 1).
             newBall.ghostMode = true;
+            newBall.phaseWarps = 1;
             GS.ghostEffect = true;
-            // Phase 12: ghost drop sound + signature light-blue
-            // activation ring at the ball's launch point. The ball
-            // will phase through pegs and the ring serves as the
-            // visual cue that ghost is engaged.
             Audio.playPayloadDrop('ghost');
             spawnPayloadRing(newBall.x, newBall.y, '#88ddff', 90);
         }
         if (pl.indexOf('slowmo') !== -1) {
-            newBall.slowmoMode = true;
-            GS.slowmoEffect = true;
-            // Phase 12: slowmo drop sound (stab + descending pitch)
-            // + signature cyan ring. Paired with the existing
-            // GS.slowmoEffect blue octagonal overlay that the render
-            // loop draws while the flag is true.
+            // Phase P3 rework: Stasis. Ball freezes in mid-air
+            // for 30 frames on first peg hit, pulling nearby pegs
+            // toward it (like Magnetize). After the freeze, the
+            // ball resumes at half speed. Creates a "hang time"
+            // moment where pegs cluster around the ball.
+            newBall.stasis = true;
             Audio.playPayloadDrop('slowmo');
             spawnPayloadRing(newBall.x, newBall.y, '#00fff2', 90);
         }
@@ -7418,33 +7872,38 @@
             spawnPayloadRing(newBall.x, newBall.y, '#ffff00', 70);
         }
         if (pl.indexOf('explosive') !== -1) {
-            // Explosive: on the ball's first peg hit, trigger a chain explosion
-            // at the ball's position. Peg.hit() detects b.explosive and calls
-            // triggerExplosion(b.x, b.y) plus the standard explosion FX.
-            newBall.explosive = true;
-            // Phase 12: bomb-tick + preview explosion on drop. The
-            // peg-side explosion (more dramatic) fires on activation.
+            // Phase P3 rework: Detonator. Each peg hit triggers
+            // a targeted explosion at that peg's position — the
+            // peg is destroyed for +500*(cc+1)*(frenzy?3:1) score
+            // plus screen shake. Unlike the old Explosive (one-shot
+            // AoE chain-destroy), Detonator fires on EVERY hit,
+            // making it a "boom on every bounce" payload.
+            newBall.detonator = true;
             Audio.playPayloadDrop('explosive');
             spawnPayloadRing(newBall.x, newBall.y, '#ff2244', 70);
         }
         if (pl.indexOf('scrambler') !== -1) {
-            // Scrambler: on the ball's first peg hit, reverse the ball's velocity
-            // (b.vx *= -1, b.vy *= -1) so it bounces back the way it came.
-            // b.scrambled starts false; Peg.hit() checks and flips it to true.
-            newBall.scrambled = false;
-            // Phase 12: sharp electronic "select" + small orange ring.
-            // The dramatic "WHOOP" + reverse fires on activation.
+            // Phase P3 rework: Ricochet. On first peg hit, the ball
+            // gets 3 smart bounces that steer toward the nearest
+            // unhit peg. Each smart bounce sets the ball's velocity
+            // toward the target peg and decrements ricochetBounces.
+            // The effect is visible (ball zigzags through pegs) and
+            // reliable (guaranteed 3 extra hits, unlike old Scrambler
+            // which could hurt the player).
+            newBall.ricochet = true;
+            newBall.ricochetBounces = 3;
             Audio.playPayloadDrop('scrambler');
             spawnPayloadRing(newBall.x, newBall.y, '#ff8844', 70);
         }
         if (pl.indexOf('worm') !== -1) {
-            // Worm: ball passes through pegs without bouncing. checkCols() still
-            // registers the hit (so combos and peg progression work) but skips
-            // the position correction and velocity reflection.
+            // Phase P3 rework: Tunnel. Ball passes through pegs
+            // without bouncing (worm flag, unchanged). Each peg
+            // hit is tagged (tunnelTagged array). When the ball
+            // exits, all tagged pegs explode in a chain reaction.
+            // The pass-through gives combos; the exit explosion
+            // gives a dramatic payoff.
             newBall.worm = true;
-            // Phase 12: deep sustained hum on drop + green ring.
-            // The phase-shift whoosh fires on activation (in checkCols
-            // when the ball first passes through a peg).
+            newBall.tunnelTagged = [];
             Audio.playPayloadDrop('worm');
             spawnPayloadRing(newBall.x, newBall.y, '#00ff88', 90);
         }
@@ -7469,7 +7928,34 @@
             Audio.playPayloadDrop('cluster');
             spawnPayloadRing(newBall.x, newBall.y, '#ff00ff', 90);
         }
-        
+
+        // --- Phase P1: peg-interaction payloads ---
+
+        if (pl.indexOf('chain_reaction') !== -1) {
+            // Chain Reaction: every peg hit triggers an AoE explosion
+            // (30px radius) that scores affected pegs at 50%. Peg.hit
+            // checks b.chainReaction and runs the AoE loop after the
+            // per-peg-type logic.
+            newBall.chainReaction = true;
+            Audio.playPayloadDrop('chain_reaction');
+            spawnPayloadRing(newBall.x, newBall.y, '#ff4444', 80);
+        }
+        if (pl.indexOf('synergy') !== -1) {
+            // Synergy: Cache, Ice, Fiber, Honeycomb pegs give 2× score.
+            // Peg.hit checks b.synergy and doubles the per-type bonus.
+            newBall.synergy = true;
+            Audio.playPayloadDrop('synergy');
+            spawnPayloadRing(newBall.x, newBall.y, '#88ddff', 80);
+        }
+        if (pl.indexOf('magnetize') !== -1) {
+            // Magnetize: pegs within 80px are attracted toward the ball
+            // at 2px/frame for the ball's lifetime. Implemented in
+            // Ball.update (runs every frame, not just on hit).
+            newBall.magnetize = true;
+            Audio.playPayloadDrop('magnetize');
+            spawnPayloadRing(newBall.x, newBall.y, '#00ccff', 80);
+        }
+
         if (PERSIST.multiballEnabled && GS.ball) {
             // Add to existing ball's mini-balls array for rendering
             GS.ball.mb.push(newBall);
@@ -8356,7 +8842,7 @@
         checkAchievements: checkAchievements,
         modActive: modActive, getDailySeed: getDailySeed,
         seededRandom: seededRandom, getDailyModifiers: getDailyModifiers,
-        startGame: startGame, showScreen: showScreen,
+        startGame: startGame, dropBall: dropBall, showScreen: showScreen,
         // Exposed for the render-loop regression test (ts-bug guard).
         // The functions are scoped to the IIFE, so the test suite can't
         // call them directly; exposing the .length (parameter arity) is
@@ -8367,6 +8853,7 @@
         BOARD_TEMPLATES: BOARD_TEMPLATES,
         rollPegType: rollPegType, cellToPos: cellToPos,
         triggerSlotCollected: triggerSlotCollected,
+        checkBallExit: checkBallExit,
         savePersist: savePersist, loadPersist: loadPersist,
         applyContrastMode: applyContrastMode,
         // Phase 12: SFX overhaul helpers exposed for testing.
